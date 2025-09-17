@@ -1,4 +1,4 @@
-use crate::{Square, BOARD_HEIGHT, BOARD_WIDTH};
+use crate::{square::Coord, Square};
 use std::{
     fmt::{self, Display, Formatter},
     ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not},
@@ -10,7 +10,7 @@ pub struct Bitboard(u64);
 impl Bitboard {
     pub const EMPTY: Self = Self(0);
 
-    pub const fn single(square: Square) -> Self {
+    pub fn single(square: Square) -> Self {
         Self(1 << square.index())
     }
 
@@ -19,19 +19,11 @@ impl Bitboard {
     }
 
     pub fn add(&mut self, square: Square) {
-        *self = *self | Self::single(square);
+        *self |= Self::single(square);
     }
 
     pub fn remove(&mut self, square: Square) {
-        *self = *self & !Self::single(square);
-    }
-}
-
-impl BitOr for Bitboard {
-    type Output = Self;
-
-    fn bitor(self, other: Self) -> Self::Output {
-        Self(self.0 | other.0)
+        *self &= !Self::single(square);
     }
 }
 
@@ -40,6 +32,14 @@ impl BitAnd for Bitboard {
 
     fn bitand(self, other: Self) -> Self::Output {
         Self(self.0 & other.0)
+    }
+}
+
+impl BitOr for Bitboard {
+    type Output = Self;
+
+    fn bitor(self, other: Self) -> Self::Output {
+        Self(self.0 | other.0)
     }
 }
 
@@ -79,10 +79,9 @@ impl BitXorAssign for Bitboard {
 
 impl Display for Bitboard {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        for row in 0..BOARD_HEIGHT {
-            for column in 0..BOARD_WIDTH {
-                let square = Square::from_row_column(row, column);
-                if self.contains(square) {
+        for y in 0..Coord::HEIGHT {
+            for x in 0..Coord::WIDTH {
+                if self.contains(Coord::new(x, y).into()) {
                     write!(f, "x")?;
                 } else {
                     write!(f, ".")?;

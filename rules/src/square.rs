@@ -1,4 +1,4 @@
-use crate::{ParseError, BOARD_HEIGHT, BOARD_SIZE, BOARD_WIDTH};
+use crate::ParseError;
 use std::{
     fmt::{self, Display, Formatter},
     mem,
@@ -20,34 +20,34 @@ pub enum Square {
 }
 
 impl Square {
-    pub const fn from_row_column(row: usize, column: usize) -> Self {
-        assert!(row < BOARD_HEIGHT && column < BOARD_WIDTH);
-        Self::from_index(row * BOARD_WIDTH + column)
-    }
+    pub const COUNT: usize = Coord::HEIGHT * Coord::WIDTH;
 
-    pub const fn from_index(index: usize) -> Self {
-        assert!(index < BOARD_SIZE);
-        unsafe { mem::transmute(index as u8) }
-    }
-
-    pub const fn index(self) -> usize {
+    pub fn index(self) -> usize {
         self as usize
     }
 
-    pub const fn row(self) -> usize {
-        self as usize / BOARD_WIDTH
+    pub fn from_index(index: usize) -> Self {
+        assert!(index < Self::COUNT);
+        unsafe { Self::unsafe_from_index(index) }
     }
 
-    pub const fn column(self) -> usize {
-        self as usize % BOARD_WIDTH
+    pub unsafe fn unsafe_from_index(index: usize) -> Self {
+        unsafe { mem::transmute(index as u8) }
+    }
+}
+
+impl From<Coord> for Square {
+    fn from(coord: Coord) -> Self {
+        unsafe { Self::unsafe_from_index(coord.y() * Coord::WIDTH + coord.x()) }
     }
 }
 
 impl Display for Square {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let row = char::from(b'a' + self.row() as u8);
-        let column = char::from(b'1' + self.column() as u8);
-        write!(f, "{row}{column}")
+        let coord = Coord::from(*self);
+        let x = char::from(b'1' + coord.x() as u8);
+        let y = char::from(b'a' + coord.y() as u8);
+        write!(f, "{y}{x}")
     }
 }
 
@@ -62,8 +62,73 @@ impl FromStr for Square {
         {
             return Err(ParseError);
         }
-        let row = usize::from(bytes[0] - b'a');
-        let column = usize::from(bytes[1] - b'1');
-        Ok(Self::from_row_column(row, column))
+        let y = usize::from(bytes[0] - b'a');
+        let x = usize::from(bytes[1] - b'1');
+        Ok(Coord::new(x, y).into())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Coord {
+    x: u8,
+    y: u8,
+}
+
+impl Coord {
+    pub const WIDTH: usize = 8;
+    pub const HEIGHT: usize = 8;
+
+    pub fn new(x: usize, y: usize) -> Self {
+        assert!(x < Self::WIDTH && y < Self::HEIGHT);
+
+        Self {
+            x: x as u8,
+            y: y as u8,
+        }
+    }
+
+    pub fn x(self) -> usize {
+        self.x as usize
+    }
+
+    pub fn y(self) -> usize {
+        self.y as usize
+    }
+}
+
+impl From<Square> for Coord {
+    fn from(square: Square) -> Self {
+        let index = square.index();
+        Self {
+            x: (index % Coord::WIDTH) as u8,
+            y: (index / Coord::WIDTH) as u8,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Vector {
+    x: i8,
+    y: i8,
+}
+
+impl Vector {
+    pub const MAX_X: isize = Coord::WIDTH as isize - 1;
+    pub const MAX_Y: isize = Coord::HEIGHT as isize - 1;
+
+    pub const fn new(x: isize, y: isize) -> Self {
+        assert!(x >= -Self::MAX_X && x <= Self::MAX_X && y >= -Self::MAX_Y && y <= Self::MAX_Y);
+        Self {
+            x: x as i8,
+            y: y as i8,
+        }
+    }
+
+    pub fn x(self) -> isize {
+        self.x as isize
+    }
+
+    pub fn y(self) -> isize {
+        self.y as isize
     }
 }
