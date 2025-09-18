@@ -12,4 +12,4 @@ pub use error::ParseError;
 pub use mov::{ColoredMove, ColoredOpeningMove, ColoredRegularMove, OpeningMove, RegularMove};
 pub use piece::{ColoredPiece, Piece};
 pub use position::Position;
-pub use square::Square;
+pub use square::{Coord, Square, Vector};

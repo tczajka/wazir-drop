@@ -1,4 +1,4 @@
-use crate::{square::Vector, Color, ParseError};
+use crate::{Color, ParseError, Vector};
 use std::{fmt::{self, Display, Formatter}, str::FromStr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -86,6 +86,10 @@ impl Piece {
             Self::Knight => &KNIGHT,
             Self::Wazir => &WAZIR,
         }
+    }
+
+    pub fn with_color(self, color: Color) -> ColoredPiece {
+        ColoredPiece { color, piece: self }
     }
 }
 

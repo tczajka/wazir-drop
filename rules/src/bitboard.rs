@@ -1,4 +1,4 @@
-use crate::{square::Coord, Square};
+use crate::{Coord, Square};
 use std::{
     fmt::{self, Display, Formatter},
     ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not},
