@@ -117,7 +117,10 @@ impl Position {
         let mov = match s.len() {
             3 => {
                 // Drop move.
-                let (piece_name, to) = s.split_at_checked(1).ok_or(ParseError)?;
+                if !s.is_char_boundary(1) {
+                    return Err(ParseError);
+                }
+                let (piece_name, to) = s.split_at(1);
                 let colored_piece = ColoredPiece::from_str(piece_name)?;
                 if colored_piece.color != self.to_move {
                     return Err(ParseError);
@@ -133,7 +136,10 @@ impl Position {
             }
             4 => {
                 // Jump move.
-                let (from, to) = s.split_at_checked(2).ok_or(ParseError)?;
+                if !s.is_char_boundary(2) {
+                    return Err(ParseError);
+                }
+                let (from, to) = s.split_at(2);
                 let from = Square::from_str(from)?;
                 let to = Square::from_str(to)?;
 
