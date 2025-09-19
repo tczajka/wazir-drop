@@ -1,5 +1,5 @@
-use rules::{ParseError, Piece, Position, RegularMove, Square};
 use std::str::FromStr;
+use zero_point_one::{ParseError, Piece, Position, RegularMove, Square};
 
 #[test]
 fn test_display_from_str() {

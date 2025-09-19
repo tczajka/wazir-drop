@@ -1,3 +1,6 @@
-[workspace]
-members = ["rules", "submission"]
-resolver = "2"
+[package]
+name = "zero-point-one"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]

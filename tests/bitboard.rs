@@ -1,4 +1,4 @@
-use rules::{Bitboard, Square};
+use zero_point_one::{Bitboard, Square};
 
 #[test]
 fn test_empty() {

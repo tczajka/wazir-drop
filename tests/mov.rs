@@ -1,5 +1,5 @@
-use rules::{ColoredOpeningMove, OpeningMove, ParseError, Piece};
 use std::str::FromStr;
+use zero_point_one::{ColoredOpeningMove, OpeningMove, ParseError, Piece};
 
 #[test]
 fn test_opening_move_size_matches_piece_initial_count() {

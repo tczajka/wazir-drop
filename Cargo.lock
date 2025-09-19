@@ -3,12 +3,5 @@
 version = 4
 
 [[package]]
-name = "rules"
+name = "zero-point-one"
 version = "0.1.0"
-
-[[package]]
-name = "submission"
-version = "0.1.0"
-dependencies = [
- "rules",
-]

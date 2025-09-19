@@ -1,5 +1,5 @@
-use rules::{ParseError, Square};
 use std::str::FromStr;
+use zero_point_one::{ParseError, Square};
 
 #[test]
 fn test_display() {
