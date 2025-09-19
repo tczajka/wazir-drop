@@ -1,4 +1,4 @@
-use zero_point_one::{Bitboard, Square};
+use wazir_drop::{Bitboard, Square};
 
 #[test]
 fn test_empty() {

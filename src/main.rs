@@ -1,4 +1,4 @@
-use zero_point_one::Position;
+use wazir_drop::Position;
 
 fn main() {
     println!("Hello, world!");
