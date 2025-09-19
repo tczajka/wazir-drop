@@ -1,4 +1,4 @@
-use crate::ParseError;
+use crate::{unsafe_simple_enum, ParseError};
 use std::{
     fmt::{self, Display, Formatter},
     str::FromStr,
@@ -11,21 +11,9 @@ pub enum Color {
     Blue,
 }
 
+unsafe_simple_enum!(Color, 2);
+
 impl Color {
-    pub const COUNT: usize = 2;
-
-    pub fn index(self) -> usize {
-        self as usize
-    }
-
-    pub fn from_index(index: usize) -> Self {
-        match index {
-            0 => Self::Red,
-            1 => Self::Blue,
-            _ => panic!("Invalid Color index"),
-        }
-    }
-
     pub fn opposite(self) -> Self {
         match self {
             Self::Red => Self::Blue,

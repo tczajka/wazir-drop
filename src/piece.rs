@@ -1,4 +1,4 @@
-use crate::{Color, ParseError, Vector};
+use crate::{unsafe_simple_enum, Color, ParseError, Vector};
 use std::{fmt::{self, Display, Formatter}, str::FromStr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -11,24 +11,9 @@ pub enum Piece {
     Wazir,
 }
 
+unsafe_simple_enum!(Piece, 5);
+
 impl Piece {
-    pub const COUNT: usize = 5;
-
-    pub fn index(self) -> usize {
-        self as usize
-    }
-
-    pub fn from_index(index: usize) -> Self {
-        match index {
-            0 => Self::Alfil,
-            1 => Self::Dabbaba,
-            2 => Self::Ferz,
-            3 => Self::Knight,
-            4 => Self::Wazir,
-            _ => panic!("Invalid PieceType index"),
-        }
-    }
-
     pub fn initial_count(self) -> usize {
         match self {
             Self::Alfil => 8,

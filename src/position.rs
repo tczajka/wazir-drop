@@ -1,9 +1,8 @@
 use crate::{
-    mov::Move, Bitboard, Color, ColoredMove, ColoredOpeningMove, ColoredPiece, ColoredRegularMove,
-    Coord, OpeningMove, ParseError, Piece, RegularMove, Square,
+    enum_map::EnumMap, mov::Move, Bitboard, Color, ColoredMove, ColoredOpeningMove, ColoredPiece,
+    ColoredRegularMove, Coord, Enum, OpeningMove, ParseError, Piece, RegularMove, Square,
 };
 use std::{
-    array,
     fmt::{self, Display, Formatter},
     str::FromStr,
 };
@@ -40,15 +39,15 @@ impl FromStr for Stage {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct PositionSide {
-    piece_bitboards: [Bitboard; Piece::COUNT],
-    num_captured: [u8; Piece::COUNT],
+    piece_bitboards: EnumMap<Piece, Bitboard>,
+    num_captured: EnumMap<Piece, u8>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Position {
     stage: Stage,
     to_move: Color,
-    sides: [PositionSide; 2],
+    sides: EnumMap<Color, PositionSide>,
 }
 
 impl Position {
@@ -61,14 +60,10 @@ impl Position {
     }
 
     pub fn colored_piece(&self, square: Square) -> Option<ColoredPiece> {
-        for color_index in 0..Color::COUNT {
-            let side = &self.sides[color_index];
-            for piece_index in 0..Piece::COUNT {
-                if side.piece_bitboards[piece_index].contains(square) {
-                    return Some(ColoredPiece {
-                        color: Color::from_index(color_index),
-                        piece: Piece::from_index(piece_index),
-                    });
+        for (color, side) in self.sides.iter() {
+            for (piece, bitboard) in side.piece_bitboards.iter() {
+                if bitboard.contains(square) {
+                    return Some(ColoredPiece { color, piece });
                 }
             }
         }
@@ -76,7 +71,7 @@ impl Position {
     }
 
     pub fn num_captured(&self, colored_piece: ColoredPiece) -> usize {
-        self.sides[colored_piece.color.index()].num_captured[colored_piece.piece.index()].into()
+        self.sides[colored_piece.color].num_captured[colored_piece.piece].into()
     }
 
     pub fn is_legal_regular_move(&self, mov: RegularMove) -> bool {
@@ -205,13 +200,10 @@ impl Display for Position {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "{}", self.stage)?;
         writeln!(f, "{}", self.to_move)?;
-        for color_index in 0..Color::COUNT {
-            for piece_index in 0..Piece::COUNT {
-                let colored_piece = ColoredPiece {
-                    color: Color::from_index(color_index),
-                    piece: Piece::from_index(piece_index),
-                };
-                for _ in 0..self.num_captured(colored_piece) {
+        for (color, side) in self.sides.iter() {
+            for (piece, &count) in side.num_captured.iter() {
+                let colored_piece = ColoredPiece { color, piece };
+                for _ in 0..count {
                     write!(f, "{colored_piece}")?;
                 }
             }
@@ -246,19 +238,22 @@ impl FromStr for Position {
         let mut position = Position {
             stage,
             to_move,
-            sides: [PositionSide {
-                piece_bitboards: [Bitboard::EMPTY; Piece::COUNT],
-                num_captured: [0; Piece::COUNT],
-            }; 2],
+            sides: EnumMap::from_array(
+                [PositionSide {
+                    piece_bitboards: EnumMap::from_array([Bitboard::EMPTY; Piece::COUNT]),
+                    num_captured: EnumMap::from_array([0; Piece::COUNT]),
+                }; Color::COUNT],
+            ),
         };
 
-        let mut remaining_pieces: [usize; Piece::COUNT] =
-            array::from_fn(|i| Color::COUNT * Piece::from_index(i).initial_count());
+        // TODO: In opening, piece counts are different.
+        let mut remaining_pieces: EnumMap<Piece, usize> = EnumMap::from_array([0; Piece::COUNT]);
+        for (piece, r) in remaining_pieces.iter_mut() {
+            *r = 2 * piece.initial_count();
+        }
 
         // Parse captured pieces.
-        for color_index in 0..Color::COUNT {
-            let color = Color::from_index(color_index);
-            let side = &mut position.sides[color_index];
+        for (color, side) in position.sides.iter_mut() {
             let line = lines.next().ok_or(ParseError)?;
             for i in 0..line.len() {
                 let piece_name = line.get(i..i + 1).ok_or(ParseError)?;
@@ -266,12 +261,11 @@ impl FromStr for Position {
                 if colored_piece.color != color {
                     return Err(ParseError);
                 }
-                let piece_index = colored_piece.piece.index();
-                if remaining_pieces[piece_index] == 0 {
+                if remaining_pieces[colored_piece.piece] == 0 {
                     return Err(ParseError);
                 }
-                remaining_pieces[piece_index] -= 1;
-                side.num_captured[piece_index] += 1;
+                remaining_pieces[colored_piece.piece] -= 1;
+                side.num_captured[colored_piece.piece] += 1;
             }
         }
 
@@ -288,12 +282,11 @@ impl FromStr for Position {
                     continue;
                 }
                 let colored_piece = ColoredPiece::from_str(piece_name)?;
-                let piece_index = colored_piece.piece.index();
-                if remaining_pieces[piece_index] == 0 {
+                if remaining_pieces[colored_piece.piece] == 0 {
                     return Err(ParseError);
                 }
-                remaining_pieces[piece_index] -= 1;
-                position.sides[colored_piece.color.index()].piece_bitboards[piece_index]
+                remaining_pieces[colored_piece.piece] -= 1;
+                position.sides[colored_piece.color].piece_bitboards[colored_piece.piece]
                     .add(square);
             }
         }
@@ -302,7 +295,7 @@ impl FromStr for Position {
             return Err(ParseError);
         }
 
-        if remaining_pieces.iter().any(|&n| n != 0) {
+        if remaining_pieces.iter().any(|(_, &r)| r != 0) {
             return Err(ParseError);
         }
 

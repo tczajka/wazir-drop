@@ -1,7 +1,6 @@
-use crate::ParseError;
+use crate::{enum_map::Enum, unsafe_simple_enum, ParseError};
 use std::{
     fmt::{self, Display, Formatter},
-    mem,
     str::FromStr,
 };
 
@@ -19,26 +18,11 @@ pub enum Square {
     H1, H2, H3, H4, H5, H6, H7, H8,
 }
 
-impl Square {
-    pub const COUNT: usize = Coord::HEIGHT * Coord::WIDTH;
-
-    pub fn index(self) -> usize {
-        self as usize
-    }
-
-    pub fn from_index(index: usize) -> Self {
-        assert!(index < Self::COUNT);
-        unsafe { Self::unsafe_from_index(index) }
-    }
-
-    pub unsafe fn unsafe_from_index(index: usize) -> Self {
-        unsafe { mem::transmute(index as u8) }
-    }
-}
+unsafe_simple_enum!(Square, 64);
 
 impl From<Coord> for Square {
     fn from(coord: Coord) -> Self {
-        unsafe { Self::unsafe_from_index(coord.y() * Coord::WIDTH + coord.x()) }
+        Self::from_usize(coord.y() * Coord::WIDTH + coord.x())
     }
 }
 
@@ -98,7 +82,7 @@ impl Coord {
 
 impl From<Square> for Coord {
     fn from(square: Square) -> Self {
-        let index = square.index();
+        let index = square.into_usize();
         Self {
             x: (index % Coord::WIDTH) as u8,
             y: (index / Coord::WIDTH) as u8,

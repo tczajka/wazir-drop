@@ -1,6 +1,5 @@
-use crate::{Color, ColoredPiece, ParseError, Piece, Square};
+use crate::{enum_map::EnumMap, Color, ColoredPiece, Enum, ParseError, Piece, Square};
 use std::{
-    array,
     fmt::{self, Display, Formatter},
     str::FromStr,
 };
@@ -54,8 +53,10 @@ impl FromStr for ColoredOpeningMove {
 
         let mut color: Option<Color> = None;
         let mut pieces = [Piece::Alfil; OpeningMove::SIZE];
-        let mut remaining: [usize; Piece::COUNT] =
-            array::from_fn(|i| Piece::from_index(i).initial_count());
+        let mut remaining: EnumMap<Piece, usize> = EnumMap::from_array([0; Piece::COUNT]);
+        for (piece, r) in remaining.iter_mut() {
+            *r = piece.initial_count();
+        }
 
         for i in 0..OpeningMove::SIZE {
             let piece_name = s.get(i..i + 1).ok_or(ParseError)?;
@@ -68,10 +69,10 @@ impl FromStr for ColoredOpeningMove {
                     }
                 }
             }
-            if remaining[colored_piece.piece.index()] == 0 {
+            if remaining[colored_piece.piece] == 0 {
                 return Err(ParseError);
             }
-            remaining[colored_piece.piece.index()] -= 1;
+            remaining[colored_piece.piece] -= 1;
             pieces[i] = colored_piece.piece;
         }
         let color = color.unwrap();

@@ -1,4 +1,4 @@
-use crate::{Coord, Square};
+use crate::{enum_map::Enum, Coord, Square};
 use std::{
     fmt::{self, Display, Formatter},
     ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not},
@@ -11,7 +11,7 @@ impl Bitboard {
     pub const EMPTY: Self = Self(0);
 
     pub fn single(square: Square) -> Self {
-        Self(1 << square.index())
+        Self(1 << square.into_usize())
     }
 
     pub fn contains(&self, square: Square) -> bool {
