@@ -1,4 +1,4 @@
-use crate::{enum_map::EnumMap, Color, ColoredPiece, ParseError, Piece, Square};
+use crate::{enum_map::EnumMap, parser::ParseError, Color, ColoredPiece, Piece, Square};
 use std::{
     fmt::{self, Display, Formatter},
     str::FromStr,

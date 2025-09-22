@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{ParseError, Square};
+use wazir_drop::{parser::ParseError, Square};
 
 #[test]
 fn test_display() {

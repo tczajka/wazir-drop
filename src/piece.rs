@@ -1,4 +1,4 @@
-use crate::{unsafe_simple_enum, Color, ParseError, Vector};
+use crate::{parser::ParseError, unsafe_simple_enum, Color, Vector};
 use std::{fmt::{self, Display, Formatter}, str::FromStr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

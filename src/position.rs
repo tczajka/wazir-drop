@@ -1,6 +1,7 @@
 use crate::{
-    enum_map::EnumMap, mov::Move, Bitboard, Color, ColoredMove, ColoredOpeningMove, ColoredPiece,
-    ColoredRegularMove, Coord, OpeningMove, ParseError, Piece, RegularMove, Square,
+    enum_map::EnumMap, mov::Move, parser::ParseError, Bitboard, Color, ColoredMove,
+    ColoredOpeningMove, ColoredPiece, ColoredRegularMove, Coord, OpeningMove, Piece, RegularMove,
+    Square,
 };
 use std::{
     fmt::{self, Display, Formatter},
