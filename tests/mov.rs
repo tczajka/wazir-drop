@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{ColoredOpeningMove, OpeningMove, ParseError, Piece, SimpleEnum};
+use wazir_drop::{enum_map::SimpleEnumExt, ColoredOpeningMove, OpeningMove, ParseError, Piece};
 
 #[test]
 fn test_opening_move_size_matches_piece_initial_count() {

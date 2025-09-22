@@ -3,7 +3,6 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-#[allow(dead_code)]
 pub trait SimpleEnum: Sized {
     /// Representation of an enum.
     ///
@@ -19,12 +18,6 @@ pub trait SimpleEnum: Sized {
 
     /// Returns an unique identifier for a value within range of `0..Array::LENGTH`.
     fn into_usize(self) -> usize;
-
-    const COUNT: usize = Self::Array::<()>::LENGTH;
-
-    fn all() -> impl Iterator<Item = Self> {
-        (0..Self::COUNT).map(|i| Self::from_usize(i))
-    }
 }
 
 /// SAFETY: enum!(Type, length) requires that `Type` is a #[repr(u8)] simple enum, and `length` is the number of variants.
@@ -46,7 +39,16 @@ macro_rules! unsafe_simple_enum {
     };
 }
 
-#[allow(unused_imports)]
+pub trait SimpleEnumExt: SimpleEnum {
+    const COUNT: usize = Self::Array::<()>::LENGTH;
+
+    fn all() -> impl Iterator<Item = Self> {
+        (0..Self::COUNT).map(|i| Self::from_usize(i))
+    }
+}
+
+impl<T: SimpleEnum> SimpleEnumExt for T {}
+
 pub use unsafe_simple_enum;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -55,7 +57,6 @@ pub struct EnumMap<K: SimpleEnum, V> {
     array: K::Array<V>,
 }
 
-#[allow(dead_code)]
 impl<K: SimpleEnum, V> EnumMap<K, V> {
     pub fn from_fn<F>(mut f: F) -> Self
     where

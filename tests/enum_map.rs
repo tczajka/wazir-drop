@@ -1,4 +1,4 @@
-use wazir_drop::enum_map::{unsafe_simple_enum, EnumMap, SimpleEnum};
+use wazir_drop::enum_map::{unsafe_simple_enum, EnumMap, SimpleEnum, SimpleEnumExt};
 
 #[repr(u8)]
 enum Foo {
