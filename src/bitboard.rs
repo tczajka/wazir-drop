@@ -1,4 +1,4 @@
-use crate::{enum_map::Enum, Coord, Square};
+use crate::{enum_map::SimpleEnum, Coord, Square};
 use std::{
     fmt::{self, Display, Formatter},
     ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not},

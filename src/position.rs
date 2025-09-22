@@ -1,6 +1,6 @@
 use crate::{
     enum_map::EnumMap, mov::Move, Bitboard, Color, ColoredMove, ColoredOpeningMove, ColoredPiece,
-    ColoredRegularMove, Coord, Enum, OpeningMove, ParseError, Piece, RegularMove, Square,
+    ColoredRegularMove, Coord, OpeningMove, ParseError, Piece, RegularMove, SimpleEnum, Square,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -238,16 +238,14 @@ impl FromStr for Position {
         let mut position = Position {
             stage,
             to_move,
-            sides: EnumMap::from_array(
-                [PositionSide {
-                    piece_bitboards: EnumMap::from_array([Bitboard::EMPTY; Piece::COUNT]),
-                    num_captured: EnumMap::from_array([0; Piece::COUNT]),
-                }; Color::COUNT],
-            ),
+            sides: EnumMap::from_fn(|_| PositionSide {
+                piece_bitboards: EnumMap::from_fn(|_| Bitboard::EMPTY),
+                num_captured: EnumMap::from_fn(|_| 0),
+            }),
         };
 
         // TODO: In opening, piece counts are different.
-        let mut remaining_pieces: EnumMap<Piece, usize> = EnumMap::from_array([0; Piece::COUNT]);
+        let mut remaining_pieces: EnumMap<Piece, usize> = EnumMap::from_fn(|_| 0);
         for (piece, r) in remaining_pieces.iter_mut() {
             *r = 2 * piece.initial_count();
         }

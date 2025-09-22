@@ -1,4 +1,4 @@
-use crate::{enum_map::EnumMap, Color, ColoredPiece, Enum, ParseError, Piece, Square};
+use crate::{enum_map::EnumMap, Color, ColoredPiece, ParseError, Piece, SimpleEnum, Square};
 use std::{
     fmt::{self, Display, Formatter},
     str::FromStr,
@@ -53,10 +53,7 @@ impl FromStr for ColoredOpeningMove {
 
         let mut color: Option<Color> = None;
         let mut pieces = [Piece::Alfil; OpeningMove::SIZE];
-        let mut remaining: EnumMap<Piece, usize> = EnumMap::from_array([0; Piece::COUNT]);
-        for (piece, r) in remaining.iter_mut() {
-            *r = piece.initial_count();
-        }
+        let mut remaining: EnumMap<Piece, usize> = EnumMap::from_fn(Piece::initial_count);
 
         for i in 0..OpeningMove::SIZE {
             let piece_name = s.get(i..i + 1).ok_or(ParseError)?;
