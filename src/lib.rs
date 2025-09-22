@@ -1,3 +1,4 @@
+pub mod array;
 mod bitboard;
 mod color;
 pub mod either;

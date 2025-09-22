@@ -1,7 +1,4 @@
-use std::{
-    array,
-    ops::{Index, IndexMut},
-};
+use std::ops::{Index, IndexMut};
 
 pub trait SimpleEnum: Sized {
     /// Representation of an enum.
@@ -49,6 +46,7 @@ pub trait SimpleEnumExt: SimpleEnum {
 
 impl<T: SimpleEnum> SimpleEnumExt for T {}
 
+use crate::array::Array;
 pub use unsafe_simple_enum;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -94,37 +92,5 @@ impl<K: SimpleEnum, V> Index<K> for EnumMap<K, V> {
 impl<K: SimpleEnum, V> IndexMut<K> for EnumMap<K, V> {
     fn index_mut(&mut self, key: K) -> &mut V {
         &mut self.array[key.into_usize()]
-    }
-}
-
-pub trait Array: Index<usize, Output = Self::Element> + IndexMut<usize> {
-    type Element;
-    const LENGTH: usize;
-
-    fn from_fn<F>(f: F) -> Self
-    where
-        F: FnMut(usize) -> Self::Element;
-
-    fn as_slice(&self) -> &[Self::Element];
-    fn as_mut_slice(&mut self) -> &mut [Self::Element];
-}
-
-impl<V, const N: usize> Array for [V; N] {
-    type Element = V;
-    const LENGTH: usize = N;
-
-    fn from_fn<F>(f: F) -> Self
-    where
-        F: FnMut(usize) -> Self::Element,
-    {
-        array::from_fn(f)
-    }
-
-    fn as_slice(&self) -> &[Self::Element] {
-        self.as_slice()
-    }
-
-    fn as_mut_slice(&mut self) -> &mut [Self::Element] {
-        self.as_mut_slice()
     }
 }
