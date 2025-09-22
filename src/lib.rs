@@ -1,5 +1,6 @@
 mod bitboard;
 mod color;
+pub mod either;
 pub mod enum_map;
 mod mov;
 pub mod parser;

@@ -1,11 +1,15 @@
-use wazir_drop::parser::{self, Parser, ParserExt};
+use wazir_drop::{
+    either::Either,
+    parser::{self, Parser, ParserExt},
+};
 
 #[test]
-fn test_parse_all() {
-    let result = parser::Byte.parse_all(b"a");
-    assert_eq!(result, Ok(b'a'));
+fn test_end() {
+    let result = parser::End.parse(b"").unwrap();
+    assert_eq!(result.value, ());
+    assert_eq!(result.remaining, b"");
 
-    assert!(parser::Byte.parse_all(b"ab").is_err());
+    assert!(parser::End.parse(b"a").is_err());
 }
 
 #[test]
@@ -36,4 +40,19 @@ fn test_pair() {
         .then(parser::exact(b"abc"))
         .parse(b"xxx")
         .is_err());
+}
+
+#[test]
+fn test_or() {
+    let parser = parser::exact(b"abc").or(parser::exact(b"def"));
+
+    let result = parser.parse(b"abcxyz").unwrap();
+    assert_eq!(result.value, Either::Left(()));
+    assert_eq!(result.remaining, b"xyz");
+
+    let result = parser.parse(b"defxyz").unwrap();
+    assert_eq!(result.value, Either::Right(()));
+    assert_eq!(result.remaining, b"xyz");
+
+    assert!(parser.parse(b"xxx").is_err());
 }
