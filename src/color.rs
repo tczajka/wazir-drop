@@ -1,4 +1,8 @@
-use crate::{parser::ParseError, unsafe_simple_enum};
+use crate::{
+    either::Either,
+    parser::{self, ParseError, Parser, ParserExt},
+    unsafe_simple_enum,
+};
 use std::{
     fmt::{self, Display, Formatter},
     str::FromStr,
@@ -19,6 +23,15 @@ impl Color {
             Self::Red => Self::Blue,
             Self::Blue => Self::Red,
         }
+    }
+
+    pub fn parser() -> impl Parser<Output = Self> + Clone {
+        parser::exact(b"red")
+            .or(parser::exact(b"blue"))
+            .map(|result| match result {
+                Either::Left(_) => Self::Red,
+                Either::Right(_) => Self::Blue,
+            })
     }
 }
 

@@ -4,6 +4,12 @@ use wazir_drop::{
 };
 
 #[test]
+fn test_parse_all() {
+    assert_eq!(parser::Byte.parse_all(b"a"), Ok(b'a'));
+    assert!(parser::Byte.parse_all(b"ab").is_err());
+}
+
+#[test]
 fn test_end() {
     let result = parser::End.parse(b"").unwrap();
     assert_eq!(result.remaining, b"");
@@ -86,10 +92,11 @@ fn test_ignore_then() {
 
 #[test]
 fn test_repeat() {
-    let result = parser::Byte.repeat(1..=3).parse(b"abc").unwrap();
+    let p = parser::Byte.repeat(1..=3);
+    let result = p.clone().parse(b"abc").unwrap();
     assert_eq!(result.value, vec![b'a', b'b', b'c']);
     assert_eq!(result.remaining, b"");
 
-    assert!(parser::Byte.repeat(1..=3).parse(b"").is_err());
-    assert!(parser::Byte.repeat(1..=3).parse(b"abcde").is_err());
+    assert!(p.clone().parse(b"").is_err());
+    assert!(p.clone().parse(b"abcde").is_err());
 }
