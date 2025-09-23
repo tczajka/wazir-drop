@@ -25,7 +25,7 @@ impl Color {
         }
     }
 
-    pub fn parser() -> impl Parser<Output = Self> + Clone {
+    pub fn parser() -> impl Parser<Output = Self> {
         parser::exact(b"red")
             .or(parser::exact(b"blue"))
             .map(|result| match result {
