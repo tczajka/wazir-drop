@@ -209,6 +209,9 @@ impl<P: Parser, R: RangeBounds<usize>> Parser for Repeat<P, R> {
         let mut remaining_input = input;
         let mut count = 0;
         while let Ok(ParseSuccess { value, remaining }) = self.parser.parse(remaining_input) {
+            if remaining_input.len() == remaining.len() {
+                return Err(ParseError);
+            }
             output.push(value);
             remaining_input = remaining;
             count += 1;
