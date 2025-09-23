@@ -2,6 +2,7 @@ use crate::either::Either;
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
+    ops::RangeBounds,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -36,9 +37,29 @@ pub trait ParserExt: Parser {
     fn or<P: Parser>(self, p: P) -> impl Parser<Output = Either<Self::Output, P::Output>> {
         Or { p1: self, p2: p }
     }
+
+    fn map<T, F: Fn(Self::Output) -> T>(self, f: F) -> impl Parser<Output = T> {
+        Map { parser: self, f }
+    }
+
+    fn then_ignore<P: Parser>(self, p: P) -> impl Parser<Output = Self::Output> {
+        self.then(p).map(|(a, _)| a)
+    }
+
+    fn ignore_then<P: Parser>(self, p: P) -> impl Parser<Output = P::Output> {
+        self.then(p).map(|(_, b)| b)
+    }
+
+    // Note: This will greedily match too many elements and fail.
+    fn repeat<R: RangeBounds<usize>>(self, range: R) -> impl Parser<Output = Vec<Self::Output>> {
+        Repeat {
+            parser: self,
+            range,
+        }
+    }
 }
 
-impl<'a, P: Parser> ParserExt for P {}
+impl<P: Parser> ParserExt for P {}
 
 #[derive(Debug, Clone, Copy)]
 pub struct End;
@@ -69,7 +90,7 @@ impl Parser for Byte {
             [] => Err(ParseError),
             [head, tail @ ..] => Ok(ParseSuccess {
                 value: *head,
-                remaining: &tail,
+                remaining: tail,
             }),
         }
     }
@@ -140,5 +161,51 @@ impl<P1: Parser, P2: Parser> Parser for Or<P1, P2> {
                 remaining,
             })
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Map<P: Parser, T, F: Fn(P::Output) -> T> {
+    parser: P,
+    f: F,
+}
+
+impl<P: Parser, T, F: Fn(P::Output) -> T> Parser for Map<P, T, F> {
+    type Output = T;
+
+    fn parse<'a>(&self, input: &'a [u8]) -> ParseResult<'a, T> {
+        let success = self.parser.parse(input)?;
+        Ok(ParseSuccess {
+            value: (self.f)(success.value),
+            remaining: success.remaining,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Repeat<P: Parser, R: RangeBounds<usize>> {
+    parser: P,
+    range: R,
+}
+
+impl<P: Parser, R: RangeBounds<usize>> Parser for Repeat<P, R> {
+    type Output = Vec<P::Output>;
+
+    fn parse<'a>(&self, input: &'a [u8]) -> ParseResult<'a, Vec<P::Output>> {
+        let mut output = Vec::new();
+        let mut remaining_input = input;
+        let mut count = 0;
+        while let Ok(ParseSuccess { value, remaining }) = self.parser.parse(remaining_input) {
+            output.push(value);
+            remaining_input = remaining;
+            count += 1;
+        }
+        if !self.range.contains(&count) {
+            return Err(ParseError);
+        }
+        Ok(ParseSuccess {
+            value: output,
+            remaining: remaining_input,
+        })
     }
 }

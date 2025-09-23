@@ -18,7 +18,7 @@ a.a...f.
 add.w..a
 ";
 
-    let position = Position::from_str(&s).unwrap();
+    let position = Position::from_str(s).unwrap();
     assert_eq!(position.to_string(), s);
 
     // Too many ferzes.
@@ -37,7 +37,7 @@ a.a...f.
 add.w..a
 ";
 
-    assert_eq!(Position::from_str(&s), Err(ParseError));
+    assert_eq!(Position::from_str(s), Err(ParseError));
 
     // Too few ferzes.
     let s = "\
@@ -54,7 +54,7 @@ AaFA.DDA
 a.a...f.
 add.w..a
 ";
-    assert_eq!(Position::from_str(&s), Err(ParseError));
+    assert_eq!(Position::from_str(s), Err(ParseError));
 
     // Too many lines ferzes.
     let s = "\
@@ -72,7 +72,7 @@ a.a...f.
 add.w..a
 ........
 ";
-    assert_eq!(Position::from_str(&s), Err(ParseError));
+    assert_eq!(Position::from_str(s), Err(ParseError));
 }
 
 #[test]

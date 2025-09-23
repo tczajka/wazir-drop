@@ -1,3 +1,7 @@
+#![deny(unsafe_op_in_unsafe_fn)]
+#![deny(unused_results)]
+#![deny(clippy::default_trait_access)]
+
 pub mod array;
 pub mod either;
 pub mod enum_map;
