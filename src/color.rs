@@ -49,10 +49,6 @@ impl FromStr for Color {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, ParseError> {
-        match s {
-            "red" => Ok(Self::Red),
-            "blue" => Ok(Self::Blue),
-            _ => Err(ParseError),
-        }
+        Self::parser().parse_all(s.as_bytes())
     }
 }
