@@ -2,7 +2,7 @@ use crate::either::Either;
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
-    ops::RangeBounds,
+    ops::{Bound, RangeBounds},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -64,10 +64,22 @@ pub trait ParserExt: Parser {
     }
 
     // Note: This will greedily match too many elements and fail.
-    fn repeat<R: RangeBounds<usize>>(self, range: R) -> Repeat<Self, R> {
+    fn repeat<R: RangeBounds<usize>>(self, range: R) -> Repeat<Self> {
+        let min_count = match range.start_bound() {
+            Bound::Included(&x) => x,
+            Bound::Excluded(&x) => x.checked_add(1).unwrap(),
+            Bound::Unbounded => 0,
+        };
+        let max_count = match range.end_bound() {
+            Bound::Included(&x) => x,
+            Bound::Excluded(&x) => x.checked_sub(1).unwrap(),
+            Bound::Unbounded => usize::MAX,
+        };
+        assert!(min_count <= max_count);
         Repeat {
             parser: self,
-            range,
+            min_count,
+            max_count,
         }
     }
 }
@@ -196,27 +208,28 @@ impl<P: Parser, T, F: Fn(P::Output) -> T> Parser for Map<P, T, F> {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Repeat<P: Parser, R: RangeBounds<usize>> {
+pub struct Repeat<P: Parser> {
     parser: P,
-    range: R,
+    min_count: usize,
+    max_count: usize,
 }
 
-impl<P: Parser, R: RangeBounds<usize>> Parser for Repeat<P, R> {
+impl<P: Parser> Parser for Repeat<P> {
     type Output = Vec<P::Output>;
 
     fn parse<'a>(&self, input: &'a [u8]) -> ParseResult<'a, Vec<P::Output>> {
         let mut output = Vec::new();
         let mut remaining_input = input;
         let mut count = 0;
-        while let Ok(ParseSuccess { value, remaining }) = self.parser.parse(remaining_input) {
-            if remaining_input.len() == remaining.len() {
-                return Err(ParseError);
-            }
+        while count < self.max_count {
+            let Ok(ParseSuccess { value, remaining }) = self.parser.parse(remaining_input) else {
+                break;
+            };
             output.push(value);
             remaining_input = remaining;
             count += 1;
         }
-        if !self.range.contains(&count) {
+        if count < self.min_count {
             return Err(ParseError);
         }
         Ok(ParseSuccess {
