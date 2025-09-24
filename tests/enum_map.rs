@@ -20,7 +20,7 @@ fn test_all() {
 
 #[test]
 fn test_index() {
-    let mut map: EnumMap<Foo, usize> = EnumMap::from_fn(Foo::into_usize);
+    let mut map: EnumMap<Foo, usize> = EnumMap::from_fn(Foo::index);
     assert_eq!(map[Foo::A], 0);
     assert_eq!(map[Foo::B], 1);
     assert_eq!(map[Foo::C], 2);
@@ -30,7 +30,7 @@ fn test_index() {
 
 #[test]
 fn test_iter() {
-    let map: EnumMap<Foo, usize> = EnumMap::from_fn(Foo::into_usize);
+    let map: EnumMap<Foo, usize> = EnumMap::from_fn(Foo::index);
     let mut iter = map.iter();
     assert!(matches!(iter.next(), Some((Foo::A, &0))));
     assert!(matches!(iter.next(), Some((Foo::B, &1))));
@@ -40,7 +40,7 @@ fn test_iter() {
 
 #[test]
 fn test_iter_mut() {
-    let mut map: EnumMap<Foo, usize> = EnumMap::from_fn(Foo::into_usize);
+    let mut map: EnumMap<Foo, usize> = EnumMap::from_fn(Foo::index);
     let mut iter = map.iter_mut();
     assert!(matches!(iter.next(), Some((Foo::A, &mut 0))));
     assert!(matches!(iter.next(), Some((Foo::B, &mut 1))));

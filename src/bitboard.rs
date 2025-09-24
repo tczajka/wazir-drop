@@ -11,7 +11,7 @@ impl Bitboard {
     pub const EMPTY: Self = Self(0);
 
     pub fn single(square: Square) -> Self {
-        Self(1 << square.into_usize())
+        Self(1 << square.index())
     }
 
     pub fn contains(&self, square: Square) -> bool {

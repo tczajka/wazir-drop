@@ -22,7 +22,7 @@ unsafe_simple_enum!(Square, 64);
 
 impl From<Coord> for Square {
     fn from(coord: Coord) -> Self {
-        Self::from_usize(coord.y() * Coord::WIDTH + coord.x())
+        Self::from_index(coord.y() * Coord::WIDTH + coord.x())
     }
 }
 
@@ -82,7 +82,7 @@ impl Coord {
 
 impl From<Square> for Coord {
     fn from(square: Square) -> Self {
-        let index = square.into_usize();
+        let index = square.index();
         Self {
             x: (index % Coord::WIDTH) as u8,
             y: (index / Coord::WIDTH) as u8,
