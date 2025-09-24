@@ -1,4 +1,4 @@
-use crate::{parser::ParseError, unsafe_simple_enum, Color, Vector};
+use crate::{parser::{self, ParseError, Parser, ParserExt}, unsafe_simple_enum, Color, Vector};
 use std::{fmt::{self, Display, Formatter}, str::FromStr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -79,9 +79,65 @@ impl Piece {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PieceNonWazir {
+    Alfil,
+    Dabbaba,
+    Ferz,
+    Knight,
+}
+
+unsafe_simple_enum!(PieceNonWazir, 4);
+
+impl From<PieceNonWazir> for Piece {
+    fn from(piece: PieceNonWazir) -> Self {
+        match piece {
+            PieceNonWazir::Alfil => Self::Alfil,
+            PieceNonWazir::Dabbaba => Self::Dabbaba,
+            PieceNonWazir::Ferz => Self::Ferz,
+            PieceNonWazir::Knight => Self::Knight,
+        }
+    }
+}
+
+impl TryFrom<Piece> for PieceNonWazir {
+    type Error = ();
+
+    fn try_from(piece: Piece) -> Result<Self, Self::Error> {
+        match piece {
+            Piece::Alfil => Ok(PieceNonWazir::Alfil),
+            Piece::Dabbaba => Ok(PieceNonWazir::Dabbaba),
+            Piece::Ferz => Ok(PieceNonWazir::Ferz),
+            Piece::Knight => Ok(PieceNonWazir::Knight),
+            Piece::Wazir => Err(()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ColoredPiece {
     pub color: Color,
     pub piece: Piece,
+}
+
+impl ColoredPiece {
+    pub fn parser() -> impl Parser<Output = Self> {
+        use Color::*;
+        use Piece::*;
+
+        parser::byte().try_map(|b| match b {
+            b'A' => Ok(Self { color: Red, piece: Alfil }),
+            b'D' => Ok(Self { color: Red, piece: Dabbaba }),
+            b'F' => Ok(Self { color: Red, piece: Ferz }),
+            b'N' => Ok(Self { color: Red, piece: Knight }),
+            b'W' => Ok(Self { color: Red, piece: Wazir }),
+            b'a' => Ok(Self { color: Blue, piece: Alfil }),
+            b'd' => Ok(Self { color: Blue, piece: Dabbaba }),
+            b'f' => Ok(Self { color: Blue, piece: Ferz }),
+            b'n' => Ok(Self { color: Blue, piece: Knight }),
+            b'w' => Ok(Self { color: Blue, piece: Wazir }),
+            _ => Err(ParseError),
+        })
+    }
 }
 
 impl Display for ColoredPiece {
@@ -109,23 +165,7 @@ impl Display for ColoredPiece {
 impl FromStr for ColoredPiece {
     type Err = ParseError;
 
-    #[rustfmt::skip]
     fn from_str(s: &str) -> Result<Self, ParseError> {
-        use Color::*;
-        use Piece::*;
-
-        match s {
-            "A" => Ok(Self { color: Red, piece: Alfil }),
-            "D" => Ok(Self { color: Red, piece: Dabbaba }),
-            "F" => Ok(Self { color: Red, piece: Ferz }),
-            "N" => Ok(Self { color: Red, piece: Knight }),
-            "W" => Ok(Self { color: Red, piece: Wazir }),
-            "a" => Ok(Self { color: Blue, piece: Alfil }),
-            "d" => Ok(Self { color: Blue, piece: Dabbaba }),
-            "f" => Ok(Self { color: Blue, piece: Ferz }),
-            "n" => Ok(Self { color: Blue, piece: Knight }),
-            "w" => Ok(Self { color: Blue, piece: Wazir }),
-            _ => Err(ParseError),
-        }
+        Self::parser().parse_all(s.as_bytes())
     }
 }

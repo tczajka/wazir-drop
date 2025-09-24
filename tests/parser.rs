@@ -5,25 +5,28 @@ use wazir_drop::{
 
 #[test]
 fn test_parse_all() {
-    assert_eq!(parser::Byte.parse_all(b"a"), Ok(b'a'));
-    assert!(parser::Byte.parse_all(b"ab").is_err());
+    let p = parser::byte();
+    assert_eq!(p.parse_all(b"a"), Ok(b'a'));
+    assert!(p.parse_all(b"ab").is_err());
 }
 
 #[test]
 fn test_end() {
-    let result = parser::End.parse(b"").unwrap();
+    let p = parser::end();
+    let result = p.parse(b"").unwrap();
     assert_eq!(result.remaining, b"");
 
-    assert!(parser::End.parse(b"a").is_err());
+    assert!(p.parse(b"a").is_err());
 }
 
 #[test]
 fn test_byte() {
-    let result = parser::Byte.parse(b"abc").unwrap();
+    let p = parser::byte();
+    let result = p.parse(b"abc").unwrap();
     assert_eq!(result.value, b'a');
     assert_eq!(result.remaining, b"bc");
 
-    assert!(parser::Byte.parse(b"").is_err());
+    assert!(p.parse(b"").is_err());
 }
 
 #[test]
@@ -38,7 +41,7 @@ fn test_exact() {
 
 #[test]
 fn test_then() {
-    let p = parser::Byte.then(parser::Byte);
+    let p = parser::byte().then(parser::byte());
 
     let result = p.parse(b"abcdef").unwrap();
     assert_eq!(result.value, (b'a', b'b'));
@@ -64,7 +67,7 @@ fn test_or() {
 
 #[test]
 fn test_map() {
-    let p = parser::Byte.map(|b| b + 1);
+    let p = parser::byte().map(|b| b + 1);
 
     let result = p.parse(b"abc").unwrap();
     assert_eq!(result.value, b'b');
@@ -75,8 +78,8 @@ fn test_map() {
 
 #[test]
 fn test_then_ignore() {
-    let result = parser::Byte
-        .then_ignore(parser::Byte)
+    let result = parser::byte()
+        .then_ignore(parser::byte())
         .parse(b"abc")
         .unwrap();
     assert_eq!(result.value, b'a');
@@ -85,8 +88,8 @@ fn test_then_ignore() {
 
 #[test]
 fn test_ignore_then() {
-    let result = parser::Byte
-        .ignore_then(parser::Byte)
+    let result = parser::byte()
+        .ignore_then(parser::byte())
         .parse(b"abc")
         .unwrap();
     assert_eq!(result.value, b'b');
@@ -95,7 +98,7 @@ fn test_ignore_then() {
 
 #[test]
 fn test_repeat() {
-    let p = parser::Byte.repeat(1..=3);
+    let p = parser::byte().repeat(1..=3);
     let result = p.parse(b"abcdef").unwrap();
     assert_eq!(result.value, vec![b'a', b'b', b'c']);
     assert_eq!(result.remaining, b"def");

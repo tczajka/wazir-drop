@@ -17,6 +17,6 @@ mod square;
 pub use bitboard::Bitboard;
 pub use color::Color;
 pub use mov::{ColoredMove, ColoredOpeningMove, ColoredRegularMove, OpeningMove, RegularMove};
-pub use piece::{ColoredPiece, Piece};
+pub use piece::{ColoredPiece, Piece, PieceNonWazir};
 pub use position::Position;
 pub use square::{Coord, Square, Vector};

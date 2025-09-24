@@ -43,28 +43,35 @@ pub trait ParserExt: Parser {
             .map(|result| result.value)
     }
 
-    fn then<P: Parser>(self, p: P) -> Pair<Self, P> {
+    fn then<P: Parser>(self, p: P) -> impl Parser<Output = (Self::Output, P::Output)> {
         Pair { p1: self, p2: p }
     }
 
-    fn or<P: Parser>(self, p: P) -> Or<Self, P> {
+    fn or<P: Parser>(self, p: P) -> impl Parser<Output = Either<Self::Output, P::Output>> {
         Or { p1: self, p2: p }
     }
 
-    fn map<T, F: Fn(Self::Output) -> T>(self, f: F) -> Map<Self, T, F> {
-        Map { parser: self, f }
+    fn try_map<T, F>(self, f: F) -> impl Parser<Output = T>
+    where
+        F: Fn(Self::Output) -> Result<T, ParseError>,
+    {
+        TryMap { parser: self, f }
+    }
+
+    fn map<T, F: Fn(Self::Output) -> T>(self, f: F) -> impl Parser<Output = T> {
+        self.try_map(move |x| Ok(f(x)))
     }
 
     fn then_ignore<P: Parser>(self, p: P) -> impl Parser<Output = Self::Output> {
-        self.then(p).map(|(a, _)| a)
+        self.then(p).try_map(|(a, _)| Ok(a))
     }
 
     fn ignore_then<P: Parser>(self, p: P) -> impl Parser<Output = P::Output> {
-        self.then(p).map(|(_, b)| b)
+        self.then(p).try_map(|(_, b)| Ok(b))
     }
 
     // Note: This will greedily match too many elements and fail.
-    fn repeat<R: RangeBounds<usize>>(self, range: R) -> Repeat<Self> {
+    fn repeat<R: RangeBounds<usize>>(self, range: R) -> impl Parser<Output = Vec<Self::Output>> {
         let min_count = match range.start_bound() {
             Bound::Included(&x) => x,
             Bound::Excluded(&x) => x.checked_add(1).unwrap(),
@@ -87,7 +94,11 @@ pub trait ParserExt: Parser {
 impl<P: Parser> ParserExt for P {}
 
 #[derive(Debug, Clone, Copy)]
-pub struct End;
+struct End;
+
+pub fn end() -> impl Parser<Output = ()> {
+    End
+}
 
 impl Parser for End {
     type Output = ();
@@ -105,7 +116,7 @@ impl Parser for End {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Byte;
+struct Byte;
 
 impl Parser for Byte {
     type Output = u8;
@@ -121,8 +132,12 @@ impl Parser for Byte {
     }
 }
 
+pub fn byte() -> impl Parser<Output = u8> {
+    Byte
+}
+
 #[derive(Debug, Clone, Copy)]
-pub struct Exact<'a> {
+struct Exact<'a> {
     s: &'a [u8],
 }
 
@@ -141,12 +156,12 @@ impl<'a> Parser for Exact<'a> {
     }
 }
 
-pub fn exact<'a>(s: &'a [u8]) -> Exact<'a> {
+pub fn exact<'a>(s: &'a [u8]) -> impl Parser<Output = ()> + 'a {
     Exact { s }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Pair<P1: Parser, P2: Parser> {
+struct Pair<P1: Parser, P2: Parser> {
     p1: P1,
     p2: P2,
 }
@@ -165,7 +180,7 @@ impl<P1: Parser, P2: Parser> Parser for Pair<P1, P2> {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Or<P1: Parser, P2: Parser> {
+struct Or<P1: Parser, P2: Parser> {
     p1: P1,
     p2: P2,
 }
@@ -190,25 +205,26 @@ impl<P1: Parser, P2: Parser> Parser for Or<P1, P2> {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Map<P: Parser, T, F: Fn(P::Output) -> T> {
+struct TryMap<P: Parser, F> {
     parser: P,
     f: F,
 }
 
-impl<P: Parser, T, F: Fn(P::Output) -> T> Parser for Map<P, T, F> {
+impl<P: Parser, T, F: Fn(P::Output) -> Result<T, ParseError>> Parser for TryMap<P, F> {
     type Output = T;
 
     fn parse<'a>(&self, input: &'a [u8]) -> ParseResult<'a, T> {
         let success = self.parser.parse(input)?;
+        let value = (self.f)(success.value)?;
         Ok(ParseSuccess {
-            value: (self.f)(success.value),
+            value,
             remaining: success.remaining,
         })
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Repeat<P: Parser> {
+struct Repeat<P: Parser> {
     parser: P,
     min_count: usize,
     max_count: usize,
