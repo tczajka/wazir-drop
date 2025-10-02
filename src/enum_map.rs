@@ -1,3 +1,4 @@
+use crate::array::Array;
 use std::ops::{Index, IndexMut};
 
 pub trait SimpleEnum: Sized {
@@ -36,9 +37,6 @@ pub trait SimpleEnumExt: SimpleEnum {
 }
 
 impl<T: SimpleEnum> SimpleEnumExt for T {}
-
-use crate::array::Array;
-pub use unsafe_simple_enum;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]

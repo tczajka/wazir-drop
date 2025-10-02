@@ -1,7 +1,8 @@
 use crate::{
     either::Either,
-    enum_map::unsafe_simple_enum,
-    parser::{self, impl_from_str_for_parsable, ParseError, Parser, ParserExt},
+    impl_from_str_for_parsable,
+    parser::{self, ParseError, Parser, ParserExt},
+    unsafe_simple_enum,
 };
 use std::{
     fmt::{self, Display, Formatter},

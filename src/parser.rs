@@ -267,5 +267,3 @@ macro_rules! impl_from_str_for_parsable {
         }
     };
 }
-
-pub use impl_from_str_for_parsable;

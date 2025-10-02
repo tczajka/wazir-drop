@@ -1,4 +1,10 @@
-use crate::{parser::{self, ParseError, Parser, ParserExt, impl_from_str_for_parsable}, enum_map::unsafe_simple_enum, Color, Vector};
+use crate::{
+    parser::{self, ParseError, Parser, ParserExt},
+    Color,
+    Vector,
+    impl_from_str_for_parsable,
+    unsafe_simple_enum
+};
 use std::{fmt::{self, Display, Formatter}, str::FromStr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
