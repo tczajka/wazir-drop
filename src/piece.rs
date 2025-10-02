@@ -1,4 +1,4 @@
-use crate::{parser::{self, ParseError, Parser, ParserExt}, unsafe_simple_enum, Color, Vector};
+use crate::{parser::{self, ParseError, Parser, ParserExt, impl_from_str_for_parsable}, enum_map::unsafe_simple_enum, Color, Vector};
 use std::{fmt::{self, Display, Formatter}, str::FromStr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -162,10 +162,4 @@ impl Display for ColoredPiece {
     }
 }
 
-impl FromStr for ColoredPiece {
-    type Err = ParseError;
-
-    fn from_str(s: &str) -> Result<Self, ParseError> {
-        Self::parser().parse_all(s.as_bytes())
-    }
-}
+impl_from_str_for_parsable!(ColoredPiece);

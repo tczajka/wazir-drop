@@ -1,4 +1,7 @@
-use crate::{enum_map::SimpleEnum, parser::ParseError, unsafe_simple_enum};
+use crate::{
+    enum_map::{unsafe_simple_enum, SimpleEnum},
+    parser::ParseError,
+};
 use std::{
     fmt::{self, Display, Formatter},
     str::FromStr,

@@ -254,3 +254,18 @@ impl<P: Parser> Parser for Repeat<P> {
         })
     }
 }
+
+#[macro_export]
+macro_rules! impl_from_str_for_parsable {
+    ($type:ty) => {
+        impl FromStr for $type {
+            type Err = ParseError;
+
+            fn from_str(s: &str) -> Result<Self, ParseError> {
+                Self::parser().parse_all(s.as_bytes())
+            }
+        }
+    };
+}
+
+pub use impl_from_str_for_parsable;

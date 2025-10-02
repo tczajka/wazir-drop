@@ -1,7 +1,7 @@
 use crate::{
     either::Either,
-    parser::{self, ParseError, Parser, ParserExt},
-    unsafe_simple_enum,
+    enum_map::unsafe_simple_enum,
+    parser::{self, impl_from_str_for_parsable, ParseError, Parser, ParserExt},
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -45,10 +45,4 @@ impl Display for Color {
     }
 }
 
-impl FromStr for Color {
-    type Err = ParseError;
-
-    fn from_str(s: &str) -> Result<Self, ParseError> {
-        Self::parser().parse_all(s.as_bytes())
-    }
-}
+impl_from_str_for_parsable!(Color);
