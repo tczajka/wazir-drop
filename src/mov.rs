@@ -1,5 +1,11 @@
-use crate::{enum_map::EnumMap, parser::ParseError, Color, ColoredPiece, Piece, Square};
+use crate::{
+    enum_map::EnumMap,
+    impl_from_str_for_parsable,
+    parser::{ParseError, Parser, ParserExt},
+    Color, ColoredPiece, Piece, Square,
+};
 use std::{
+    array,
     fmt::{self, Display, Formatter},
     str::FromStr,
 };
@@ -13,6 +19,25 @@ pub struct OpeningMove {
 
 impl OpeningMove {
     pub const SIZE: usize = 16;
+
+    fn parser() -> impl Parser<Output = Self> {
+        ColoredPiece::parser()
+            .repeat(OpeningMove::SIZE..=OpeningMove::SIZE)
+            .try_map(|colored_pieces| {
+                let color = colored_pieces[0].color;
+                if colored_pieces.iter().any(|p| p.color != color) {
+                    return Err(ParseError);
+                }
+                let mut pieces = array::from_fn(|i| colored_pieces[i].piece);
+                match color {
+                    Color::Red => {}
+                    Color::Blue => {
+                        pieces.reverse();
+                    }
+                }
+                Ok(OpeningMove { color, pieces })
+            })
+    }
 }
 
 impl Display for OpeningMove {
@@ -34,45 +59,7 @@ impl Display for OpeningMove {
     }
 }
 
-impl FromStr for OpeningMove {
-    type Err = ParseError;
-
-    fn from_str(s: &str) -> Result<Self, ParseError> {
-        if s.len() != OpeningMove::SIZE {
-            return Err(ParseError);
-        }
-
-        let mut color: Option<Color> = None;
-        let mut pieces = [Piece::Alfil; OpeningMove::SIZE];
-        let mut remaining: EnumMap<Piece, usize> = EnumMap::from_fn(Piece::initial_count);
-
-        for i in 0..OpeningMove::SIZE {
-            let piece_name = s.get(i..i + 1).ok_or(ParseError)?;
-            let colored_piece = ColoredPiece::from_str(piece_name)?;
-            match color {
-                None => color = Some(colored_piece.color),
-                Some(c) => {
-                    if c != colored_piece.color {
-                        return Err(ParseError);
-                    }
-                }
-            }
-            if remaining[colored_piece.piece] == 0 {
-                return Err(ParseError);
-            }
-            remaining[colored_piece.piece] -= 1;
-            pieces[i] = colored_piece.piece;
-        }
-        let color = color.unwrap();
-        match color {
-            Color::Red => {}
-            Color::Blue => {
-                pieces.reverse();
-            }
-        }
-        Ok(OpeningMove { color, pieces })
-    }
-}
+impl_from_str_for_parsable!(OpeningMove);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RegularMove {
