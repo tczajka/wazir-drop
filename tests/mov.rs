@@ -1,7 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{
-    enum_map::SimpleEnumExt, parser::ParseError, ColoredOpeningMove, OpeningMove, Piece,
-};
+use wazir_drop::{enum_map::SimpleEnumExt, parser::ParseError, OpeningMove, Piece};
 
 #[test]
 fn test_opening_move_size_matches_piece_initial_count() {
@@ -10,19 +8,13 @@ fn test_opening_move_size_matches_piece_initial_count() {
 }
 
 #[test]
-fn test_colored_opening_move_display_from_str() {
-    let com = ColoredOpeningMove::from_str("AWNAADADAFFAADDA").unwrap();
+fn test_opening_move_display_from_str() {
+    let com = OpeningMove::from_str("AWNAADADAFFAADDA").unwrap();
     assert_eq!(com.to_string(), "AWNAADADAFFAADDA");
-    let com = ColoredOpeningMove::from_str("aaaaaffdaddadnwa").unwrap();
+    let com = OpeningMove::from_str("aaaaaffdaddadnwa").unwrap();
     assert_eq!(com.to_string(), "aaaaaffdaddadnwa");
 
-    assert_eq!(
-        ColoredOpeningMove::from_str("WWWWWWWWWWWWWWWW"),
-        Err(ParseError)
-    );
-    assert_eq!(
-        ColoredOpeningMove::from_str("AWNAADADAFFAADDa"),
-        Err(ParseError)
-    );
-    assert_eq!(ColoredOpeningMove::from_str("W"), Err(ParseError));
+    assert_eq!(OpeningMove::from_str("WWWWWWWWWWWWWWWW"), Err(ParseError));
+    assert_eq!(OpeningMove::from_str("AWNAADADAFFAADDa"), Err(ParseError));
+    assert_eq!(OpeningMove::from_str("W"), Err(ParseError));
 }

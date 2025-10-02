@@ -1,7 +1,6 @@
 use crate::{
-    enum_map::EnumMap, mov::Move, parser::ParseError, Bitboard, Color, ColoredMove,
-    ColoredOpeningMove, ColoredPiece, ColoredRegularMove, Coord, OpeningMove, Piece, RegularMove,
-    Square,
+    enum_map::EnumMap, mov::Move, parser::ParseError, Bitboard, Color, ColoredPiece, Coord,
+    OpeningMove, Piece, RegularMove, Square,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -48,6 +47,7 @@ struct PositionSide {
 pub struct Position {
     stage: Stage,
     to_move: Color,
+    // TODO: square: piece, attack_count
     sides: EnumMap<Color, PositionSide>,
 }
 
@@ -102,11 +102,11 @@ impl Position {
         if self.stage != Stage::Opening {
             return Err(ParseError);
         }
-        let mov = ColoredOpeningMove::from_str(s)?;
+        let mov = OpeningMove::from_str(s)?;
         if mov.color != self.to_move {
             return Err(ParseError);
         }
-        Ok(mov.mov)
+        Ok(mov)
     }
 
     pub fn parse_regular_move(&self, s: &str) -> Result<RegularMove, ParseError> {
@@ -124,6 +124,7 @@ impl Position {
                 let piece = colored_piece.piece;
                 let to = Square::from_str(to)?;
                 RegularMove {
+                    color: self.to_move,
                     piece,
                     captured: None,
                     from: None,
@@ -156,6 +157,7 @@ impl Position {
                 };
 
                 RegularMove {
+                    color: self.to_move,
                     piece,
                     captured,
                     from: Some(from),
@@ -182,18 +184,6 @@ impl Position {
             }
             Stage::End => Err(ParseError),
         }
-    }
-
-    pub fn colored_opening_move(&self, mov: OpeningMove) -> ColoredOpeningMove {
-        mov.with_color(self.to_move)
-    }
-
-    pub fn colored_regular_move(&self, mov: RegularMove) -> ColoredRegularMove {
-        mov.with_color(self.to_move)
-    }
-
-    pub fn colored_move(&self, mov: Move) -> ColoredMove {
-        mov.with_color(self.to_move)
     }
 }
 

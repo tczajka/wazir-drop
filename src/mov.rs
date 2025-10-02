@@ -6,35 +6,26 @@ use std::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OpeningMove {
+    pub color: Color,
     // From square 0 or square 63.
     pub pieces: [Piece; Self::SIZE],
 }
 
 impl OpeningMove {
     pub const SIZE: usize = 16;
-
-    pub fn with_color(self, color: Color) -> ColoredOpeningMove {
-        ColoredOpeningMove { color, mov: self }
-    }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ColoredOpeningMove {
-    pub color: Color,
-    pub mov: OpeningMove,
-}
-
-impl Display for ColoredOpeningMove {
+impl Display for OpeningMove {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let color = self.color;
         match color {
             Color::Red => {
-                for &piece in &self.mov.pieces {
+                for &piece in &self.pieces {
                     write!(f, "{}", ColoredPiece { color, piece })?;
                 }
             }
             Color::Blue => {
-                for &piece in self.mov.pieces.iter().rev() {
+                for &piece in self.pieces.iter().rev() {
                     write!(f, "{}", ColoredPiece { color, piece })?;
                 }
             }
@@ -43,7 +34,7 @@ impl Display for ColoredOpeningMove {
     }
 }
 
-impl FromStr for ColoredOpeningMove {
+impl FromStr for OpeningMove {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, ParseError> {
@@ -79,43 +70,29 @@ impl FromStr for ColoredOpeningMove {
                 pieces.reverse();
             }
         }
-        Ok(ColoredOpeningMove {
-            color,
-            mov: OpeningMove { pieces },
-        })
+        Ok(OpeningMove { color, pieces })
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RegularMove {
+    pub color: Color,
     pub piece: Piece,
     pub captured: Option<Piece>,
     pub from: Option<Square>,
     pub to: Square,
 }
 
-impl RegularMove {
-    pub fn with_color(self, color: Color) -> ColoredRegularMove {
-        ColoredRegularMove { color, mov: self }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ColoredRegularMove {
-    pub color: Color,
-    pub mov: RegularMove,
-}
-
-impl Display for ColoredRegularMove {
+impl Display for RegularMove {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.mov.from {
+        match self.from {
             None => {
                 write!(
                     f,
                     "{}",
                     ColoredPiece {
                         color: self.color,
-                        piece: self.mov.piece
+                        piece: self.piece
                     }
                 )?;
             }
@@ -123,7 +100,7 @@ impl Display for ColoredRegularMove {
                 write!(f, "{from}")?;
             }
         }
-        write!(f, "{}", self.mov.to)?;
+        write!(f, "{}", self.to)?;
         Ok(())
     }
 }
@@ -134,37 +111,11 @@ pub enum Move {
     Regular(RegularMove),
 }
 
-impl Move {
-    pub fn with_color(self, color: Color) -> ColoredMove {
-        ColoredMove { color, mov: self }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ColoredMove {
-    pub color: Color,
-    pub mov: Move,
-}
-
-impl Display for ColoredMove {
+impl Display for Move {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.mov {
-            Move::Opening(mov) => write!(
-                f,
-                "{}",
-                ColoredOpeningMove {
-                    color: self.color,
-                    mov
-                }
-            ),
-            Move::Regular(mov) => write!(
-                f,
-                "{}",
-                ColoredRegularMove {
-                    color: self.color,
-                    mov
-                }
-            ),
+        match self {
+            Move::Opening(mov) => write!(f, "{mov}"),
+            Move::Regular(mov) => write!(f, "{mov}"),
         }
     }
 }

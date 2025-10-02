@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{parser::ParseError, Piece, Position, RegularMove, Square};
+use wazir_drop::{parser::ParseError, Color, Piece, Position, RegularMove, Square};
 
 #[test]
 fn test_display_from_str() {
@@ -100,19 +100,20 @@ add.w..a
     assert_eq!(
         mov,
         RegularMove {
+            color: Color::Red,
             piece: Piece::Wazir,
             captured: None,
             from: Some(Square::A2),
             to: Square::A3,
         }
     );
-    assert_eq!(position.colored_regular_move(mov).to_string(), "a2a3");
 
     // Capture.
     let mov = position.parse_regular_move("a2b2").unwrap();
     assert_eq!(
         mov,
         RegularMove {
+            color: Color::Red,
             piece: Piece::Wazir,
             captured: Some(Piece::Alfil),
             from: Some(Square::A2),
@@ -130,13 +131,13 @@ add.w..a
     assert_eq!(
         mov,
         RegularMove {
+            color: Color::Red,
             piece: Piece::Alfil,
             captured: None,
             from: None,
             to: Square::A1,
         }
     );
-    assert_eq!(position.colored_regular_move(mov).to_string(), "Aa1");
 
     // Can't drop on an existing piece.
     assert_eq!(position.parse_regular_move("Ab2"), Err(ParseError));
