@@ -1,6 +1,12 @@
-use crate::{enum_map::SimpleEnum, parser::ParseError, unsafe_simple_enum};
+use crate::{
+    enum_map::SimpleEnum,
+    impl_from_str_for_parsable,
+    parser::{self, ParseError, Parser, ParserExt},
+    unsafe_simple_enum,
+};
 use std::{
     fmt::{self, Display, Formatter},
+    mem,
     str::FromStr,
 };
 
@@ -20,35 +26,25 @@ pub enum Square {
 
 unsafe_simple_enum!(Square, 64);
 
+impl Square {
+    pub fn parser() -> impl Parser<Output = Self> {
+        Coord::parser().map(|coord| coord.into())
+    }
+}
+
+impl_from_str_for_parsable!(Square);
+
 impl From<Coord> for Square {
     fn from(coord: Coord) -> Self {
-        Self::from_index(coord.y() * Coord::WIDTH + coord.x())
+        let index = coord.y * (Coord::WIDTH as u8) + coord.x;
+        unsafe { mem::transmute(index) }
     }
 }
 
 impl Display for Square {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let coord = Coord::from(*self);
-        let x = char::from(b'1' + coord.x() as u8);
-        let y = char::from(b'a' + coord.y() as u8);
-        write!(f, "{y}{x}")
-    }
-}
-
-impl FromStr for Square {
-    type Err = ParseError;
-
-    fn from_str(s: &str) -> Result<Self, ParseError> {
-        let bytes = s.as_bytes();
-        if bytes.len() != 2
-            || !(b'a'..=b'h').contains(&bytes[0])
-            || !(b'1'..=b'8').contains(&bytes[1])
-        {
-            return Err(ParseError);
-        }
-        let y = usize::from(bytes[0] - b'a');
-        let x = usize::from(bytes[1] - b'1');
-        Ok(Coord::new(x, y).into())
+        write!(f, "{coord}")
     }
 }
 
@@ -78,6 +74,19 @@ impl Coord {
     pub fn y(self) -> usize {
         self.y as usize
     }
+
+    pub fn parser() -> impl Parser<Output = Self> {
+        parser::byte()
+            .try_map(|b| match b {
+                b'a'..=b'h' => Ok(b - b'a'),
+                _ => Err(ParseError),
+            })
+            .then(parser::byte().try_map(|b| match b {
+                b'1'..=b'8' => Ok(b - b'1'),
+                _ => Err(ParseError),
+            }))
+            .map(|(y, x)| Coord { x, y })
+    }
 }
 
 impl From<Square> for Coord {
@@ -87,6 +96,16 @@ impl From<Square> for Coord {
             x: (index % Coord::WIDTH) as u8,
             y: (index / Coord::WIDTH) as u8,
         }
+    }
+}
+
+impl_from_str_for_parsable!(Coord);
+
+impl Display for Coord {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let x = char::from(b'1' + self.x);
+        let y = char::from(b'a' + self.y);
+        write!(f, "{y}{x}")
     }
 }
 

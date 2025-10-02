@@ -1,6 +1,5 @@
 use crate::{
-    enum_map::EnumMap, mov::Move, parser::ParseError, Bitboard, Color, ColoredPiece, Coord,
-    OpeningMove, Piece, RegularMove, Square,
+    enum_map::EnumMap, parser::ParseError, Bitboard, Color, ColoredPiece, Coord, Piece, Square,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -73,117 +72,6 @@ impl Position {
 
     pub fn num_captured(&self, colored_piece: ColoredPiece) -> usize {
         self.sides[colored_piece.color].num_captured[colored_piece.piece].into()
-    }
-
-    pub fn is_legal_regular_move(&self, mov: RegularMove) -> bool {
-        if self.stage != Stage::Regular {
-            return false;
-        }
-        match mov.from {
-            None => {
-                // Drop move.
-                let dropped = mov.piece.with_color(self.to_move);
-                self.num_captured(dropped) != 0 && self.colored_piece(mov.to).is_none()
-            }
-            Some(from) => {
-                // Jump move.
-                let moved = mov.piece.with_color(self.to_move);
-                let captured = mov
-                    .captured
-                    .map(|piece| piece.with_color(self.to_move.opposite()));
-
-                // TODO: Check move vector.
-                self.colored_piece(from) == Some(moved) && self.colored_piece(mov.to) == captured
-            }
-        }
-    }
-
-    pub fn parse_opening_move(&self, s: &str) -> Result<OpeningMove, ParseError> {
-        if self.stage != Stage::Opening {
-            return Err(ParseError);
-        }
-        let mov = OpeningMove::from_str(s)?;
-        if mov.color != self.to_move {
-            return Err(ParseError);
-        }
-        Ok(mov)
-    }
-
-    pub fn parse_regular_move(&self, s: &str) -> Result<RegularMove, ParseError> {
-        let mov = match s.len() {
-            3 => {
-                // Drop move.
-                if !s.is_char_boundary(1) {
-                    return Err(ParseError);
-                }
-                let (piece_name, to) = s.split_at(1);
-                let colored_piece = ColoredPiece::from_str(piece_name)?;
-                if colored_piece.color != self.to_move {
-                    return Err(ParseError);
-                }
-                let piece = colored_piece.piece;
-                let to = Square::from_str(to)?;
-                RegularMove {
-                    color: self.to_move,
-                    piece,
-                    captured: None,
-                    from: None,
-                    to,
-                }
-            }
-            4 => {
-                // Jump move.
-                if !s.is_char_boundary(2) {
-                    return Err(ParseError);
-                }
-                let (from, to) = s.split_at(2);
-                let from = Square::from_str(from)?;
-                let to = Square::from_str(to)?;
-
-                let colored_piece = self.colored_piece(from).ok_or(ParseError)?;
-                if colored_piece.color != self.to_move {
-                    return Err(ParseError);
-                }
-                let piece = colored_piece.piece;
-
-                let captured = match self.colored_piece(to) {
-                    None => None,
-                    Some(colored_captured) => {
-                        if colored_captured.color == self.to_move {
-                            return Err(ParseError);
-                        }
-                        Some(colored_captured.piece)
-                    }
-                };
-
-                RegularMove {
-                    color: self.to_move,
-                    piece,
-                    captured,
-                    from: Some(from),
-                    to,
-                }
-            }
-            _ => return Err(ParseError),
-        };
-        if !self.is_legal_regular_move(mov) {
-            return Err(ParseError);
-        }
-        Ok(mov)
-    }
-
-    pub fn parse_move(&self, s: &str) -> Result<Move, ParseError> {
-        match self.stage {
-            Stage::Opening => {
-                let mov = self.parse_opening_move(s)?;
-                Ok(Move::Opening(mov))
-            }
-            Stage::Regular => {
-                let mov = self.parse_regular_move(s)?;
-                Ok(Move::Regular(mov))
-            }
-            Stage::End => Err(ParseError),
-        }
     }
 }
 
