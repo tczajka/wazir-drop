@@ -1,5 +1,4 @@
 use crate::{
-    enum_map::EnumMap,
     impl_from_str_for_parsable,
     parser::{ParseError, Parser, ParserExt},
     Color, ColoredPiece, Piece, Square,
