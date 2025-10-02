@@ -40,6 +40,8 @@ impl OpeningMove {
     }
 }
 
+impl_from_str_for_parsable!(OpeningMove);
+
 impl Display for OpeningMove {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let color = self.color;
@@ -58,8 +60,6 @@ impl Display for OpeningMove {
         Ok(())
     }
 }
-
-impl_from_str_for_parsable!(OpeningMove);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RegularMove {
