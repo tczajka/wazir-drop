@@ -137,13 +137,25 @@ impl Move {
         OpeningMove::parser()
             .or(RegularMove::parser())
             .map(|mov| match mov {
-                Either::Left(mov) => Move::Opening(mov),
-                Either::Right(mov) => Move::Regular(mov),
+                Either::Left(mov) => mov.into(),
+                Either::Right(mov) => mov.into(),
             })
     }
 }
 
 impl_from_str_for_parsable!(Move);
+
+impl From<OpeningMove> for Move {
+    fn from(mov: OpeningMove) -> Self {
+        Move::Opening(mov)
+    }
+}
+
+impl From<RegularMove> for Move {
+    fn from(mov: RegularMove) -> Self {
+        Move::Regular(mov)
+    }
+}
 
 impl Display for Move {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
