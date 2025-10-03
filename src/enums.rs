@@ -1,4 +1,4 @@
-use crate::array::Array;
+use crate::arrays::Array;
 use std::ops::{Index, IndexMut};
 
 pub trait SimpleEnum: Sized {
@@ -12,7 +12,7 @@ pub trait SimpleEnum: Sized {
 #[macro_export]
 macro_rules! unsafe_simple_enum {
     {$name:ty, $n:literal} => {
-        impl $crate::enum_map::SimpleEnum for $name {
+        impl $crate::enums::SimpleEnum for $name {
             type Array<V> = [V; $n];
 
             fn index(self) -> usize {

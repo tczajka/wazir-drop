@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{enum_map::SimpleEnumExt, ColoredPiece, Piece, PieceNonWazir};
+use wazir_drop::{enums::SimpleEnumExt, ColoredPiece, Piece, PieceNonWazir};
 
 #[test]
 fn test_piece_non_wazir() {

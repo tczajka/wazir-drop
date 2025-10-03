@@ -1,5 +1,5 @@
 use wazir_drop::{
-    enum_map::{EnumMap, SimpleEnum, SimpleEnumExt},
+    enums::{EnumMap, SimpleEnum, SimpleEnumExt},
     unsafe_simple_enum,
 };
 

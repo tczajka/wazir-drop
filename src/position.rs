@@ -1,5 +1,5 @@
 use crate::{
-    enum_map::EnumMap, parser::ParseError, Bitboard, Color, ColoredPiece, Coord, Piece, Square,
+    enums::EnumMap, parser::ParseError, Bitboard, Color, ColoredPiece, Coord, Piece, Square,
 };
 use std::{
     fmt::{self, Display, Formatter},

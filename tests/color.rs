@@ -1,4 +1,4 @@
-use wazir_drop::{enum_map::SimpleEnumExt, parser::ParserExt, Color};
+use wazir_drop::{enums::SimpleEnumExt, parser::ParserExt, Color};
 
 #[test]
 fn test_opposite() {

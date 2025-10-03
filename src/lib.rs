@@ -2,9 +2,9 @@
 #![deny(unused_results)]
 #![deny(clippy::default_trait_access)]
 
-pub mod array;
+pub mod arrays;
 pub mod either;
-pub mod enum_map;
+pub mod enums;
 pub mod parser;
 
 mod bitboard;
