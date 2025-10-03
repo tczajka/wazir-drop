@@ -165,3 +165,41 @@ impl Display for Move {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ShortMove {
+    Opening(OpeningMove),
+    Slide {
+        from: Square,
+        to: Square,
+    },
+    Drop {
+        colored_piece: ColoredPiece,
+        to: Square,
+    },
+}
+
+impl Display for ShortMove {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ShortMove::Opening(mov) => write!(f, "{mov}"),
+            ShortMove::Slide { from, to } => write!(f, "{from}{to}"),
+            ShortMove::Drop { colored_piece, to } => write!(f, "{colored_piece}{to}"),
+        }
+    }
+}
+
+impl From<Move> for ShortMove {
+    fn from(mov: Move) -> Self {
+        match mov {
+            Move::Opening(mov) => ShortMove::Opening(mov),
+            Move::Regular(mov) => match mov.from {
+                None => ShortMove::Drop {
+                    colored_piece: mov.colored_piece,
+                    to: mov.to,
+                },
+                Some(from) => ShortMove::Slide { from, to: mov.to },
+            },
+        }
+    }
+}

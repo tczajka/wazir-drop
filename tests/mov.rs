@@ -1,5 +1,7 @@
 use std::str::FromStr;
-use wazir_drop::{enums::SimpleEnumExt, parser::ParseError, OpeningMove, Piece, RegularMove};
+use wazir_drop::{
+    enums::SimpleEnumExt, parser::ParseError, Move, OpeningMove, Piece, RegularMove, ShortMove,
+};
 
 #[test]
 fn test_opening_move_size_matches_piece_initial_count() {
@@ -29,4 +31,16 @@ fn test_regular_move_display_from_str() {
 
     assert_eq!(RegularMove::from_str("Aa1"), Err(ParseError));
     assert_eq!(RegularMove::from_str("Da1xNa3"), Err(ParseError));
+}
+
+#[test]
+fn test_move_to_short_move() {
+    let mov = Move::from_str("AWNAADADAFFAADDA").unwrap();
+    assert_eq!(ShortMove::from(mov).to_string(), "AWNAADADAFFAADDA");
+    let mov = Move::from_str("d@a3").unwrap();
+    assert_eq!(ShortMove::from(mov).to_string(), "da3");
+    let mov = Move::from_str("Da1-a3").unwrap();
+    assert_eq!(ShortMove::from(mov).to_string(), "a1a3");
+    let mov = Move::from_str("Da1xna3").unwrap();
+    assert_eq!(ShortMove::from(mov).to_string(), "a1a3");
 }
