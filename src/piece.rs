@@ -1,11 +1,13 @@
 use crate::{
-    parser::{self, ParseError, Parser, ParserExt},
-    Color,
-    Vector,
+    enum_map::{SimpleEnum, SimpleEnumExt},
     impl_from_str_for_parsable,
-    unsafe_simple_enum
+    parser::{self, ParseError, Parser, ParserExt},
+    unsafe_simple_enum, Color, Vector,
 };
-use std::{fmt::{self, Display, Formatter}, str::FromStr};
+use std::{
+    fmt::{self, Display, Formatter},
+    str::FromStr,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
@@ -80,7 +82,7 @@ impl Piece {
     }
 
     pub fn with_color(self, color: Color) -> ColoredPiece {
-        ColoredPiece { color, piece: self }
+        ColoredPiece::from_index(self.index() * Color::COUNT + color.index())
     }
 }
 
@@ -120,49 +122,62 @@ impl TryFrom<Piece> for PieceNonWazir {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ColoredPiece {
-    pub color: Color,
-    pub piece: Piece,
+#[repr(u8)]
+pub enum ColoredPiece {
+    RedAlfil,
+    BlueAlfil,
+    RedDabbaba,
+    BlueDabbaba,
+    RedFerz,
+    BlueFerz,
+    RedKnight,
+    BlueKnight,
+    RedWazir,
+    BlueWazir,
 }
+
+unsafe_simple_enum!(ColoredPiece, 10);
 
 impl ColoredPiece {
     pub fn parser() -> impl Parser<Output = Self> {
-        use Color::*;
-        use Piece::*;
-
         parser::byte().try_map(|b| match b {
-            b'A' => Ok(Self { color: Red, piece: Alfil }),
-            b'D' => Ok(Self { color: Red, piece: Dabbaba }),
-            b'F' => Ok(Self { color: Red, piece: Ferz }),
-            b'N' => Ok(Self { color: Red, piece: Knight }),
-            b'W' => Ok(Self { color: Red, piece: Wazir }),
-            b'a' => Ok(Self { color: Blue, piece: Alfil }),
-            b'd' => Ok(Self { color: Blue, piece: Dabbaba }),
-            b'f' => Ok(Self { color: Blue, piece: Ferz }),
-            b'n' => Ok(Self { color: Blue, piece: Knight }),
-            b'w' => Ok(Self { color: Blue, piece: Wazir }),
+            b'A' => Ok(ColoredPiece::RedAlfil),
+            b'a' => Ok(ColoredPiece::BlueAlfil),
+            b'D' => Ok(ColoredPiece::RedDabbaba),
+            b'd' => Ok(ColoredPiece::BlueDabbaba),
+            b'F' => Ok(ColoredPiece::RedFerz),
+            b'f' => Ok(ColoredPiece::BlueFerz),
+            b'N' => Ok(ColoredPiece::RedKnight),
+            b'n' => Ok(ColoredPiece::BlueKnight),
+            b'W' => Ok(ColoredPiece::RedWazir),
+            b'w' => Ok(ColoredPiece::BlueWazir),
             _ => Err(ParseError),
         })
+    }
+
+    pub fn color(self) -> Color {
+        Color::from_index(self.index() % Color::COUNT)
+    }
+
+    pub fn piece(self) -> Piece {
+        Piece::from_index(self.index() / Color::COUNT)
     }
 }
 
 impl Display for ColoredPiece {
     #[rustfmt::skip]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use Color::*;
-        use Piece::*;
-        
         let name = match self {
-            ColoredPiece { color: Red, piece: Alfil } => "A",
-            ColoredPiece { color: Red, piece: Dabbaba } => "D",
-            ColoredPiece { color: Red, piece: Ferz } => "F",
-            ColoredPiece { color: Red, piece: Knight } => "N",
-            ColoredPiece { color: Red, piece: Wazir } => "W",
-            ColoredPiece { color: Blue, piece: Alfil } => "a",
-            ColoredPiece { color: Blue, piece: Dabbaba } => "d",
-            ColoredPiece { color: Blue, piece: Ferz } => "f",
-            ColoredPiece { color: Blue, piece: Knight } => "n",
-            ColoredPiece { color: Blue, piece: Wazir } => "w",
+            ColoredPiece::RedAlfil    => "A",
+            ColoredPiece::BlueAlfil   => "a",
+            ColoredPiece::RedDabbaba  => "D",
+            ColoredPiece::BlueDabbaba => "d",
+            ColoredPiece::RedFerz     => "F",
+            ColoredPiece::BlueFerz    => "f",
+            ColoredPiece::RedKnight   => "N",
+            ColoredPiece::BlueKnight  => "n",
+            ColoredPiece::RedWazir    => "W",
+            ColoredPiece::BlueWazir   => "w",
         };
         write!(f, "{name}")
     }

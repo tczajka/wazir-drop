@@ -63,7 +63,7 @@ impl Position {
         for (color, side) in self.sides.iter() {
             for (piece, bitboard) in side.piece_bitboards.iter() {
                 if bitboard.contains(square) {
-                    return Some(ColoredPiece { color, piece });
+                    return Some(piece.with_color(color));
                 }
             }
         }
@@ -71,7 +71,7 @@ impl Position {
     }
 
     pub fn num_captured(&self, colored_piece: ColoredPiece) -> usize {
-        self.sides[colored_piece.color].num_captured[colored_piece.piece].into()
+        self.sides[colored_piece.color()].num_captured[colored_piece.piece()].into()
     }
 }
 
@@ -81,7 +81,7 @@ impl Display for Position {
         writeln!(f, "{}", self.to_move)?;
         for (color, side) in self.sides.iter() {
             for (piece, &count) in side.num_captured.iter() {
-                let colored_piece = ColoredPiece { color, piece };
+                let colored_piece = piece.with_color(color);
                 for _ in 0..count {
                     write!(f, "{colored_piece}")?;
                 }
@@ -135,14 +135,14 @@ impl FromStr for Position {
             for i in 0..line.len() {
                 let piece_name = line.get(i..i + 1).ok_or(ParseError)?;
                 let colored_piece = ColoredPiece::from_str(piece_name)?;
-                if colored_piece.color != color {
+                if colored_piece.color() != color {
                     return Err(ParseError);
                 }
-                if remaining_pieces[colored_piece.piece] == 0 {
+                if remaining_pieces[colored_piece.piece()] == 0 {
                     return Err(ParseError);
                 }
-                remaining_pieces[colored_piece.piece] -= 1;
-                side.num_captured[colored_piece.piece] += 1;
+                remaining_pieces[colored_piece.piece()] -= 1;
+                side.num_captured[colored_piece.piece()] += 1;
             }
         }
 
@@ -159,11 +159,11 @@ impl FromStr for Position {
                     continue;
                 }
                 let colored_piece = ColoredPiece::from_str(piece_name)?;
-                if remaining_pieces[colored_piece.piece] == 0 {
+                if remaining_pieces[colored_piece.piece()] == 0 {
                     return Err(ParseError);
                 }
-                remaining_pieces[colored_piece.piece] -= 1;
-                position.sides[colored_piece.color].piece_bitboards[colored_piece.piece]
+                remaining_pieces[colored_piece.piece()] -= 1;
+                position.sides[colored_piece.color()].piece_bitboards[colored_piece.piece()]
                     .add(square);
             }
         }

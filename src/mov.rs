@@ -24,11 +24,11 @@ impl OpeningMove {
         ColoredPiece::parser()
             .repeat(OpeningMove::SIZE..=OpeningMove::SIZE)
             .try_map(|colored_pieces| {
-                let color = colored_pieces[0].color;
-                if colored_pieces.iter().any(|p| p.color != color) {
+                let color = colored_pieces[0].color();
+                if colored_pieces.iter().any(|p| p.color() != color) {
                     return Err(ParseError);
                 }
-                let mut pieces = array::from_fn(|i| colored_pieces[i].piece);
+                let mut pieces = array::from_fn(|i| colored_pieces[i].piece());
                 match color {
                     Color::Red => {}
                     Color::Blue => {
@@ -45,17 +45,15 @@ impl_from_str_for_parsable!(OpeningMove);
 impl Display for OpeningMove {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let color = self.color;
+        let mut pieces = self.pieces;
         match color {
-            Color::Red => {
-                for &piece in &self.pieces {
-                    write!(f, "{}", ColoredPiece { color, piece })?;
-                }
-            }
+            Color::Red => {}
             Color::Blue => {
-                for &piece in self.pieces.iter().rev() {
-                    write!(f, "{}", ColoredPiece { color, piece })?;
-                }
+                pieces.reverse();
             }
+        }
+        for piece in pieces {
+            write!(f, "{}", piece.with_color(color))?;
         }
         Ok(())
     }
@@ -93,10 +91,10 @@ impl RegularMove {
                 let captured = match colored_captured {
                     None => None,
                     Some(colored_captured) => {
-                        if colored_captured.color != colored_piece.color.opposite() {
+                        if colored_captured.color() != colored_piece.color().opposite() {
                             return Err(ParseError);
                         }
-                        Some(colored_captured.piece)
+                        Some(colored_captured.piece())
                     }
                 };
                 Ok(RegularMove {
@@ -119,10 +117,7 @@ impl Display for RegularMove {
             (None, Some(_)) => panic!("Drop capture"),
             (Some(from), None) => write!(f, "{from}-")?,
             (Some(from), Some(captured)) => {
-                let captured_piece = ColoredPiece {
-                    color: self.colored_piece.color.opposite(),
-                    piece: captured,
-                };
+                let captured_piece = captured.with_color(self.colored_piece.color().opposite());
                 write!(f, "{from}x{captured_piece}")?;
             }
         }

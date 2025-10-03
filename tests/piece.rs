@@ -1,6 +1,5 @@
-use wazir_drop::{
-    enum_map::SimpleEnumExt, parser::ParserExt, Color, ColoredPiece, Piece, PieceNonWazir,
-};
+use std::str::FromStr;
+use wazir_drop::{enum_map::SimpleEnumExt, ColoredPiece, Piece, PieceNonWazir};
 
 #[test]
 fn test_piece_non_wazir() {
@@ -11,15 +10,16 @@ fn test_piece_non_wazir() {
 }
 
 #[test]
-fn test_display_round_trip() {
-    for color in Color::all() {
-        for piece in Piece::all() {
-            let colored_piece = ColoredPiece { color, piece };
-            let name = colored_piece.to_string();
-            assert_eq!(
-                ColoredPiece::parser().parse_all(name.as_bytes()),
-                Ok(ColoredPiece { color, piece })
-            );
-        }
+fn test_colored_piece_display_round_trip() {
+    for cpiece in ColoredPiece::all() {
+        let name = cpiece.to_string();
+        assert_eq!(ColoredPiece::from_str(&name), Ok(cpiece));
+    }
+}
+
+#[test]
+fn test_colored_piece_parts() {
+    for cpiece in ColoredPiece::all() {
+        assert_eq!(cpiece, cpiece.piece().with_color(cpiece.color()));
     }
 }
