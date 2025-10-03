@@ -1,4 +1,3 @@
-use crate::either::Either;
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
@@ -43,11 +42,18 @@ pub trait ParserExt: Parser {
             .map(|result| result.value)
     }
 
-    fn then<P: Parser>(self, p: P) -> impl Parser<Output = (Self::Output, P::Output)> {
-        Pair { p1: self, p2: p }
+    fn and<P: Parser>(self, p: P) -> impl Parser<Output = (Self::Output, P::Output)> {
+        And { p1: self, p2: p }
     }
 
-    fn or<P: Parser>(self, p: P) -> impl Parser<Output = Either<Self::Output, P::Output>> {
+    fn and_then<P: Parser, F: Fn(Self::Output) -> P>(
+        self,
+        f: F,
+    ) -> impl Parser<Output = P::Output> {
+        AndThen { p1: self, f }
+    }
+
+    fn or<P: Parser<Output = Self::Output>>(self, p: P) -> impl Parser<Output = Self::Output> {
         Or { p1: self, p2: p }
     }
 
@@ -63,11 +69,11 @@ pub trait ParserExt: Parser {
     }
 
     fn then_ignore<P: Parser>(self, p: P) -> impl Parser<Output = Self::Output> {
-        self.then(p).try_map(|(a, _)| Ok(a))
+        self.and(p).try_map(|(a, _)| Ok(a))
     }
 
     fn ignore_then<P: Parser>(self, p: P) -> impl Parser<Output = P::Output> {
-        self.then(p).try_map(|(_, b)| Ok(b))
+        self.and(p).try_map(|(_, b)| Ok(b))
     }
 
     // Note: This will greedily match too many elements and fail.
@@ -161,12 +167,12 @@ pub fn exact<'a>(s: &'a [u8]) -> impl Parser<Output = ()> + 'a {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct Pair<P1: Parser, P2: Parser> {
+struct And<P1: Parser, P2: Parser> {
     p1: P1,
     p2: P2,
 }
 
-impl<P1: Parser, P2: Parser> Parser for Pair<P1, P2> {
+impl<P1: Parser, P2: Parser> Parser for And<P1, P2> {
     type Output = (P1::Output, P2::Output);
 
     fn parse<'a>(&self, input: &'a [u8]) -> ParseResult<'a, (P1::Output, P2::Output)> {
@@ -180,26 +186,36 @@ impl<P1: Parser, P2: Parser> Parser for Pair<P1, P2> {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct Or<P1: Parser, P2: Parser> {
+struct AndThen<P1: Parser, P2: Parser, F: Fn(P1::Output) -> P2> {
+    p1: P1,
+    f: F,
+}
+
+impl<P1: Parser, P2: Parser, F: Fn(P1::Output) -> P2> Parser for AndThen<P1, P2, F> {
+    type Output = P2::Output;
+
+    fn parse<'a>(&self, input: &'a [u8]) -> ParseResult<'a, P2::Output> {
+        let success1 = self.p1.parse(input)?;
+        let success2 = (self.f)(success1.value).parse(success1.remaining)?;
+        Ok(success2)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Or<P1: Parser, P2: Parser<Output = P1::Output>> {
     p1: P1,
     p2: P2,
 }
 
-impl<P1: Parser, P2: Parser> Parser for Or<P1, P2> {
-    type Output = Either<P1::Output, P2::Output>;
+impl<P1: Parser, P2: Parser<Output = P1::Output>> Parser for Or<P1, P2> {
+    type Output = P1::Output;
 
-    fn parse<'a>(&self, input: &'a [u8]) -> ParseResult<'a, Either<P1::Output, P2::Output>> {
+    fn parse<'a>(&self, input: &'a [u8]) -> ParseResult<'a, P1::Output> {
         if let Ok(ParseSuccess { value, remaining }) = self.p1.parse(input) {
-            Ok(ParseSuccess {
-                value: Either::Left(value),
-                remaining,
-            })
+            Ok(ParseSuccess { value, remaining })
         } else {
             let ParseSuccess { value, remaining } = self.p2.parse(input)?;
-            Ok(ParseSuccess {
-                value: Either::Right(value),
-                remaining,
-            })
+            Ok(ParseSuccess { value, remaining })
         }
     }
 }

@@ -1,5 +1,4 @@
 use crate::{
-    either::Either,
     impl_from_str_for_parsable,
     parser::{self, ParseError, Parser, ParserExt},
     Color, ColoredPiece, Piece, Square,
@@ -70,39 +69,27 @@ pub struct RegularMove {
 impl RegularMove {
     pub fn parser() -> impl Parser<Output = Self> {
         ColoredPiece::parser()
-            .then(
-                // (from, colored_captured)
+            .and_then(move |cpiece| {
                 parser::exact(b"@")
-                    .or(Square::parser().then(
-                        parser::exact(b"-")
-                            .or(parser::exact(b"x").ignore_then(ColoredPiece::parser()))
-                            .map(|captured| match captured {
-                                Either::Left(()) => None,
-                                Either::Right(square) => Some(square),
-                            }),
+                    .map(|_| (None, None)) // (from, captured)
+                    .or(Square::parser().map(Some).and(
+                        parser::exact(b"-").map(|_| None).or(parser::exact(b"x")
+                            .ignore_then(ColoredPiece::parser())
+                            .try_map(move |cpiece2| {
+                                if cpiece2.color() != cpiece.color().opposite() {
+                                    return Err(ParseError);
+                                }
+                                Ok(Some(cpiece2.piece()))
+                            })),
                     ))
-                    .map(|from_captured| match from_captured {
-                        Either::Left(()) => (None, None),
-                        Either::Right((from, captured)) => (Some(from), captured),
-                    }),
-            )
-            .then(Square::parser())
-            .try_map(|((colored_piece, (from, colored_captured)), to)| {
-                let captured = match colored_captured {
-                    None => None,
-                    Some(colored_captured) => {
-                        if colored_captured.color() != colored_piece.color().opposite() {
-                            return Err(ParseError);
-                        }
-                        Some(colored_captured.piece())
-                    }
-                };
-                Ok(RegularMove {
-                    colored_piece,
-                    from,
-                    captured,
-                    to,
-                })
+                    .map(move |(from, captured)| (cpiece, from, captured))
+            })
+            .and(Square::parser())
+            .map(|((colored_piece, from, captured), to)| RegularMove {
+                colored_piece,
+                from,
+                captured,
+                to,
             })
     }
 }
@@ -135,11 +122,8 @@ pub enum Move {
 impl Move {
     pub fn parser() -> impl Parser<Output = Self> {
         OpeningMove::parser()
-            .or(RegularMove::parser())
-            .map(|mov| match mov {
-                Either::Left(mov) => mov.into(),
-                Either::Right(mov) => mov.into(),
-            })
+            .map(Move::from)
+            .or(RegularMove::parser().map(Move::from))
     }
 }
 

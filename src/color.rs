@@ -1,5 +1,4 @@
 use crate::{
-    either::Either,
     impl_from_str_for_parsable,
     parser::{self, ParseError, Parser, ParserExt},
     unsafe_simple_enum,
@@ -28,11 +27,8 @@ impl Color {
 
     pub fn parser() -> impl Parser<Output = Self> {
         parser::exact(b"red")
-            .or(parser::exact(b"blue"))
-            .map(|result| match result {
-                Either::Left(_) => Self::Red,
-                Either::Right(_) => Self::Blue,
-            })
+            .map(|_| Self::Red)
+            .or(parser::exact(b"blue").map(|_| Self::Blue))
     }
 }
 

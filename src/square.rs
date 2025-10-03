@@ -81,7 +81,7 @@ impl Coord {
                 b'a'..=b'h' => Ok(b - b'a'),
                 _ => Err(ParseError),
             })
-            .then(parser::byte().try_map(|b| match b {
+            .and(parser::byte().try_map(|b| match b {
                 b'1'..=b'8' => Ok(b - b'1'),
                 _ => Err(ParseError),
             }))

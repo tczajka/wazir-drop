@@ -3,7 +3,6 @@
 #![deny(clippy::default_trait_access)]
 
 pub mod arrays;
-pub mod either;
 pub mod enums;
 pub mod parser;
 

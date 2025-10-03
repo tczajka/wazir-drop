@@ -1,7 +1,4 @@
-use wazir_drop::{
-    either::Either,
-    parser::{self, Parser, ParserExt},
-};
+use wazir_drop::parser::{self, Parser, ParserExt};
 
 #[test]
 fn test_parse_all() {
@@ -40,8 +37,8 @@ fn test_exact() {
 }
 
 #[test]
-fn test_then() {
-    let p = parser::byte().then(parser::byte());
+fn test_and() {
+    let p = parser::byte().and(parser::byte());
 
     let result = p.parse(b"abcdef").unwrap();
     assert_eq!(result.value, (b'a', b'b'));
@@ -51,15 +48,27 @@ fn test_then() {
 }
 
 #[test]
+fn test_and_then() {
+    let p = parser::byte().and_then(|b| {
+        let n = usize::from(b);
+        parser::byte().repeat(n..=n)
+    });
+
+    let result = p.parse(b"3bcdef").unwrap();
+    assert_eq!(result.value, vec![b'b', b'c', b'd']);
+    assert_eq!(result.remaining, b"ef");
+
+    assert!(p.parse(b"3ab").is_err());
+}
+
+#[test]
 fn test_or() {
     let p = parser::exact(b"abc").or(parser::exact(b"def"));
 
     let result = p.parse(b"abcxyz").unwrap();
-    assert_eq!(result.value, Either::Left(()));
     assert_eq!(result.remaining, b"xyz");
 
     let result = p.parse(b"defxyz").unwrap();
-    assert_eq!(result.value, Either::Right(()));
     assert_eq!(result.remaining, b"xyz");
 
     assert!(p.parse(b"xxx").is_err());
