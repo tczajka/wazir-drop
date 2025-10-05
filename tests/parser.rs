@@ -50,7 +50,7 @@ fn test_and() {
 #[test]
 fn test_and_then() {
     let p = parser::byte().and_then(|b| {
-        let n = usize::from(b);
+        let n = usize::from(b - b'0');
         parser::byte().repeat(n..=n)
     });
 

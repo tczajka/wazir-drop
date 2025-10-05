@@ -2,7 +2,7 @@ use crate::{
     enums::{SimpleEnum, SimpleEnumExt},
     impl_from_str_for_parsable,
     parser::{self, ParseError, Parser, ParserExt},
-    unsafe_simple_enum, Color, Vector,
+    unsafe_simple_enum, Color, Direction,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -32,44 +32,44 @@ impl Piece {
         }
     }
 
-    pub fn move_vectors(self) -> &'static [Vector] {
-        static ALFIL: [Vector; 4] = [
-            Vector::new(-2, -2),
-            Vector::new(2, -2),
-            Vector::new(-2, 2),
-            Vector::new(2, 2),
+    pub fn directions(self) -> &'static [Direction] {
+        static ALFIL: [Direction; 4] = [
+            Direction::new(-2, -2),
+            Direction::new(2, -2),
+            Direction::new(-2, 2),
+            Direction::new(2, 2),
         ];
 
-        static DABBABA: [Vector; 4] = [
-            Vector::new(0, -2),
-            Vector::new(-2, 0),
-            Vector::new(2, 0),
-            Vector::new(0, 2),
+        static DABBABA: [Direction; 4] = [
+            Direction::new(0, -2),
+            Direction::new(-2, 0),
+            Direction::new(2, 0),
+            Direction::new(0, 2),
         ];
 
-        static FERZ: [Vector; 4] = [
-            Vector::new(-1, -1),
-            Vector::new(1, -1),
-            Vector::new(-1, 1),
-            Vector::new(1, 1),
+        static FERZ: [Direction; 4] = [
+            Direction::new(-1, -1),
+            Direction::new(1, -1),
+            Direction::new(-1, 1),
+            Direction::new(1, 1),
         ];
 
-        static KNIGHT: [Vector; 8] = [
-            Vector::new(-1, -2),
-            Vector::new(1, -2),
-            Vector::new(-2, -1),
-            Vector::new(2, -1),
-            Vector::new(-2, 1),
-            Vector::new(2, 1),
-            Vector::new(-1, 2),
-            Vector::new(1, 2),
+        static KNIGHT: [Direction; 8] = [
+            Direction::new(-1, -2),
+            Direction::new(1, -2),
+            Direction::new(-2, -1),
+            Direction::new(2, -1),
+            Direction::new(-2, 1),
+            Direction::new(2, 1),
+            Direction::new(-1, 2),
+            Direction::new(1, 2),
         ];
 
-        static WAZIR: [Vector; 4] = [
-            Vector::new(0, -1),
-            Vector::new(-1, 0),
-            Vector::new(1, 0),
-            Vector::new(0, 1),
+        static WAZIR: [Direction; 4] = [
+            Direction::new(0, -1),
+            Direction::new(-1, 0),
+            Direction::new(1, 0),
+            Direction::new(0, 1),
         ];
 
         match self {

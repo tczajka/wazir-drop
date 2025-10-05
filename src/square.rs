@@ -110,12 +110,12 @@ impl Display for Coord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Vector {
+pub struct Direction {
     x: i8,
     y: i8,
 }
 
-impl Vector {
+impl Direction {
     pub const MAX_X: isize = Coord::WIDTH as isize - 1;
     pub const MAX_Y: isize = Coord::HEIGHT as isize - 1;
 
