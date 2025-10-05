@@ -38,7 +38,7 @@ const fn calc_move_bitboard(piece: Piece, square: Square) -> Bitboard {
     let mut i = 0;
     while i != directions.len() {
         if let Some(square2) = square.add(directions[i]) {
-            bitboard = bitboard.or(Bitboard::single(square2));
+            bitboard = bitboard.with_square(square2);
         }
         i += 1;
     }
