@@ -21,6 +21,10 @@ macro_rules! unsafe_simple_enum {
 
             pub const fn from_index(value: usize) -> Self {
                 assert!(value < $n);
+                unsafe { Self::from_index_unchecked(value) }
+            }
+
+            pub const unsafe fn from_index_unchecked(value: usize) -> Self {
                 unsafe { std::mem::transmute(value as u8) }
             }
 

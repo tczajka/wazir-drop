@@ -5,7 +5,6 @@ use crate::{
 };
 use std::{
     fmt::{self, Display, Formatter},
-    mem,
     str::FromStr,
 };
 
@@ -34,8 +33,8 @@ impl Square {
     }
 
     pub const fn from_coord(coord: Coord) -> Self {
-        let index = coord.y * (Coord::WIDTH as u8) + coord.x;
-        unsafe { mem::transmute(index) }
+        let index = coord.y() * Coord::WIDTH + coord.x();
+        unsafe { Self::from_index_unchecked(index) }
     }
 
     pub fn parser() -> impl Parser<Output = Self> {
@@ -77,11 +76,11 @@ impl Coord {
         }
     }
 
-    pub fn x(self) -> usize {
+    pub const fn x(self) -> usize {
         self.x as usize
     }
 
-    pub fn y(self) -> usize {
+    pub const fn y(self) -> usize {
         self.y as usize
     }
 
