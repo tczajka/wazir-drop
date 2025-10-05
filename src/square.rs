@@ -1,5 +1,4 @@
 use crate::{
-    enums::SimpleEnum,
     impl_from_str_for_parsable,
     parser::{self, ParseError, Parser, ParserExt},
     unsafe_simple_enum,

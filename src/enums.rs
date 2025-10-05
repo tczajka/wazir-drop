@@ -12,16 +12,29 @@ pub trait SimpleEnum: Sized {
 #[macro_export]
 macro_rules! unsafe_simple_enum {
     {$name:ty, $n:literal} => {
+        impl $name {
+            pub const COUNT: usize = $n;
+
+            pub const fn index(self) -> usize {
+                self as usize
+            }
+
+            pub const fn from_index(value: usize) -> Self {
+                assert!(value < $n);
+                unsafe { std::mem::transmute(value as u8) }
+            }
+
+        }
+
         impl $crate::enums::SimpleEnum for $name {
             type Array<V> = [V; $n];
 
             fn index(self) -> usize {
-                self as usize
+                self.index()
             }
 
             fn from_index(value: usize) -> Self {
-                assert!(value < $n);
-                unsafe { std::mem::transmute(value as u8) }
+                Self::from_index(value)
             }
 
         }
