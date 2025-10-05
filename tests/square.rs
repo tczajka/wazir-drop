@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{parser::ParseError, Square};
+use wazir_drop::{parser::ParseError, Direction, Square};
 
 #[test]
 fn test_display() {
@@ -23,4 +23,11 @@ fn test_from_str() {
     assert_eq!(Square::from_str("a9"), Err(ParseError));
     assert_eq!(Square::from_str("ab"), Err(ParseError));
     assert_eq!(Square::from_str("a10"), Err(ParseError));
+}
+
+#[test]
+fn test_add() {
+    assert_eq!(Square::A5.add(Direction::new(-1, 2)), Some(Square::C4));
+    assert!(Square::A5.add(Direction::new(-1, -1)).is_none());
+    assert!(Square::H5.add(Direction::new(-1, 2)).is_none());
 }

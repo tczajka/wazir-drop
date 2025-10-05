@@ -32,7 +32,7 @@ impl Piece {
         }
     }
 
-    pub fn directions(self) -> &'static [Direction] {
+    pub const fn directions(self) -> &'static [Direction] {
         static ALFIL: [Direction; 4] = [
             Direction::new(-2, -2),
             Direction::new(2, -2),

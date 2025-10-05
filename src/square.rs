@@ -27,6 +27,18 @@ pub enum Square {
 unsafe_simple_enum!(Square, 64);
 
 impl Square {
+    pub const fn add(self, direction: Direction) -> Option<Self> {
+        match Coord::from_square(self).add(direction) {
+            None => None,
+            Some(coord2) => Some(Square::from_coord(coord2)),
+        }
+    }
+
+    pub const fn from_coord(coord: Coord) -> Self {
+        let index = coord.y * (Coord::WIDTH as u8) + coord.x;
+        unsafe { mem::transmute(index) }
+    }
+
     pub fn parser() -> impl Parser<Output = Self> {
         Coord::parser().map(|coord| coord.into())
     }
@@ -36,8 +48,7 @@ impl_from_str_for_parsable!(Square);
 
 impl From<Coord> for Square {
     fn from(coord: Coord) -> Self {
-        let index = coord.y * (Coord::WIDTH as u8) + coord.x;
-        unsafe { mem::transmute(index) }
+        Self::from_coord(coord)
     }
 }
 
@@ -73,6 +84,24 @@ impl Coord {
 
     pub fn y(self) -> usize {
         self.y as usize
+    }
+
+    pub const fn from_square(square: Square) -> Self {
+        let index = square as u8;
+        Self {
+            x: index % Coord::WIDTH as u8,
+            y: index / Coord::WIDTH as u8,
+        }
+    }
+
+    pub const fn add(self, direction: Direction) -> Option<Self> {
+        let x = self.x.wrapping_add_signed(direction.x);
+        let y = self.y.wrapping_add_signed(direction.y);
+        if x < Coord::WIDTH as u8 && y < Coord::HEIGHT as u8 {
+            Some(Coord { x, y })
+        } else {
+            None
+        }
     }
 
     pub fn parser() -> impl Parser<Output = Self> {

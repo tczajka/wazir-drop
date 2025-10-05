@@ -9,6 +9,7 @@ pub mod parser;
 mod bitboard;
 mod color;
 mod mov;
+pub mod movegen;
 mod piece;
 mod position;
 mod square;

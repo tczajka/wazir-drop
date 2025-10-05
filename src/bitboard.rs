@@ -1,4 +1,4 @@
-use crate::{enums::SimpleEnum, Coord, Square};
+use crate::{Coord, Square};
 use std::{
     fmt::{self, Display, Formatter},
     ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not},
@@ -10,8 +10,8 @@ pub struct Bitboard(u64);
 impl Bitboard {
     pub const EMPTY: Self = Self(0);
 
-    pub fn single(square: Square) -> Self {
-        Self(1 << square.index())
+    pub const fn single(square: Square) -> Self {
+        Self(1 << (square as u8))
     }
 
     pub fn contains(&self, square: Square) -> bool {
@@ -24,6 +24,10 @@ impl Bitboard {
 
     pub fn remove(&mut self, square: Square) {
         *self &= !Self::single(square);
+    }
+
+    pub const fn or(self, other: Self) -> Self {
+        Bitboard(self.0 | other.0)
     }
 }
 

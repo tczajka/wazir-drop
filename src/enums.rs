@@ -53,6 +53,10 @@ impl<K: SimpleEnum, V> EnumMap<K, V> {
         EnumMap { array }
     }
 
+    pub const fn from_array(array: K::Array<V>) -> Self {
+        Self { array }
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (K, &V)> {
         self.array
             .as_slice()
