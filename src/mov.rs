@@ -163,6 +163,21 @@ pub enum ShortMove {
     },
 }
 
+impl ShortMove {
+    pub fn parser() -> impl Parser<Output = Self> {
+        OpeningMove::parser()
+            .map(ShortMove::Opening)
+            .or(Square::parser()
+                .and(Square::parser())
+                .map(|(from, to)| ShortMove::Slide { from, to }))
+            .or(ColoredPiece::parser()
+                .and(Square::parser())
+                .map(|(colored_piece, to)| ShortMove::Drop { colored_piece, to }))
+    }
+}
+
+impl_from_str_for_parsable!(ShortMove);
+
 impl Display for ShortMove {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {

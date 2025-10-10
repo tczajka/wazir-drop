@@ -24,6 +24,8 @@ macro_rules! unsafe_simple_enum {
                 unsafe { Self::from_index_unchecked(value) }
             }
 
+            /// # Safety
+            /// The value must be less than COUNT.
             pub const unsafe fn from_index_unchecked(value: usize) -> Self {
                 unsafe { std::mem::transmute(value as u8) }
             }
