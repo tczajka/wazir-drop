@@ -9,9 +9,77 @@ fn test_stage_display_round_trip() {
     }
 }
 
-/*
 #[test]
 fn test_display_from_str() {
+    // Opening.
+    let s = "\
+opening
+red
+
+
+........
+........
+........
+........
+........
+........
+........
+........
+";
+    let position = Position::from_str(s).unwrap();
+    assert_eq!(position.to_string(), s);
+
+    // Red has placed something before opening.
+    let s = "\
+opening
+red
+
+
+W.......
+........
+........
+........
+........
+........
+........
+........
+";
+    assert_eq!(Position::from_str(s), Err(ParseError));
+
+    let s = "\
+opening
+blue
+
+
+WNFFDDDD
+AAAAAAAA
+........
+........
+........
+........
+........
+........
+";
+    let position = Position::from_str(s).unwrap();
+    assert_eq!(position.to_string(), s);
+
+    // Invalid placement in opening.
+    let s = "\
+opening
+blue
+
+
+WNFFDDDD
+AAAAAAA.
+.......A
+........
+........
+........
+........
+........
+";
+    assert_eq!(Position::from_str(s), Err(ParseError));
+
     let s = "\
 regular
 red
@@ -65,7 +133,7 @@ add.w..a
 ";
     assert_eq!(Position::from_str(s), Err(ParseError));
 
-    // Too many lines ferzes.
+    // Too many lines.
     let s = "\
 regular
 red
@@ -82,5 +150,23 @@ add.w..a
 ........
 ";
     assert_eq!(Position::from_str(s), Err(ParseError));
+
+    // Ended, no red wazir.
+    let s = "\
+end
+red
+AF
+f
+...A.D.D
+AaFA.DDA
+..A.A.A.
+......A.
+...a.a.d
+..d..nN.
+a.a...f.
+add.w..a
+";
+
+    let position = Position::from_str(s).unwrap();
+    assert_eq!(position.to_string(), s);
 }
-*/

@@ -18,6 +18,12 @@ fn test_empty() {
 }
 
 #[test]
+fn test_is_empty() {
+    assert!(Bitboard::EMPTY.is_empty());
+    assert!(!Bitboard::single(Square::B3).is_empty());
+}
+
+#[test]
 fn test_single() {
     let bitboard = Bitboard::single(Square::B3);
     assert_eq!(
@@ -123,4 +129,19 @@ xxxxxxxx
 xxxxxxxx
 "
     );
+}
+
+#[test]
+fn test_count() {
+    let a = Bitboard::single(Square::A1) | Bitboard::single(Square::H8);
+    assert_eq!(a.count(), 2);
+}
+
+#[test]
+fn test_is_subset_of() {
+    let a = Bitboard::single(Square::B3);
+    let b = Bitboard::single(Square::H8);
+    assert!(a.is_subset_of(a));
+    assert!(a.is_subset_of(a | b));
+    assert!(!(a | b).is_subset_of(a));
 }

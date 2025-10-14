@@ -10,12 +10,20 @@ pub struct Bitboard(u64);
 impl Bitboard {
     pub const EMPTY: Self = Self(0);
 
+    pub fn from_bits(bits: u64) -> Self {
+        Self(bits)
+    }
+
+    pub fn is_empty(self) -> bool {
+        self == Self::EMPTY
+    }
+
     pub const fn single(square: Square) -> Self {
         Self(1 << (square as u8))
     }
 
     pub fn contains(&self, square: Square) -> bool {
-        *self & Self::single(square) != Self::EMPTY
+        !(*self & Self::single(square)).is_empty()
     }
 
     pub fn add(&mut self, square: Square) {
@@ -32,6 +40,14 @@ impl Bitboard {
 
     pub const fn with_square(self, square: Square) -> Self {
         Self::union(self, Self::single(square))
+    }
+
+    pub fn count(self) -> usize {
+        self.0.count_ones().try_into().unwrap()
+    }
+
+    pub fn is_subset_of(self, other: Bitboard) -> bool {
+        (self & !other).is_empty()
     }
 }
 

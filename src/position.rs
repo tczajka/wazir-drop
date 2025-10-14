@@ -1,8 +1,9 @@
 use crate::{
-    enums::EnumMap,
+    enums::{EnumMap, SimpleEnumExt},
     impl_from_str_for_parsable,
     parser::{self, ParseError, Parser, ParserExt},
-    unsafe_simple_enum, Bitboard, Color, ColoredPiece, Coord, Piece, PieceNonWazir, Square,
+    unsafe_simple_enum, Bitboard, Color, ColoredPiece, Coord, OpeningMove, Piece, PieceNonWazir,
+    Square,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -41,16 +42,10 @@ impl Display for Stage {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct PositionSide {
-    piece_bitboards: EnumMap<Piece, Bitboard>,
-    num_captured: EnumMap<Piece, u8>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Position {
     stage: Stage,
     to_move: Color,
-    piece_squares: EnumMap<Color, EnumMap<Piece, Bitboard>>,
+    piece_maps: EnumMap<Color, EnumMap<Piece, Bitboard>>,
     captured: EnumMap<Color, EnumMap<PieceNonWazir, u8>>,
 }
 
@@ -64,7 +59,7 @@ impl Position {
     }
 
     pub fn square(&self, square: Square) -> Option<ColoredPiece> {
-        for (color, piece_map) in self.piece_squares.iter() {
+        for (color, piece_map) in self.piece_maps.iter() {
             for (piece, bitboard) in piece_map.iter() {
                 if bitboard.contains(square) {
                     return Some(piece.with_color(color));
@@ -83,14 +78,127 @@ impl Position {
             .then_ignore(parser::exact(b"\n"))
             .and(Color::parser())
             .then_ignore(parser::exact(b"\n"))
-            .and(
-                ColoredPiece::parser()
-                    .repeat(..)
-                    .then_ignore(parser::exact(b"\n").repeat(2..=2)),
+            .and(Self::captured_parser(Color::Red))
+            .then_ignore(parser::exact(b"\n"))
+            .and(Self::captured_parser(Color::Blue))
+            .then_ignore(parser::exact(b"\n"))
+            .and(Self::board_parser())
+            .try_map(
+                |((((stage, to_move), captured_red), captured_blue), piece_maps)| {
+                    let captured = EnumMap::from_fn(|color| match color {
+                        Color::Red => captured_red,
+                        Color::Blue => captured_blue,
+                    });
+                    Self::from_parts(stage, to_move, piece_maps, captured).map_err(|_| ParseError)
+                },
             )
-            .try_map(|_| Err(ParseError)) // TODO
+    }
+
+    fn captured_parser(color: Color) -> impl Parser<Output = EnumMap<PieceNonWazir, u8>> {
+        ColoredPiece::parser()
+            .try_map(move |cpiece| {
+                if cpiece.color() == color {
+                    PieceNonWazir::try_from(cpiece.piece()).map_err(|_| ParseError)
+                } else {
+                    Err(ParseError)
+                }
+            })
+            .repeat(0..=Color::COUNT * OpeningMove::SIZE)
+            .map(move |pieces| {
+                let mut captured = EnumMap::from_fn(|_| 0);
+                for piece in pieces {
+                    captured[piece] += 1;
+                }
+                captured
+            })
+    }
+
+    fn board_parser() -> impl Parser<Output = EnumMap<Color, EnumMap<Piece, Bitboard>>> {
+        ColoredPiece::parser()
+            .map(Some)
+            .or(parser::exact(b".").map(|_| None))
+            .repeat(Coord::WIDTH..=Coord::WIDTH)
+            .then_ignore(parser::exact(b"\n"))
+            .repeat(Coord::HEIGHT..=Coord::HEIGHT)
+            .map(move |board| {
+                let mut piece_maps = EnumMap::from_fn(|_| EnumMap::from_fn(|_| Bitboard::EMPTY));
+                for y in 0..Coord::HEIGHT {
+                    for x in 0..Coord::WIDTH {
+                        let square = Coord::new(x, y).into();
+                        if let Some(cpiece) = board[y][x] {
+                            piece_maps[cpiece.color()][cpiece.piece()].add(square);
+                        }
+                    }
+                }
+                piece_maps
+            })
+    }
+
+    fn from_parts(
+        stage: Stage,
+        to_move: Color,
+        piece_maps: EnumMap<Color, EnumMap<Piece, Bitboard>>,
+        captured: EnumMap<Color, EnumMap<PieceNonWazir, u8>>,
+    ) -> Result<Position, ()> {
+        match stage {
+            Stage::Opening => {
+                for color in Color::all() {
+                    if color < to_move {
+                        for (piece, &squares) in piece_maps[color].iter() {
+                            if squares.count() != piece.initial_count()
+                                || !squares.is_subset_of(color.initial_squares())
+                            {
+                                return Err(());
+                            }
+                        }
+                    } else {
+                        for (_, squares) in piece_maps[color].iter() {
+                            if !squares.is_empty() {
+                                return Err(());
+                            }
+                        }
+                    }
+
+                    for (_, &count) in captured[color].iter() {
+                        if count != 0 {
+                            return Err(());
+                        }
+                    }
+                }
+            }
+            Stage::Regular | Stage::End => {
+                for piece in PieceNonWazir::all() {
+                    let mut count = 0;
+                    for color in Color::all() {
+                        count += piece_maps[color][piece.into()].count();
+                        count += usize::from(captured[color][piece]);
+                    }
+                    if count != Color::COUNT * Piece::from(piece).initial_count() {
+                        return Err(());
+                    }
+                }
+                for color in Color::all() {
+                    let expected_wazirs = if stage == Stage::End && color == to_move {
+                        0
+                    } else {
+                        1
+                    };
+                    if piece_maps[color][Piece::Wazir].count() != expected_wazirs {
+                        return Err(());
+                    }
+                }
+            }
+        }
+        Ok(Position {
+            stage,
+            to_move,
+            piece_maps,
+            captured,
+        })
     }
 }
+
+impl_from_str_for_parsable!(Position);
 
 impl Display for Position {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -118,85 +226,3 @@ impl Display for Position {
         Ok(())
     }
 }
-/*
-impl FromStr for Position {
-    type Err = ParseError;
-
-    fn from_str(s: &str) -> Result<Self, ParseError> {
-        let mut lines = s.lines();
-
-        // Parse stage.
-        let stage = Stage::from_str(lines.next().ok_or(ParseError)?)?;
-
-        // Parse to_move.
-        let to_move = Color::from_str(lines.next().ok_or(ParseError)?)?;
-
-        let mut position = Position {
-            stage,
-            to_move,
-            sides: EnumMap::from_fn(|_| PositionSide {
-                piece_bitboards: EnumMap::from_fn(|_| Bitboard::EMPTY),
-                num_captured: EnumMap::from_fn(|_| 0),
-            }),
-        };
-
-        // TODO: In opening, piece counts are different.
-        let mut remaining_pieces: EnumMap<Piece, usize> = EnumMap::from_fn(|_| 0);
-        for (piece, r) in remaining_pieces.iter_mut() {
-            *r = 2 * piece.initial_count();
-        }
-
-        // Parse captured pieces.
-        for (color, side) in position.sides.iter_mut() {
-            let line = lines.next().ok_or(ParseError)?;
-            for i in 0..line.len() {
-                let piece_name = line.get(i..i + 1).ok_or(ParseError)?;
-                let colored_piece = ColoredPiece::from_str(piece_name)?;
-                if colored_piece.color() != color {
-                    return Err(ParseError);
-                }
-                if remaining_pieces[colored_piece.piece()] == 0 {
-                    return Err(ParseError);
-                }
-                remaining_pieces[colored_piece.piece()] -= 1;
-                side.num_captured[colored_piece.piece()] += 1;
-            }
-        }
-
-        // Parse board.
-        for y in 0..Coord::HEIGHT {
-            let line = lines.next().ok_or(ParseError)?;
-            if line.len() != Coord::WIDTH {
-                return Err(ParseError);
-            }
-            for x in 0..Coord::WIDTH {
-                let square = Coord::new(x, y).into();
-                let piece_name = line.get(x..x + 1).ok_or(ParseError)?;
-                if piece_name == "." {
-                    continue;
-                }
-                let colored_piece = ColoredPiece::from_str(piece_name)?;
-                if remaining_pieces[colored_piece.piece()] == 0 {
-                    return Err(ParseError);
-                }
-                remaining_pieces[colored_piece.piece()] -= 1;
-                position.sides[colored_piece.color()].piece_bitboards[colored_piece.piece()]
-                    .add(square);
-            }
-        }
-
-        if lines.next().is_some() {
-            return Err(ParseError);
-        }
-
-        if remaining_pieces.iter().any(|(_, &r)| r != 0) {
-            return Err(ParseError);
-        }
-
-        // TODO: Check wazir count depending on stage.
-        // TODO: Check opening positions are correct.
-
-        Ok(position)
-    }
-}
-*/
