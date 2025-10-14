@@ -169,4 +169,21 @@ add.w..a
 
     let position = Position::from_str(s).unwrap();
     assert_eq!(position.to_string(), s);
+
+    // Ended, but red wazir still there.
+    let s = "\
+end
+red
+AF
+f
+.W.A.D.D
+AaFA.DDA
+..A.A.A.
+......A.
+...a.a.d
+..d..nN.
+a.a...f.
+add.w..a
+";
+    assert_eq!(Position::from_str(s), Err(ParseError));
 }
