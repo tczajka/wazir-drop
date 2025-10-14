@@ -1,5 +1,8 @@
 use crate::{
-    enums::EnumMap, parser::ParseError, Bitboard, Color, ColoredPiece, Coord, Piece, Square,
+    enums::EnumMap,
+    impl_from_str_for_parsable,
+    parser::{self, ParseError, Parser, ParserExt},
+    unsafe_simple_enum, Bitboard, Color, ColoredPiece, Coord, Piece, PieceNonWazir, Square,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -7,11 +10,25 @@ use std::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
 pub enum Stage {
     Opening,
     Regular,
     End,
 }
+
+unsafe_simple_enum!(Stage, 3);
+
+impl Stage {
+    fn parser() -> impl Parser<Output = Self> {
+        parser::exact(b"opening")
+            .map(|_| Stage::Opening)
+            .or(parser::exact(b"regular").map(|_| Stage::Regular))
+            .or(parser::exact(b"end").map(|_| Stage::End))
+    }
+}
+
+impl_from_str_for_parsable!(Stage);
 
 impl Display for Stage {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -19,19 +36,6 @@ impl Display for Stage {
             Stage::Opening => write!(f, "opening"),
             Stage::Regular => write!(f, "regular"),
             Stage::End => write!(f, "end"),
-        }
-    }
-}
-
-impl FromStr for Stage {
-    type Err = ParseError;
-
-    fn from_str(s: &str) -> Result<Self, ParseError> {
-        match s {
-            "opening" => Ok(Stage::Opening),
-            "regular" => Ok(Stage::Regular),
-            "end" => Ok(Stage::End),
-            _ => Err(ParseError),
         }
     }
 }
@@ -46,8 +50,8 @@ struct PositionSide {
 pub struct Position {
     stage: Stage,
     to_move: Color,
-    // TODO: square: piece, attack_count
-    sides: EnumMap<Color, PositionSide>,
+    piece_squares: EnumMap<Color, EnumMap<Piece, Bitboard>>,
+    captured: EnumMap<Color, EnumMap<PieceNonWazir, u8>>,
 }
 
 impl Position {
@@ -59,9 +63,9 @@ impl Position {
         self.to_move
     }
 
-    pub fn colored_piece(&self, square: Square) -> Option<ColoredPiece> {
-        for (color, side) in self.sides.iter() {
-            for (piece, bitboard) in side.piece_bitboards.iter() {
+    pub fn square(&self, square: Square) -> Option<ColoredPiece> {
+        for (color, piece_map) in self.piece_squares.iter() {
+            for (piece, bitboard) in piece_map.iter() {
                 if bitboard.contains(square) {
                     return Some(piece.with_color(color));
                 }
@@ -70,8 +74,21 @@ impl Position {
         None
     }
 
-    pub fn num_captured(&self, colored_piece: ColoredPiece) -> usize {
-        self.sides[colored_piece.color()].num_captured[colored_piece.piece()].into()
+    pub fn num_captured(&self, color: Color, piece: PieceNonWazir) -> usize {
+        self.captured[color][piece].into()
+    }
+
+    pub fn parser() -> impl Parser<Output = Self> {
+        Stage::parser()
+            .then_ignore(parser::exact(b"\n"))
+            .and(Color::parser())
+            .then_ignore(parser::exact(b"\n"))
+            .and(
+                ColoredPiece::parser()
+                    .repeat(..)
+                    .then_ignore(parser::exact(b"\n").repeat(2..=2)),
+            )
+            .try_map(|_| Err(ParseError)) // TODO
     }
 }
 
@@ -79,9 +96,9 @@ impl Display for Position {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "{}", self.stage)?;
         writeln!(f, "{}", self.to_move)?;
-        for (color, side) in self.sides.iter() {
-            for (piece, &count) in side.num_captured.iter() {
-                let colored_piece = piece.with_color(color);
+        for (color, piece_counts) in self.captured.iter() {
+            for (piece, &count) in piece_counts.iter() {
+                let colored_piece = Piece::from(piece).with_color(color);
                 for _ in 0..count {
                     write!(f, "{colored_piece}")?;
                 }
@@ -91,9 +108,9 @@ impl Display for Position {
         for y in 0..Coord::HEIGHT {
             for x in 0..Coord::WIDTH {
                 let square = Coord::new(x, y).into();
-                match self.colored_piece(square) {
+                match self.square(square) {
                     None => write!(f, ".")?,
-                    Some(colored_piece) => write!(f, "{colored_piece}")?,
+                    Some(cpiece) => write!(f, "{cpiece}")?,
                 }
             }
             writeln!(f)?;
@@ -101,7 +118,7 @@ impl Display for Position {
         Ok(())
     }
 }
-
+/*
 impl FromStr for Position {
     type Err = ParseError;
 
@@ -182,3 +199,4 @@ impl FromStr for Position {
         Ok(position)
     }
 }
+*/

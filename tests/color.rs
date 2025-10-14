@@ -1,4 +1,5 @@
-use wazir_drop::{enums::SimpleEnumExt, parser::ParserExt, Color};
+use std::str::FromStr;
+use wazir_drop::{enums::SimpleEnumExt, Color};
 
 #[test]
 fn test_opposite() {
@@ -11,6 +12,6 @@ fn test_opposite() {
 fn test_display_round_trip() {
     for color in Color::all() {
         let name = color.to_string();
-        assert_eq!(Color::parser().parse_all(name.as_bytes()), Ok(color));
+        assert_eq!(Color::from_str(&name), Ok(color));
     }
 }

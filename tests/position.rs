@@ -1,6 +1,15 @@
 use std::str::FromStr;
-use wazir_drop::{parser::ParseError, Position};
+use wazir_drop::{enums::SimpleEnumExt, parser::ParseError, Position, Stage};
 
+#[test]
+fn test_stage_display_round_trip() {
+    for stage in Stage::all() {
+        let name = stage.to_string();
+        assert_eq!(Stage::from_str(&name), Ok(stage));
+    }
+}
+
+/*
 #[test]
 fn test_display_from_str() {
     let s = "\
@@ -74,3 +83,4 @@ add.w..a
 ";
     assert_eq!(Position::from_str(s), Err(ParseError));
 }
+*/
