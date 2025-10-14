@@ -100,6 +100,24 @@ pub trait ParserExt: Parser {
 impl<P: Parser> ParserExt for P {}
 
 #[derive(Debug, Clone, Copy)]
+struct Empty;
+
+pub fn empty() -> impl Parser<Output = ()> {
+    Empty
+}
+
+impl Parser for Empty {
+    type Output = ();
+
+    fn parse<'a>(&self, input: &'a [u8]) -> ParseResult<'a, ()> {
+        Ok(ParseSuccess {
+            value: (),
+            remaining: input,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 struct End;
 
 pub fn end() -> impl Parser<Output = ()> {

@@ -8,6 +8,13 @@ fn test_parse_all() {
 }
 
 #[test]
+fn test_empty() {
+    let p = parser::empty();
+    let result = p.parse(b"abc").unwrap();
+    assert_eq!(result.remaining, b"abc");
+}
+
+#[test]
 fn test_end() {
     let p = parser::end();
     let result = p.parse(b"").unwrap();
