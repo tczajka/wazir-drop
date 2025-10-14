@@ -122,10 +122,10 @@ impl Position {
             .repeat(Coord::HEIGHT..=Coord::HEIGHT)
             .map(move |board| {
                 let mut piece_maps = EnumMap::from_fn(|_| EnumMap::from_fn(|_| Bitboard::EMPTY));
-                for y in 0..Coord::HEIGHT {
-                    for x in 0..Coord::WIDTH {
+                for (y, line) in board.iter().enumerate() {
+                    for (x, &optional_cpiece) in line.iter().enumerate() {
                         let square = Coord::new(x, y).into();
-                        if let Some(cpiece) = board[y][x] {
+                        if let Some(cpiece) = optional_cpiece {
                             piece_maps[cpiece.color()][cpiece.piece()].add(square);
                         }
                     }
