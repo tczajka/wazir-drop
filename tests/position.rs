@@ -44,7 +44,7 @@ W.......
 ........
 ........
 ";
-    assert_eq!(Position::from_str(s), Err(ParseError));
+    assert!(Position::from_str(s).is_err());
 
     let s = "\
 opening
@@ -78,7 +78,7 @@ AAAAAAA.
 ........
 ........
 ";
-    assert_eq!(Position::from_str(s), Err(ParseError));
+    assert!(Position::from_str(s).is_err());
 
     let s = "\
 regular
@@ -114,7 +114,7 @@ a.a...f.
 add.w..a
 ";
 
-    assert_eq!(Position::from_str(s), Err(ParseError));
+    assert!(Position::from_str(s).is_err());
 
     // Too few ferzes.
     let s = "\
@@ -131,7 +131,7 @@ AaFA.DDA
 a.a...f.
 add.w..a
 ";
-    assert_eq!(Position::from_str(s), Err(ParseError));
+    assert!(Position::from_str(s).is_err());
 
     // Too many lines.
     let s = "\
@@ -149,7 +149,7 @@ a.a...f.
 add.w..a
 ........
 ";
-    assert_eq!(Position::from_str(s), Err(ParseError));
+    assert!(Position::from_str(s).is_err());
 
     // Ended, no red wazir.
     let s = "\
@@ -185,5 +185,5 @@ AaFA.DDA
 a.a...f.
 add.w..a
 ";
-    assert_eq!(Position::from_str(s), Err(ParseError));
+    assert!(Position::from_str(s).is_err());
 }

@@ -41,7 +41,7 @@ impl Display for Stage {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Hash)]
 pub struct Position {
     stage: Stage,
     to_move: Color,
