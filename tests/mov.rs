@@ -57,3 +57,11 @@ fn test_short_move_display_from_str() {
     assert_eq!(mov.to_string(), "a1a3");
     assert!(ShortMove::from_str("Da1-a3").is_err());
 }
+
+#[test]
+fn test_opening_move_validate_pieces() {
+    let mov = OpeningMove::from_str("AWNAADADAFFAADDA").unwrap();
+    assert!(mov.validate_pieces().is_ok());
+    let mov = OpeningMove::from_str("AWNAADADAFFAADDN").unwrap();
+    assert!(mov.validate_pieces().is_err());
+}

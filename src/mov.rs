@@ -1,13 +1,14 @@
 use crate::{
-    impl_from_str_for_parsable,
-    parser::{self, ParseError, Parser, ParserExt},
-    Color, ColoredPiece, Piece, Square,
+    enums::EnumMap, impl_from_str_for_parsable, parser::{self, ParseError, Parser, ParserExt}, Color, ColoredPiece, Piece, Square
 };
 use std::{
     array,
     fmt::{self, Display, Formatter},
     str::FromStr,
 };
+
+#[derive(Debug, Clone, Copy)]
+pub struct InvalidMove;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OpeningMove {
@@ -36,6 +37,17 @@ impl OpeningMove {
                 }
                 Ok(OpeningMove { color, pieces })
             })
+    }
+
+    pub fn validate_pieces(&self) -> Result<(), InvalidMove> {
+        let mut counts = EnumMap::from_fn(|_| 0);
+        for piece in self.pieces {
+            counts[piece] += 1;
+        }
+        if counts.iter().any(|(piece, &count)| count != piece.initial_count()) {
+            return Err(InvalidMove);
+        }
+        Ok(())
     }
 }
 

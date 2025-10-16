@@ -1,9 +1,9 @@
 use crate::{
     enums::{EnumMap, SimpleEnumExt},
-    impl_from_str_for_parsable,
+    impl_from_str_for_parsable, movegen,
     parser::{self, ParseError, Parser, ParserExt},
-    unsafe_simple_enum, Bitboard, Color, ColoredPiece, Coord, OpeningMove, Piece, PieceNonWazir,
-    Square,
+    unsafe_simple_enum, Bitboard, Color, ColoredPiece, Coord, InvalidMove, Move, OpeningMove,
+    Piece, PieceNonWazir, RegularMove, ShortMove, Square,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -198,6 +198,57 @@ impl Position {
             piece_maps,
             captured,
         })
+    }
+
+    pub fn move_from_short_move(&self, short_move: ShortMove) -> Result<Move, InvalidMove> {
+        match short_move {
+            ShortMove::Opening(mov) => {
+                if self.stage != Stage::Opening || mov.color != self.to_move {
+                    return Err(InvalidMove);
+                }
+                mov.validate_pieces()?;
+                Ok(Move::Opening(mov))
+            }
+            ShortMove::Slide { from, to } => {
+                let colored_piece = self.square(from).ok_or(InvalidMove)?;
+                if self.stage != Stage::Regular || colored_piece.color() != self.to_move {
+                    return Err(InvalidMove);
+                }
+                movegen::validate_from_to(colored_piece.piece(), from, to)?;
+                let captured = match self.square(to) {
+                    None => None,
+                    Some(captured) => {
+                        if captured.color() != self.to_move.opposite() {
+                            return Err(InvalidMove);
+                        }
+                        Some(captured.piece())
+                    }
+                };
+                Ok(Move::Regular(RegularMove {
+                    colored_piece,
+                    from: Some(from),
+                    captured,
+                    to: to,
+                }))
+            }
+            ShortMove::Drop { colored_piece, to } => {
+                let piece_non_wazir =
+                    PieceNonWazir::try_from(colored_piece.piece()).map_err(|_| InvalidMove)?;
+                if self.stage != Stage::Regular
+                    || colored_piece.color() != self.to_move
+                    || self.square(to).is_some()
+                    || self.num_captured(self.to_move, piece_non_wazir) == 0
+                {
+                    return Err(InvalidMove);
+                }
+                Ok(Move::Regular(RegularMove {
+                    colored_piece,
+                    from: None,
+                    captured: None,
+                    to,
+                }))
+            }
+        }
     }
 }
 

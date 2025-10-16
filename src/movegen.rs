@@ -1,9 +1,16 @@
-use crate::{enums::EnumMap, Bitboard, Piece, Square};
+use crate::{enums::EnumMap, Bitboard, InvalidMove, Piece, Square};
 
 static MOVE_BITBOARD_TABLE: EnumMap<Piece, EnumMap<Square, Bitboard>> = calc_move_bitboard_table();
 
 pub fn move_bitboard(piece: Piece, square: Square) -> Bitboard {
     MOVE_BITBOARD_TABLE[piece][square]
+}
+
+pub fn validate_from_to(piece: Piece, from: Square, to: Square) -> Result<(), InvalidMove> {
+    if !move_bitboard(piece, from).contains(to) {
+        return Err(InvalidMove);
+    }
+    Ok(())
 }
 
 const fn calc_move_bitboard_table() -> EnumMap<Piece, EnumMap<Square, Bitboard>> {
