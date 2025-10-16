@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{enums::SimpleEnumExt, parser::ParseError, Position, Stage};
+use wazir_drop::{enums::SimpleEnumExt, Position, Stage};
 
 #[test]
 fn test_stage_display_round_trip() {

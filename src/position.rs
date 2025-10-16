@@ -41,6 +41,9 @@ impl Display for Stage {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct InvalidPosition;
+
 #[derive(Debug, Clone, Copy, Hash)]
 pub struct Position {
     stage: Stage,
@@ -139,7 +142,7 @@ impl Position {
         to_move: Color,
         piece_maps: EnumMap<Color, EnumMap<Piece, Bitboard>>,
         captured: EnumMap<Color, EnumMap<PieceNonWazir, u8>>,
-    ) -> Result<Position, ()> {
+    ) -> Result<Position, InvalidPosition> {
         match stage {
             Stage::Opening => {
                 for color in Color::all() {
@@ -148,20 +151,20 @@ impl Position {
                             if squares.count() != piece.initial_count()
                                 || !squares.is_subset_of(color.initial_squares())
                             {
-                                return Err(());
+                                return Err(InvalidPosition);
                             }
                         }
                     } else {
                         for (_, squares) in piece_maps[color].iter() {
                             if !squares.is_empty() {
-                                return Err(());
+                                return Err(InvalidPosition);
                             }
                         }
                     }
 
                     for (_, &count) in captured[color].iter() {
                         if count != 0 {
-                            return Err(());
+                            return Err(InvalidPosition);
                         }
                     }
                 }
@@ -174,7 +177,7 @@ impl Position {
                         count += usize::from(captured[color][piece]);
                     }
                     if count != Color::COUNT * Piece::from(piece).initial_count() {
-                        return Err(());
+                        return Err(InvalidPosition);
                     }
                 }
                 for color in Color::all() {
@@ -184,7 +187,7 @@ impl Position {
                         1
                     };
                     if piece_maps[color][Piece::Wazir].count() != expected_wazirs {
-                        return Err(());
+                        return Err(InvalidPosition);
                     }
                 }
             }
