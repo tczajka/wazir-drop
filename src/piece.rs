@@ -32,28 +32,28 @@ impl Piece {
     }
 
     pub const fn directions(self) -> &'static [Direction] {
-        static ALFIL: [Direction; 4] = [
+        const ALFIL: [Direction; 4] = [
             Direction::new(-2, -2),
             Direction::new(2, -2),
             Direction::new(-2, 2),
             Direction::new(2, 2),
         ];
 
-        static DABBABA: [Direction; 4] = [
+        const DABBABA: [Direction; 4] = [
             Direction::new(0, -2),
             Direction::new(-2, 0),
             Direction::new(2, 0),
             Direction::new(0, 2),
         ];
 
-        static FERZ: [Direction; 4] = [
+        const FERZ: [Direction; 4] = [
             Direction::new(-1, -1),
             Direction::new(1, -1),
             Direction::new(-1, 1),
             Direction::new(1, 1),
         ];
 
-        static KNIGHT: [Direction; 8] = [
+        const KNIGHT: [Direction; 8] = [
             Direction::new(-1, -2),
             Direction::new(1, -2),
             Direction::new(-2, -1),
@@ -64,7 +64,7 @@ impl Piece {
             Direction::new(1, 2),
         ];
 
-        static WAZIR: [Direction; 4] = [
+        const WAZIR: [Direction; 4] = [
             Direction::new(0, -1),
             Direction::new(-1, 0),
             Direction::new(1, 0),
