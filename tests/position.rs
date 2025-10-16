@@ -234,7 +234,9 @@ add.w..a
     let mov = position.move_from_short_move(ShortMove::from_str("a2b2").unwrap()).unwrap();
     assert_eq!(mov.to_string(), "Wa2xab2");
 
+    assert!(position.move_from_short_move(ShortMove::from_str("AWNAADADAFFAADDA").unwrap()).is_err());
     assert!(position.move_from_short_move(ShortMove::from_str("fa1").unwrap()).is_err());
     assert!(position.move_from_short_move(ShortMove::from_str("a2c2").unwrap()).is_err());
     assert!(position.move_from_short_move(ShortMove::from_str("b3a4").unwrap()).is_err());
+    assert!(position.move_from_short_move(ShortMove::from_str("Na1").unwrap()).is_err());
 }
