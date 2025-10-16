@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{enums::SimpleEnumExt, Position, ShortMove, Stage};
+use wazir_drop::{enums::SimpleEnumExt, Move, Position, ShortMove, Stage};
 
 #[test]
 fn test_stage_display_round_trip() {
@@ -205,11 +205,17 @@ red
 ........
 ";
     let position = Position::from_str(s).unwrap();
-    let mov = position.move_from_short_move(ShortMove::from_str("AWNAADADAFFAADDA").unwrap()).unwrap();
+    let mov = position
+        .move_from_short_move(ShortMove::from_str("AWNAADADAFFAADDA").unwrap())
+        .unwrap();
     assert_eq!(mov.to_string(), "AWNAADADAFFAADDA");
 
-    assert!(position.move_from_short_move(ShortMove::from_str("AWNAADADAFFAADDN").unwrap()).is_err());
-    assert!(position.move_from_short_move(ShortMove::from_str("awnaadadaffaadda").unwrap()).is_err());
+    assert!(position
+        .move_from_short_move(ShortMove::from_str("AWNAADADAFFAADDN").unwrap())
+        .is_err());
+    assert!(position
+        .move_from_short_move(ShortMove::from_str("awnaadadaffaadda").unwrap())
+        .is_err());
 
     let s = "\
 regular
@@ -227,16 +233,235 @@ add.w..a
 ";
     let position = Position::from_str(s).unwrap();
 
-    let mov = position.move_from_short_move(ShortMove::from_str("Aa1").unwrap()).unwrap();
+    let mov = position
+        .move_from_short_move(ShortMove::from_str("Aa1").unwrap())
+        .unwrap();
     assert_eq!(mov.to_string(), "A@a1");
-    let mov = position.move_from_short_move(ShortMove::from_str("a2a3").unwrap()).unwrap();
+    let mov = position
+        .move_from_short_move(ShortMove::from_str("a2a3").unwrap())
+        .unwrap();
     assert_eq!(mov.to_string(), "Wa2-a3");
-    let mov = position.move_from_short_move(ShortMove::from_str("a2b2").unwrap()).unwrap();
+    let mov = position
+        .move_from_short_move(ShortMove::from_str("a2b2").unwrap())
+        .unwrap();
     assert_eq!(mov.to_string(), "Wa2xab2");
 
-    assert!(position.move_from_short_move(ShortMove::from_str("AWNAADADAFFAADDA").unwrap()).is_err());
-    assert!(position.move_from_short_move(ShortMove::from_str("fa1").unwrap()).is_err());
-    assert!(position.move_from_short_move(ShortMove::from_str("a2c2").unwrap()).is_err());
-    assert!(position.move_from_short_move(ShortMove::from_str("b3a4").unwrap()).is_err());
-    assert!(position.move_from_short_move(ShortMove::from_str("Na1").unwrap()).is_err());
+    assert!(position
+        .move_from_short_move(ShortMove::from_str("AWNAADADAFFAADDA").unwrap())
+        .is_err());
+    assert!(position
+        .move_from_short_move(ShortMove::from_str("fa1").unwrap())
+        .is_err());
+    assert!(position
+        .move_from_short_move(ShortMove::from_str("a2c2").unwrap())
+        .is_err());
+    assert!(position
+        .move_from_short_move(ShortMove::from_str("b3a4").unwrap())
+        .is_err());
+    assert!(position
+        .move_from_short_move(ShortMove::from_str("Na1").unwrap())
+        .is_err());
+}
+
+#[test]
+fn test_make_move() {
+    let position = Position::from_str(
+        "\
+opening
+red
+
+
+........
+........
+........
+........
+........
+........
+........
+........
+",
+    )
+    .unwrap();
+
+    let position2 = position
+        .make_move(Move::from_str("AWNAADADAFFAADDA").unwrap())
+        .unwrap();
+    assert_eq!(
+        position2.to_string(),
+        "\
+opening
+blue
+
+
+AWNAADAD
+AFFAADDA
+........
+........
+........
+........
+........
+........
+"
+    );
+
+    assert!(position
+        .make_move(Move::from_str("awnaadadaffaadda").unwrap())
+        .is_err());
+
+    let position3 = position2
+        .make_move(Move::from_str("awnaadadaffaadda").unwrap())
+        .unwrap();
+    assert_eq!(
+        position3.to_string(),
+        "\
+regular
+red
+
+
+AWNAADAD
+AFFAADDA
+........
+........
+........
+........
+awnaadad
+affaadda
+"
+    );
+
+    let position = Position::from_str(
+        "\
+regular
+red
+AF
+f
+.W.A.D.D
+AaFA.DDA
+..A.A.A.
+......A.
+...a.a.d
+..d..nN.
+a.a...f.
+add.w..a
+",
+    )
+    .unwrap();
+
+    assert!(position
+        .make_move(Move::from_str("AWNAADADAFFAADDA").unwrap())
+        .is_err());
+
+    let position2 = position.make_move(Move::from_str("A@a1").unwrap()).unwrap();
+    assert_eq!(
+        position2.to_string(),
+        "\
+regular
+blue
+F
+f
+AW.A.D.D
+AaFA.DDA
+..A.A.A.
+......A.
+...a.a.d
+..d..nN.
+a.a...f.
+add.w..a
+"
+    );
+
+    assert!(position.make_move(Move::from_str("A@a2").unwrap()).is_err());
+    assert!(position.make_move(Move::from_str("A@b2").unwrap()).is_err());
+    assert!(position.make_move(Move::from_str("N@a1").unwrap()).is_err());
+    assert!(position.make_move(Move::from_str("f@a1").unwrap()).is_err());
+
+    let position2 = position
+        .make_move(Move::from_str("Wa2-a3").unwrap())
+        .unwrap();
+    assert_eq!(
+        position2.to_string(),
+        "\
+regular
+blue
+AF
+f
+..WA.D.D
+AaFA.DDA
+..A.A.A.
+......A.
+...a.a.d
+..d..nN.
+a.a...f.
+add.w..a
+"
+    );
+    assert!(position
+        .make_move(Move::from_str("Wa2-c2").unwrap())
+        .is_err());
+    assert!(position
+        .make_move(Move::from_str("Fb3-a4").unwrap())
+        .is_err());
+
+    let position2 = position
+        .make_move(Move::from_str("Wa2xab2").unwrap())
+        .unwrap();
+    assert_eq!(
+        position2.to_string(),
+        "\
+regular
+blue
+AAF
+f
+...A.D.D
+AWFA.DDA
+..A.A.A.
+......A.
+...a.a.d
+..d..nN.
+a.a...f.
+add.w..a
+"
+    );
+    assert!(position
+        .make_move(Move::from_str("Wa2xnb2").unwrap())
+        .is_err());
+
+    let position = Position::from_str(
+        "\
+regular
+blue
+AF
+f
+.W.A.D.D
+AaFA.DDA
+n.A.A.A.
+......A.
+...a.a.d
+..d...N.
+a.a...f.
+add.w..a
+",
+    )
+    .unwrap();
+
+    let position2 = position
+        .make_move(Move::from_str("nc1xWa2").unwrap())
+        .unwrap();
+    assert_eq!(
+        position2.to_string(),
+        "\
+end
+red
+AF
+f
+.n.A.D.D
+AaFA.DDA
+..A.A.A.
+......A.
+...a.a.d
+..d...N.
+a.a...f.
+add.w..a
+",
+    );
 }

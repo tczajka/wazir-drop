@@ -228,7 +228,7 @@ impl Position {
                     colored_piece,
                     from: Some(from),
                     captured,
-                    to: to,
+                    to,
                 }))
             }
             ShortMove::Drop { colored_piece, to } => {
@@ -249,6 +249,88 @@ impl Position {
                 }))
             }
         }
+    }
+
+    pub fn make_move(&self, mov: Move) -> Result<Position, InvalidMove> {
+        match mov {
+            Move::Opening(mov) => self.make_opening_move(mov),
+            Move::Regular(mov) => self.make_regular_move(mov),
+        }
+    }
+
+    pub fn make_opening_move(&self, mov: OpeningMove) -> Result<Position, InvalidMove> {
+        if self.stage != Stage::Opening || mov.color != self.to_move {
+            return Err(InvalidMove);
+        }
+        mov.validate_pieces()?;
+        let mut new_position = *self;
+        match self.to_move {
+            Color::Red => {
+                for (i, &piece) in mov.pieces.iter().enumerate() {
+                    let square = Square::from_index(i);
+                    new_position.piece_maps[mov.color][piece].add(square);
+                }
+            }
+            Color::Blue => {
+                for (i, &piece) in mov.pieces.iter().enumerate() {
+                    let square = Square::from_index(i).rotate();
+                    new_position.piece_maps[mov.color][piece].add(square);
+                }
+                new_position.stage = Stage::Regular;
+            }
+        }
+        new_position.to_move = new_position.to_move.opposite();
+        Ok(new_position)
+    }
+
+    pub fn make_regular_move(&self, mov: RegularMove) -> Result<Position, InvalidMove> {
+        let color = self.to_move;
+        let piece = mov.colored_piece.piece();
+        if self.stage != Stage::Regular || mov.colored_piece.color() != color {
+            return Err(InvalidMove);
+        }
+        let mut new_position = *self;
+        match mov.from {
+            None => {
+                let entered = PieceNonWazir::try_from(piece).map_err(|_| InvalidMove)?;
+                let count = &mut new_position.captured[color][entered];
+                *count = count.checked_sub(1).ok_or(InvalidMove)?;
+            }
+            Some(from) => {
+                movegen::validate_from_to(piece, from, mov.to)?;
+                let map = &mut new_position.piece_maps[color][piece];
+                if !map.contains(from) {
+                    return Err(InvalidMove);
+                }
+                map.remove(from);
+            }
+        }
+        match mov.captured {
+            None => {
+                if self.square(mov.to).is_some() {
+                    return Err(InvalidMove);
+                }
+            }
+            Some(captured) => {
+                let map = &mut new_position.piece_maps[color.opposite()][captured];
+                if !map.contains(mov.to) {
+                    return Err(InvalidMove);
+                }
+                map.remove(mov.to);
+
+                match PieceNonWazir::try_from(captured) {
+                    Ok(c) => {
+                        new_position.captured[color][c] += 1;
+                    }
+                    Err(()) => {
+                        new_position.stage = Stage::End;
+                    }
+                }
+            }
+        }
+        new_position.piece_maps[color][piece].add(mov.to);
+        new_position.to_move = color.opposite();
+        Ok(new_position)
     }
 }
 

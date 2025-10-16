@@ -40,6 +40,10 @@ impl Square {
     pub fn parser() -> impl Parser<Output = Self> {
         Coord::parser().map(|coord| coord.into())
     }
+
+    pub fn rotate(self) -> Self {
+        Self::from_index(Self::COUNT - 1 - self.index())
+    }
 }
 
 impl_from_str_for_parsable!(Square);

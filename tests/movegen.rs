@@ -91,7 +91,7 @@ fn test_move_bitboard() {
 #[test]
 fn test_validate_from_to() {
     assert!(movegen::validate_from_to(Piece::Alfil, Square::D4, Square::F6).is_ok());
-    assert!(!movegen::validate_from_to(Piece::Alfil, Square::D4, Square::D5).is_ok());
+    assert!(movegen::validate_from_to(Piece::Alfil, Square::D4, Square::D5).is_err());
     assert!(movegen::validate_from_to(Piece::Knight, Square::A4, Square::B2).is_ok());
-    assert!(!movegen::validate_from_to(Piece::Knight, Square::A4, Square::C6).is_ok());
+    assert!(movegen::validate_from_to(Piece::Knight, Square::A4, Square::C6).is_err());
 }

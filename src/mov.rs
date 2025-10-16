@@ -1,5 +1,8 @@
 use crate::{
-    enums::EnumMap, impl_from_str_for_parsable, parser::{self, ParseError, Parser, ParserExt}, Color, ColoredPiece, Piece, Square
+    enums::EnumMap,
+    impl_from_str_for_parsable,
+    parser::{self, ParseError, Parser, ParserExt},
+    Color, ColoredPiece, Piece, Square,
 };
 use std::{
     array,
@@ -44,7 +47,10 @@ impl OpeningMove {
         for piece in self.pieces {
             counts[piece] += 1;
         }
-        if counts.iter().any(|(piece, &count)| count != piece.initial_count()) {
+        if counts
+            .iter()
+            .any(|(piece, &count)| count != piece.initial_count())
+        {
             return Err(InvalidMove);
         }
         Ok(())
