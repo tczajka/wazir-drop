@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 eframe = "0.33.0"
+wazir-drop = { path = ".." }
