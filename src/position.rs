@@ -264,22 +264,14 @@ impl Position {
         }
         mov.validate_pieces()?;
         let mut new_position = *self;
-        match self.to_move {
-            Color::Red => {
-                for (i, &piece) in mov.pieces.iter().enumerate() {
-                    let square = Square::from_index(i);
-                    new_position.piece_maps[mov.color][piece].add(square);
-                }
-            }
-            Color::Blue => {
-                for (i, &piece) in mov.pieces.iter().enumerate() {
-                    let square = Square::from_index(i).rotate();
-                    new_position.piece_maps[mov.color][piece].add(square);
-                }
-                new_position.stage = Stage::Regular;
-            }
+        for (i, &piece) in mov.pieces.iter().enumerate() {
+            let square = Square::from_index(i).pov(mov.color);
+            new_position.piece_maps[mov.color][piece].add(square);
         }
         new_position.to_move = new_position.to_move.opposite();
+        if new_position.to_move == Color::Red {
+            new_position.stage = Stage::Regular;
+        }
         Ok(new_position)
     }
 

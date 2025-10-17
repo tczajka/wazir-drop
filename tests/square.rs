@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{parser::ParseError, Direction, Square};
+use wazir_drop::{parser::ParseError, Color, Direction, Square};
 
 #[test]
 fn test_display() {
@@ -37,4 +37,12 @@ fn test_rotate() {
     assert_eq!(Square::A1.rotate(), Square::H8);
     assert_eq!(Square::H8.rotate(), Square::A1);
     assert_eq!(Square::C5.rotate(), Square::F4);
+}
+
+#[test]
+fn test_pov() {
+    assert_eq!(Square::A1.pov(Color::Red), Square::A1);
+    assert_eq!(Square::A1.pov(Color::Blue), Square::H8);
+    assert_eq!(Square::H8.pov(Color::Red), Square::H8);
+    assert_eq!(Square::H8.pov(Color::Blue), Square::A1);
 }
