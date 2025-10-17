@@ -3,4 +3,6 @@ name = "wazir-drop"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
+[workspace]
+resolver = "3"
+members = ["gui"]
