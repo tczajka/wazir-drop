@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use eframe::{
     App,
     egui::{
@@ -6,7 +8,7 @@ use eframe::{
     },
 };
 use wazir_drop::{
-    Color, ColoredPiece, Coord, Piece, PieceNonWazir, Square,
+    Color, ColoredPiece, Coord, Piece, PieceNonWazir, Position, Square, Stage,
     enums::{EnumMap, SimpleEnumExt},
 };
 
@@ -26,6 +28,7 @@ struct WazirDropApp {
     reverse: bool,
     piece_images: EnumMap<ColoredPiece, Image<'static>>,
     tile_size: f32,
+    position: Position,
 }
 
 impl App for WazirDropApp {
@@ -49,6 +52,23 @@ impl WazirDropApp {
             reverse: false,
             piece_images: Self::piece_images(),
             tile_size: 0.0,
+            position: Position::from_str(
+                "\
+regular
+red
+AFF
+f
+.W.A.D.D
+Aa.A.DDA
+..A.A.A.
+......A.
+...a.a.d
+..d..nN.
+a.a...f.
+add.w..a
+",
+            )
+            .unwrap(),
         }
     }
 
@@ -85,11 +105,9 @@ impl WazirDropApp {
             .min(size.y / (Coord::HEIGHT + 2) as f32);
 
         self.draw_coordinates(ui);
-        self.update_squares(ui);
+        self.update_board(ui);
         self.update_captured(ui);
-
-        // test
-        self.draw_piece(ui, Square::E1, ColoredPiece::RedWazir);
+        self.draw_to_move(ui);
     }
 
     fn square_rect(&self, square: Square) -> Rect {
@@ -159,7 +177,7 @@ impl WazirDropApp {
         }
     }
 
-    fn update_squares(&mut self, ui: &mut Ui) {
+    fn update_board(&mut self, ui: &mut Ui) {
         for square in Square::all() {
             let rect = self.square_rect(square);
             if ui.allocate_rect(rect, Sense::click()).clicked() {
@@ -167,6 +185,9 @@ impl WazirDropApp {
             }
             ui.painter()
                 .rect_filled(rect, 0.0, Self::square_color(square));
+            if let Some(cpiece) = self.position.square(square) {
+                self.draw_piece(ui, square, cpiece);
+            }
         }
     }
 
@@ -182,12 +203,54 @@ impl WazirDropApp {
                     0.0,
                     Self::square_color(Square::from_index(piece.index())),
                 );
+                let num = self.position.num_captured(color, piece);
+                if num > 0 {
+                    self.draw_captured_piece(ui, color, piece, num);
+                }
             }
         }
     }
 
     fn draw_piece(&self, ui: &mut Ui, square: Square, piece: ColoredPiece) {
         self.piece_images[piece].paint_at(ui, self.square_rect(square));
+    }
+
+    fn draw_captured_piece(&self, ui: &mut Ui, color: Color, piece: PieceNonWazir, num: usize) {
+        let image = &self.piece_images[Piece::from(piece).with_color(color)];
+        let rect = self.captured_rect(color, piece);
+        image.paint_at(ui, rect);
+        if num > 1 {
+            let pos = rect.left_top() + 0.8 * rect.size();
+            ui.painter()
+                .circle_filled(pos, 0.2 * self.tile_size, Color32::GREEN);
+            ui.painter().text(
+                pos,
+                Align2::CENTER_CENTER,
+                num.to_string(),
+                FontId::monospace(0.4 * self.tile_size),
+                Color32::BLACK,
+            );
+        }
+    }
+
+    fn draw_to_move(&self, ui: &mut Ui) {
+        if self.position.stage() != Stage::End {
+            let x = 1.1 * self.tile_size;
+            let y = if self.position.to_move() == self.pov_color() {
+                0.8 * self.tile_size
+            } else {
+                ((Coord::HEIGHT + 1) as f32 + 0.2) * self.tile_size
+            };
+            let color = match self.position.to_move() {
+                Color::Red => Color32::WHITE,
+                Color::Blue => Color32::BLACK,
+            };
+            let pos = Pos2::new(x, y);
+            ui.painter()
+                .circle_filled(Pos2::new(x, y), 0.12 * self.tile_size, Color32::BLACK);
+            ui.painter()
+                .circle_filled(Pos2::new(x, y), 0.1 * self.tile_size, color);
+        }
     }
 
     fn pov_color(&self) -> Color {

@@ -72,6 +72,10 @@ impl Position {
         None
     }
 
+    pub fn piece_map(&self, color: Color, piece: Piece) -> Bitboard {
+        self.piece_maps[color][piece]
+    }
+
     pub fn num_captured(&self, color: Color, piece: PieceNonWazir) -> usize {
         self.captured[color][piece].into()
     }
