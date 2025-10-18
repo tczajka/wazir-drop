@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use eframe::{
     App,
     egui::{
@@ -7,6 +5,7 @@ use eframe::{
         Ui, Vec2, ViewportBuilder, include_image,
     },
 };
+use std::str::FromStr;
 use wazir_drop::{
     Color, ColoredPiece, Coord, Piece, PieceNonWazir, Position, Square, Stage,
     enums::{EnumMap, SimpleEnumExt},
@@ -24,25 +23,12 @@ fn main() {
     .unwrap();
 }
 
+#[derive(Debug)]
 struct WazirDropApp {
     reverse: bool,
     piece_images: EnumMap<ColoredPiece, Image<'static>>,
     tile_size: f32,
     position: Position,
-}
-
-impl App for WazirDropApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.set_theme(Theme::Light);
-
-        SidePanel::right("side panel")
-            .resizable(false)
-            .show(ctx, |ui| {
-                ui.checkbox(&mut self.reverse, "Reverse view");
-            });
-
-        CentralPanel::default().show(ctx, |ui| self.update_chessboard(ui));
-    }
 }
 
 impl WazirDropApp {
@@ -270,4 +256,24 @@ add.w..a
             piece = Piece::from(piece).with_color(color)
         );
     }
+}
+
+impl App for WazirDropApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.set_theme(Theme::Light);
+
+        SidePanel::right("side panel")
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.checkbox(&mut self.reverse, "Reverse view");
+            });
+
+        CentralPanel::default().show(ctx, |ui| self.update_chessboard(ui));
+    }
+}
+
+#[derive(Debug)]
+enum NextMoveState {
+    Regular { from: Option<Square> },
+    EndOfGame,
 }

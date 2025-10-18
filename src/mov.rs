@@ -2,7 +2,7 @@ use crate::{
     enums::EnumMap,
     impl_from_str_for_parsable,
     parser::{self, ParseError, Parser, ParserExt},
-    Color, ColoredPiece, Piece, Square,
+    Color, ColoredPiece, Piece, PieceNonWazir, Square,
 };
 use std::{
     array,
@@ -169,28 +169,47 @@ impl Display for Move {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ShortMoveFrom {
+    Piece { color: Color, piece: PieceNonWazir },
+    Square(Square),
+}
+
+impl ShortMoveFrom {
+    pub fn parser() -> impl Parser<Output = Self> {
+        Square::parser()
+            .map(ShortMoveFrom::Square)
+            .or(ColoredPiece::parser().try_map(|cpiece| {
+                let color = cpiece.color();
+                let piece = PieceNonWazir::try_from(cpiece.piece()).map_err(|_| ParseError)?;
+                Ok(ShortMoveFrom::Piece { color, piece })
+            }))
+    }
+}
+
+impl Display for ShortMoveFrom {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match *self {
+            ShortMoveFrom::Piece { color, piece } => {
+                write!(f, "{}", Piece::from(piece).with_color(color))
+            }
+            ShortMoveFrom::Square(square) => write!(f, "{square}"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ShortMove {
     Opening(OpeningMove),
-    Slide {
-        from: Square,
-        to: Square,
-    },
-    Drop {
-        colored_piece: ColoredPiece,
-        to: Square,
-    },
+    Regular { from: ShortMoveFrom, to: Square },
 }
 
 impl ShortMove {
     pub fn parser() -> impl Parser<Output = Self> {
         OpeningMove::parser()
             .map(ShortMove::Opening)
-            .or(Square::parser()
+            .or(ShortMoveFrom::parser()
                 .and(Square::parser())
-                .map(|(from, to)| ShortMove::Slide { from, to }))
-            .or(ColoredPiece::parser()
-                .and(Square::parser())
-                .map(|(colored_piece, to)| ShortMove::Drop { colored_piece, to }))
+                .map(|(from, to)| ShortMove::Regular { from, to }))
     }
 }
 
@@ -200,8 +219,7 @@ impl Display for ShortMove {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             ShortMove::Opening(mov) => write!(f, "{mov}"),
-            ShortMove::Slide { from, to } => write!(f, "{from}{to}"),
-            ShortMove::Drop { colored_piece, to } => write!(f, "{colored_piece}{to}"),
+            ShortMove::Regular { from, to } => write!(f, "{from}{to}"),
         }
     }
 }
@@ -210,13 +228,23 @@ impl From<Move> for ShortMove {
     fn from(mov: Move) -> Self {
         match mov {
             Move::Opening(mov) => ShortMove::Opening(mov),
-            Move::Regular(mov) => match mov.from {
-                None => ShortMove::Drop {
-                    colored_piece: mov.colored_piece,
+            Move::Regular(mov) => {
+                let piece = mov
+                    .colored_piece
+                    .piece()
+                    .try_into()
+                    .expect("Dropping wazir");
+                ShortMove::Regular {
+                    from: match mov.from {
+                        None => ShortMoveFrom::Piece {
+                            color: mov.colored_piece.color(),
+                            piece,
+                        },
+                        Some(from) => ShortMoveFrom::Square(from),
+                    },
                     to: mov.to,
-                },
-                Some(from) => ShortMove::Slide { from, to: mov.to },
-            },
+                }
+            }
         }
     }
 }

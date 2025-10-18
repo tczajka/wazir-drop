@@ -3,7 +3,7 @@ use crate::{
     impl_from_str_for_parsable, movegen,
     parser::{self, ParseError, Parser, ParserExt},
     unsafe_simple_enum, Bitboard, Color, ColoredPiece, Coord, InvalidMove, Move, OpeningMove,
-    Piece, PieceNonWazir, RegularMove, ShortMove, Square,
+    Piece, PieceNonWazir, RegularMove, ShortMove, ShortMoveFrom, Square,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -213,12 +213,11 @@ impl Position {
                 mov.validate_pieces()?;
                 Ok(Move::Opening(mov))
             }
-            ShortMove::Slide { from, to } => {
-                let colored_piece = self.square(from).ok_or(InvalidMove)?;
-                if self.stage != Stage::Regular || colored_piece.color() != self.to_move {
+            ShortMove::Regular { from, to } => {
+                if self.stage != Stage::Regular {
                     return Err(InvalidMove);
                 }
-                movegen::validate_from_to(colored_piece.piece(), from, to)?;
+
                 let captured = match self.square(to) {
                     None => None,
                     Some(captured) => {
@@ -228,27 +227,29 @@ impl Position {
                         Some(captured.piece())
                     }
                 };
-                Ok(Move::Regular(RegularMove {
-                    colored_piece,
-                    from: Some(from),
-                    captured,
-                    to,
-                }))
-            }
-            ShortMove::Drop { colored_piece, to } => {
-                let piece_non_wazir =
-                    PieceNonWazir::try_from(colored_piece.piece()).map_err(|_| InvalidMove)?;
-                if self.stage != Stage::Regular
-                    || colored_piece.color() != self.to_move
-                    || self.square(to).is_some()
-                    || self.num_captured(self.to_move, piece_non_wazir) == 0
-                {
+
+                let (colored_piece, from) = match from {
+                    ShortMoveFrom::Piece { color, piece } => {
+                        if captured.is_some() || self.num_captured(color, piece) == 0 {
+                            return Err(InvalidMove);
+                        }
+
+                        (Piece::from(piece).with_color(color), None)
+                    }
+                    ShortMoveFrom::Square(square) => {
+                        let piece = self.square(square).ok_or(InvalidMove)?;
+                        movegen::validate_from_to(piece.piece(), square, to)?;
+                        (piece, Some(square))
+                    }
+                };
+
+                if colored_piece.color() != self.to_move {
                     return Err(InvalidMove);
                 }
                 Ok(Move::Regular(RegularMove {
                     colored_piece,
-                    from: None,
-                    captured: None,
+                    from,
+                    captured,
                     to,
                 }))
             }
