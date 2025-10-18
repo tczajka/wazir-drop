@@ -64,6 +64,14 @@ fn test_remove() {
 }
 
 #[test]
+fn test_first() {
+    let bitboard = Bitboard::single(Square::B3) | Bitboard::single(Square::B4);
+    assert_eq!(bitboard.first(), Some(Square::B3));
+    let bitboard = Bitboard::EMPTY;
+    assert_eq!(bitboard.first(), None);
+}
+
+#[test]
 fn test_or() {
     let a = Bitboard::single(Square::B3);
     let b = Bitboard::single(Square::B4);
@@ -144,4 +152,13 @@ fn test_is_subset_of() {
     assert!(a.is_subset_of(a));
     assert!(a.is_subset_of(a | b));
     assert!(!(a | b).is_subset_of(a));
+}
+
+#[test]
+fn test_into_iter() {
+    let bitboard = Bitboard::single(Square::B3) | Bitboard::single(Square::B4);
+    let mut iter = bitboard.into_iter();
+    assert_eq!(iter.next(), Some(Square::B3));
+    assert_eq!(iter.next(), Some(Square::B4));
+    assert_eq!(iter.next(), None);
 }

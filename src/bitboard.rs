@@ -49,6 +49,16 @@ impl Bitboard {
     pub fn is_subset_of(self, other: Bitboard) -> bool {
         (self & !other).is_empty()
     }
+
+    pub fn first(self) -> Option<Square> {
+        if self.is_empty() {
+            None
+        } else {
+            let index = self.0.trailing_zeros().try_into().unwrap();
+            let square = unsafe { Square::from_index_unchecked(index) };
+            Some(square)
+        }
+    }
 }
 
 impl BitAnd for Bitboard {
@@ -114,5 +124,26 @@ impl Display for Bitboard {
             writeln!(f)?;
         }
         Ok(())
+    }
+}
+
+impl IntoIterator for Bitboard {
+    type Item = Square;
+    type IntoIter = BitboardIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        BitboardIterator(self)
+    }
+}
+
+pub struct BitboardIterator(Bitboard);
+
+impl Iterator for BitboardIterator {
+    type Item = Square;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let square = self.0.first()?;
+        self.0.remove(square);
+        Some(square)
     }
 }

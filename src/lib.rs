@@ -14,7 +14,7 @@ mod piece;
 mod position;
 mod square;
 
-pub use bitboard::Bitboard;
+pub use bitboard::{Bitboard, BitboardIterator};
 pub use color::Color;
 pub use mov::{InvalidMove, Move, OpeningMove, RegularMove, ShortMove};
 pub use piece::{ColoredPiece, Piece, PieceNonWazir};
