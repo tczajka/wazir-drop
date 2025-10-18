@@ -247,9 +247,8 @@ add.w..a
             };
             let pos = Pos2::new(x, y);
             ui.painter()
-                .circle_filled(Pos2::new(x, y), 0.12 * self.tile_size, Color32::BLACK);
-            ui.painter()
-                .circle_filled(Pos2::new(x, y), 0.1 * self.tile_size, color);
+                .circle_filled(pos, 0.12 * self.tile_size, Color32::BLACK);
+            ui.painter().circle_filled(pos, 0.1 * self.tile_size, color);
         }
     }
 
