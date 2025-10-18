@@ -229,12 +229,16 @@ impl Position {
                 };
 
                 let (colored_piece, from) = match from {
-                    ShortMoveFrom::Piece { color, piece } => {
-                        if captured.is_some() || self.num_captured(color, piece) == 0 {
+                    ShortMoveFrom::Piece(cpiece) => {
+                        let piece = cpiece.piece();
+                        let piece_non_wazir =
+                            PieceNonWazir::try_from(piece).map_err(|_| InvalidMove)?;
+                        if captured.is_some()
+                            || self.num_captured(cpiece.color(), piece_non_wazir) == 0
+                        {
                             return Err(InvalidMove);
                         }
-
-                        (Piece::from(piece).with_color(color), None)
+                        (cpiece, None)
                     }
                     ShortMoveFrom::Square(square) => {
                         let piece = self.square(square).ok_or(InvalidMove)?;

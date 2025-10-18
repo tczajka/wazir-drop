@@ -7,7 +7,7 @@ use eframe::{
 };
 use std::str::FromStr;
 use wazir_drop::{
-    Color, ColoredPiece, Coord, Piece, PieceNonWazir, Position, Square, Stage,
+    Color, ColoredPiece, Coord, Piece, PieceNonWazir, Position, ShortMoveFrom, Square, Stage,
     enums::{EnumMap, SimpleEnumExt},
 };
 
@@ -274,6 +274,6 @@ impl App for WazirDropApp {
 
 #[derive(Debug)]
 enum NextMoveState {
-    Regular { from: Option<Square> },
+    HumanRegular { from: Option<ShortMoveFrom> },
     EndOfGame,
 }

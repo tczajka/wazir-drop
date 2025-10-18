@@ -2,7 +2,7 @@ use crate::{
     enums::EnumMap,
     impl_from_str_for_parsable,
     parser::{self, ParseError, Parser, ParserExt},
-    Color, ColoredPiece, Piece, PieceNonWazir, Square,
+    Color, ColoredPiece, Piece, Square,
 };
 use std::{
     array,
@@ -170,7 +170,7 @@ impl Display for Move {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ShortMoveFrom {
-    Piece { color: Color, piece: PieceNonWazir },
+    Piece(ColoredPiece),
     Square(Square),
 }
 
@@ -178,20 +178,14 @@ impl ShortMoveFrom {
     pub fn parser() -> impl Parser<Output = Self> {
         Square::parser()
             .map(ShortMoveFrom::Square)
-            .or(ColoredPiece::parser().try_map(|cpiece| {
-                let color = cpiece.color();
-                let piece = PieceNonWazir::try_from(cpiece.piece()).map_err(|_| ParseError)?;
-                Ok(ShortMoveFrom::Piece { color, piece })
-            }))
+            .or(ColoredPiece::parser().map(ShortMoveFrom::Piece))
     }
 }
 
 impl Display for ShortMoveFrom {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match *self {
-            ShortMoveFrom::Piece { color, piece } => {
-                write!(f, "{}", Piece::from(piece).with_color(color))
-            }
+            ShortMoveFrom::Piece(cpiece) => write!(f, "{cpiece}"),
             ShortMoveFrom::Square(square) => write!(f, "{square}"),
         }
     }
@@ -228,23 +222,13 @@ impl From<Move> for ShortMove {
     fn from(mov: Move) -> Self {
         match mov {
             Move::Opening(mov) => ShortMove::Opening(mov),
-            Move::Regular(mov) => {
-                let piece = mov
-                    .colored_piece
-                    .piece()
-                    .try_into()
-                    .expect("Dropping wazir");
-                ShortMove::Regular {
-                    from: match mov.from {
-                        None => ShortMoveFrom::Piece {
-                            color: mov.colored_piece.color(),
-                            piece,
-                        },
-                        Some(from) => ShortMoveFrom::Square(from),
-                    },
-                    to: mov.to,
-                }
-            }
+            Move::Regular(mov) => ShortMove::Regular {
+                from: match mov.from {
+                    None => ShortMoveFrom::Piece(mov.colored_piece),
+                    Some(from) => ShortMoveFrom::Square(from),
+                },
+                to: mov.to,
+            },
         }
     }
 }
