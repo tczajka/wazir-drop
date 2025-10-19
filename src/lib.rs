@@ -8,15 +8,15 @@ pub mod parser;
 
 mod bitboard;
 mod color;
-mod mov;
 pub mod movegen;
+mod moves;
 mod piece;
 mod position;
 mod square;
 
 pub use bitboard::{Bitboard, BitboardIterator};
 pub use color::Color;
-pub use mov::{InvalidMove, Move, OpeningMove, RegularMove, ShortMove, ShortMoveFrom};
+pub use moves::{InvalidMove, Move, OpeningMove, RegularMove, ShortMove, ShortMoveFrom};
 pub use piece::{ColoredPiece, Piece, PieceNonWazir};
 pub use position::{InvalidPosition, Position, Stage};
 pub use square::{Coord, Direction, Square};
