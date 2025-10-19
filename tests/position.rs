@@ -16,7 +16,6 @@ fn test_display_from_str() {
 opening
 red
 
-
 ........
 ........
 ........
@@ -34,7 +33,6 @@ red
 opening
 red
 
-
 W.......
 ........
 ........
@@ -49,7 +47,6 @@ W.......
     let s = "\
 opening
 blue
-
 
 WNFFDDDD
 AAAAAAAA
@@ -68,7 +65,6 @@ AAAAAAAA
 opening
 blue
 
-
 WNFFDDDD
 AAAAAAA.
 .......A
@@ -83,8 +79,7 @@ AAAAAAA.
     let s = "\
 regular
 red
-AF
-f
+AFf
 .W.A.D.D
 AaFA.DDA
 ..A.A.A.
@@ -102,8 +97,7 @@ add.w..a
     let s = "\
 regular
 red
-AFF
-f
+AFFf
 .W.A.D.D
 AaFA.DDA
 ..A.A.A.
@@ -120,8 +114,7 @@ add.w..a
     let s = "\
 regular
 red
-A
-f
+Af
 .W.A.D.D
 AaFA.DDA
 ..A.A.A.
@@ -137,8 +130,7 @@ add.w..a
     let s = "\
 regular
 red
-A
-f
+Af
 .W.A.D.D
 AaFA.DDA
 ..A.A.A.
@@ -155,8 +147,7 @@ add.w..a
     let s = "\
 end
 red
-AF
-fw
+AFfw
 ...A.D.D
 AaFA.DDA
 ..A.A.A.
@@ -174,8 +165,7 @@ add.w..a
     let s = "\
 end
 red
-AF
-f
+AFf
 .W.A.D.D
 AaFA.DDA
 ..A.A.A.
@@ -193,7 +183,6 @@ fn test_move_from_short_move() {
     let s = "\
 opening
 red
-
 
 ........
 ........
@@ -220,8 +209,7 @@ red
     let s = "\
 regular
 red
-AF
-f
+AFf
 .W.A.D.D
 AaFA.DDA
 ..A.A.A.
@@ -270,7 +258,6 @@ fn test_make_move() {
 opening
 red
 
-
 ........
 ........
 ........
@@ -291,7 +278,6 @@ red
         "\
 opening
 blue
-
 
 AWNAADAD
 AFFAADDA
@@ -317,7 +303,6 @@ AFFAADDA
 regular
 red
 
-
 AWNAADAD
 AFFAADDA
 ........
@@ -333,8 +318,7 @@ affaadda
         "\
 regular
 red
-AF
-f
+AFf
 .W.A.D.D
 AaFA.DDA
 ..A.A.A.
@@ -357,8 +341,7 @@ add.w..a
         "\
 regular
 blue
-F
-f
+Ff
 AW.A.D.D
 AaFA.DDA
 ..A.A.A.
@@ -383,8 +366,7 @@ add.w..a
         "\
 regular
 blue
-AF
-f
+AFf
 ..WA.D.D
 AaFA.DDA
 ..A.A.A.
@@ -410,8 +392,7 @@ add.w..a
         "\
 regular
 blue
-AAF
-f
+AAFf
 ...A.D.D
 AWFA.DDA
 ..A.A.A.
@@ -430,8 +411,7 @@ add.w..a
         "\
 regular
 blue
-AF
-f
+AFf
 .W.A.D.D
 AaFA.DDA
 n.A.A.A.
@@ -452,8 +432,7 @@ add.w..a
         "\
 end
 red
-AF
-fw
+AFfw
 .n.A.D.D
 AaFA.DDA
 ..A.A.A.

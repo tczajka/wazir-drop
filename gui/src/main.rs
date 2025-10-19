@@ -42,8 +42,7 @@ impl WazirDropApp {
                 "\
 regular
 red
-AFF
-f
+AFFf
 .W.A.D.D
 Aa.A.DDA
 ..A.A.A.
@@ -107,14 +106,14 @@ add.w..a
         )
     }
 
-    fn captured_rect(&self, color: Color, piece: Piece) -> Rect {
-        let x = Coord::WIDTH + 2 + piece.index();
+    fn captured_rect(&self, cpiece: ColoredPiece) -> Rect {
+        let x = Coord::WIDTH + 2 + cpiece.piece().index();
         let y = 1
             + (Coord::HEIGHT - 1)
                 * (if self.reverse {
-                    color.opposite().index()
+                    cpiece.color().opposite().index()
                 } else {
-                    color.index()
+                    cpiece.color().index()
                 });
 
         Rect::from_min_size(
@@ -178,21 +177,19 @@ add.w..a
     }
 
     fn update_captured(&mut self, ui: &mut Ui) {
-        for color in Color::all() {
-            for piece in Piece::all() {
-                let rect = self.captured_rect(color, piece);
-                if ui.allocate_rect(rect, Sense::click()).clicked() {
-                    self.click_captured(color, piece);
-                }
-                ui.painter().rect_filled(
-                    rect,
-                    0.0,
-                    Self::square_color(Square::from_index(piece.index())),
-                );
-                let num = self.position.num_captured(color, piece);
-                if num > 0 {
-                    self.draw_captured_piece(ui, color, piece, num);
-                }
+        for cpiece in ColoredPiece::all() {
+            let rect = self.captured_rect(cpiece);
+            if ui.allocate_rect(rect, Sense::click()).clicked() {
+                self.click_captured(cpiece);
+            }
+            ui.painter().rect_filled(
+                rect,
+                0.0,
+                Self::square_color(Square::from_index(cpiece.piece().index())),
+            );
+            let num = self.position.num_captured(cpiece);
+            if num > 0 {
+                self.draw_captured_piece(ui, cpiece, num);
             }
         }
     }
@@ -201,9 +198,9 @@ add.w..a
         self.piece_images[piece].paint_at(ui, self.square_rect(square));
     }
 
-    fn draw_captured_piece(&self, ui: &mut Ui, color: Color, piece: Piece, num: usize) {
-        let image = &self.piece_images[piece.with_color(color)];
-        let rect = self.captured_rect(color, piece);
+    fn draw_captured_piece(&self, ui: &mut Ui, cpiece: ColoredPiece, num: usize) {
+        let image = &self.piece_images[cpiece];
+        let rect = self.captured_rect(cpiece);
         image.paint_at(ui, rect);
         if num > 1 {
             let pos = rect.left_top() + 0.8 * rect.size();
@@ -250,11 +247,8 @@ add.w..a
         println!("Clicked on square {square}");
     }
 
-    fn click_captured(&mut self, color: Color, piece: Piece) {
-        println!(
-            "Clicked on captured {piece}",
-            piece = piece.with_color(color)
-        );
+    fn click_captured(&mut self, cpiece: ColoredPiece) {
+        println!("Clicked on captured {cpiece}");
     }
 }
 
