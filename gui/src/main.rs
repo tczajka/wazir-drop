@@ -7,7 +7,7 @@ use eframe::{
 };
 use std::str::FromStr;
 use wazir_drop::{
-    Color, ColoredPiece, Coord, Piece, PieceNonWazir, Position, ShortMoveFrom, Square, Stage,
+    Color, ColoredPiece, Coord, Piece, Position, ShortMoveFrom, Square, Stage,
     enums::{EnumMap, SimpleEnumExt},
 };
 
@@ -87,7 +87,7 @@ add.w..a
 
     fn update_chessboard(&mut self, ui: &mut Ui) {
         let size = ui.available_size();
-        self.tile_size = (size.x / (Coord::WIDTH + PieceNonWazir::COUNT + 3) as f32)
+        self.tile_size = (size.x / (Coord::WIDTH + Piece::COUNT + 3) as f32)
             .min(size.y / (Coord::HEIGHT + 2) as f32);
 
         self.draw_coordinates(ui);
@@ -107,7 +107,7 @@ add.w..a
         )
     }
 
-    fn captured_rect(&self, color: Color, piece: PieceNonWazir) -> Rect {
+    fn captured_rect(&self, color: Color, piece: Piece) -> Rect {
         let x = Coord::WIDTH + 2 + piece.index();
         let y = 1
             + (Coord::HEIGHT - 1)
@@ -179,7 +179,7 @@ add.w..a
 
     fn update_captured(&mut self, ui: &mut Ui) {
         for color in Color::all() {
-            for piece in PieceNonWazir::all() {
+            for piece in Piece::all() {
                 let rect = self.captured_rect(color, piece);
                 if ui.allocate_rect(rect, Sense::click()).clicked() {
                     self.click_captured(color, piece);
@@ -201,8 +201,8 @@ add.w..a
         self.piece_images[piece].paint_at(ui, self.square_rect(square));
     }
 
-    fn draw_captured_piece(&self, ui: &mut Ui, color: Color, piece: PieceNonWazir, num: usize) {
-        let image = &self.piece_images[Piece::from(piece).with_color(color)];
+    fn draw_captured_piece(&self, ui: &mut Ui, color: Color, piece: Piece, num: usize) {
+        let image = &self.piece_images[piece.with_color(color)];
         let rect = self.captured_rect(color, piece);
         image.paint_at(ui, rect);
         if num > 1 {
@@ -250,10 +250,10 @@ add.w..a
         println!("Clicked on square {square}");
     }
 
-    fn click_captured(&mut self, color: Color, piece: PieceNonWazir) {
+    fn click_captured(&mut self, color: Color, piece: Piece) {
         println!(
             "Clicked on captured {piece}",
-            piece = Piece::from(piece).with_color(color)
+            piece = piece.with_color(color)
         );
     }
 }

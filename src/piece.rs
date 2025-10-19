@@ -86,41 +86,6 @@ impl Piece {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PieceNonWazir {
-    Alfil,
-    Dabbaba,
-    Ferz,
-    Knight,
-}
-
-unsafe_simple_enum!(PieceNonWazir, 4);
-
-impl From<PieceNonWazir> for Piece {
-    fn from(piece: PieceNonWazir) -> Self {
-        match piece {
-            PieceNonWazir::Alfil => Self::Alfil,
-            PieceNonWazir::Dabbaba => Self::Dabbaba,
-            PieceNonWazir::Ferz => Self::Ferz,
-            PieceNonWazir::Knight => Self::Knight,
-        }
-    }
-}
-
-impl TryFrom<Piece> for PieceNonWazir {
-    type Error = ();
-
-    fn try_from(piece: Piece) -> Result<Self, Self::Error> {
-        match piece {
-            Piece::Alfil => Ok(PieceNonWazir::Alfil),
-            Piece::Dabbaba => Ok(PieceNonWazir::Dabbaba),
-            Piece::Ferz => Ok(PieceNonWazir::Ferz),
-            Piece::Knight => Ok(PieceNonWazir::Knight),
-            Piece::Wazir => Err(()),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum ColoredPiece {
     RedAlfil,

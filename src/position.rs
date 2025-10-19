@@ -3,7 +3,7 @@ use crate::{
     impl_from_str_for_parsable, movegen,
     parser::{self, ParseError, Parser, ParserExt},
     unsafe_simple_enum, Bitboard, Color, ColoredPiece, Coord, InvalidMove, Move, OpeningMove,
-    Piece, PieceNonWazir, RegularMove, ShortMove, ShortMoveFrom, Square,
+    Piece, RegularMove, ShortMove, ShortMoveFrom, Square,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -49,7 +49,7 @@ pub struct Position {
     stage: Stage,
     to_move: Color,
     piece_maps: EnumMap<Color, EnumMap<Piece, Bitboard>>,
-    captured: EnumMap<Color, EnumMap<PieceNonWazir, u8>>,
+    captured: EnumMap<Color, EnumMap<Piece, u8>>,
 }
 
 impl Position {
@@ -76,7 +76,7 @@ impl Position {
         self.piece_maps[color][piece]
     }
 
-    pub fn num_captured(&self, color: Color, piece: PieceNonWazir) -> usize {
+    pub fn num_captured(&self, color: Color, piece: Piece) -> usize {
         self.captured[color][piece].into()
     }
 
@@ -101,11 +101,11 @@ impl Position {
             )
     }
 
-    fn captured_parser(color: Color) -> impl Parser<Output = EnumMap<PieceNonWazir, u8>> {
+    fn captured_parser(color: Color) -> impl Parser<Output = EnumMap<Piece, u8>> {
         ColoredPiece::parser()
             .try_map(move |cpiece| {
                 if cpiece.color() == color {
-                    PieceNonWazir::try_from(cpiece.piece()).map_err(|_| ParseError)
+                    Ok(cpiece.piece())
                 } else {
                     Err(ParseError)
                 }
@@ -145,7 +145,7 @@ impl Position {
         stage: Stage,
         to_move: Color,
         piece_maps: EnumMap<Color, EnumMap<Piece, Bitboard>>,
-        captured: EnumMap<Color, EnumMap<PieceNonWazir, u8>>,
+        captured: EnumMap<Color, EnumMap<Piece, u8>>,
     ) -> Result<Position, InvalidPosition> {
         match stage {
             Stage::Opening => {
@@ -174,25 +174,34 @@ impl Position {
                 }
             }
             Stage::Regular | Stage::End => {
-                for piece in PieceNonWazir::all() {
+                for piece in Piece::all() {
                     let mut count = 0;
                     for color in Color::all() {
-                        count += piece_maps[color][piece.into()].count();
+                        count += piece_maps[color][piece].count();
                         count += usize::from(captured[color][piece]);
                     }
-                    if count != Color::COUNT * Piece::from(piece).initial_count() {
+                    if count != Color::COUNT * piece.initial_count() {
                         return Err(InvalidPosition);
                     }
                 }
-                for color in Color::all() {
-                    let expected_wazirs = if stage == Stage::End && color == to_move {
-                        0
-                    } else {
-                        1
-                    };
-                    if piece_maps[color][Piece::Wazir].count() != expected_wazirs {
-                        return Err(InvalidPosition);
+
+                // Check wazirs.
+                match stage {
+                    Stage::Regular => {
+                        for color in Color::all() {
+                            if piece_maps[color][Piece::Wazir].count() != 1 {
+                                return Err(InvalidPosition);
+                            }
+                        }
                     }
+                    Stage::End => {
+                        if piece_maps[to_move.opposite()][Piece::Wazir].count() != 1
+                            || captured[to_move.opposite()][Piece::Wazir] != 1
+                        {
+                            return Err(InvalidPosition);
+                        }
+                    }
+                    _ => unreachable!(),
                 }
             }
         }
@@ -230,11 +239,8 @@ impl Position {
 
                 let (colored_piece, from) = match from {
                     ShortMoveFrom::Piece(cpiece) => {
-                        let piece = cpiece.piece();
-                        let piece_non_wazir =
-                            PieceNonWazir::try_from(piece).map_err(|_| InvalidMove)?;
                         if captured.is_some()
-                            || self.num_captured(cpiece.color(), piece_non_wazir) == 0
+                            || self.num_captured(cpiece.color(), cpiece.piece()) == 0
                         {
                             return Err(InvalidMove);
                         }
@@ -293,8 +299,7 @@ impl Position {
         let mut new_position = *self;
         match mov.from {
             None => {
-                let entered = PieceNonWazir::try_from(piece).map_err(|_| InvalidMove)?;
-                let count = &mut new_position.captured[color][entered];
+                let count = &mut new_position.captured[color][piece];
                 *count = count.checked_sub(1).ok_or(InvalidMove)?;
             }
             Some(from) => {
@@ -318,14 +323,9 @@ impl Position {
                     return Err(InvalidMove);
                 }
                 map.remove(mov.to);
-
-                match PieceNonWazir::try_from(captured) {
-                    Ok(c) => {
-                        new_position.captured[color][c] += 1;
-                    }
-                    Err(()) => {
-                        new_position.stage = Stage::End;
-                    }
+                new_position.captured[color][captured] += 1;
+                if captured == Piece::Wazir {
+                    new_position.stage = Stage::End;
                 }
             }
         }
@@ -343,7 +343,7 @@ impl Display for Position {
         writeln!(f, "{}", self.to_move)?;
         for (color, piece_counts) in self.captured.iter() {
             for (piece, &count) in piece_counts.iter() {
-                let colored_piece = Piece::from(piece).with_color(color);
+                let colored_piece = piece.with_color(color);
                 for _ in 0..count {
                     write!(f, "{colored_piece}")?;
                 }

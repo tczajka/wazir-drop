@@ -1,13 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{enums::SimpleEnumExt, ColoredPiece, Piece, PieceNonWazir};
-
-#[test]
-fn test_piece_non_wazir() {
-    for piece in PieceNonWazir::all() {
-        assert_eq!(PieceNonWazir::try_from(Piece::from(piece)), Ok(piece));
-    }
-    assert!(PieceNonWazir::try_from(Piece::Wazir).is_err());
-}
+use wazir_drop::{enums::SimpleEnumExt, ColoredPiece};
 
 #[test]
 fn test_colored_piece_display_round_trip() {

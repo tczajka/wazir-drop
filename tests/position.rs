@@ -156,7 +156,7 @@ add.w..a
 end
 red
 AF
-f
+fw
 ...A.D.D
 AaFA.DDA
 ..A.A.A.
@@ -453,7 +453,7 @@ add.w..a
 end
 red
 AF
-f
+fw
 .n.A.D.D
 AaFA.DDA
 ..A.A.A.
