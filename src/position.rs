@@ -44,7 +44,7 @@ impl Display for Stage {
 #[derive(Debug, Clone, Copy)]
 pub struct InvalidPosition;
 
-#[derive(Debug, Clone, Copy, Hash)]
+#[derive(Debug, Clone, Copy)]
 pub struct Position {
     stage: Stage,
     to_move: Color,
