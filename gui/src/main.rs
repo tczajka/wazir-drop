@@ -7,7 +7,7 @@ use eframe::{
 };
 use std::str::FromStr;
 use wazir_drop::{
-    Color, ColoredPiece, Coord, Piece, Position, ShortMoveFrom, Square, Stage,
+    Color, ColoredPiece, Coord, Move, Piece, Position, ShortMove, ShortMoveFrom, Square, Stage,
     enums::{EnumMap, SimpleEnumExt},
 };
 
@@ -29,12 +29,13 @@ struct WazirDropApp {
     piece_images: EnumMap<ColoredPiece, Image<'static>>,
     tile_size: f32,
     position: Position,
+    next_move_state: NextMoveState,
 }
 
 impl WazirDropApp {
     fn new(ctx: &eframe::CreationContext) -> Self {
         egui_extras::install_image_loaders(&ctx.egui_ctx);
-        Self {
+        let mut app = Self {
             reverse: false,
             piece_images: Self::piece_images(),
             tile_size: 0.0,
@@ -54,7 +55,10 @@ add.w..a
 ",
             )
             .unwrap(),
-        }
+            next_move_state: NextMoveState::EndOfGame,
+        };
+        app.start_next_move();
+        app
     }
 
     fn piece_images() -> EnumMap<ColoredPiece, Image<'static>> {
@@ -78,9 +82,18 @@ add.w..a
     fn square_color(square: Square) -> Color32 {
         let coord = Coord::from(square);
         if (coord.x() + coord.y()).is_multiple_of(2) {
-            Color32::from_rgb(220, 170, 100)
+            Color32::from_rgb(200, 170, 100)
         } else {
             Color32::from_rgb(150, 75, 0)
+        }
+    }
+
+    fn selected_square_color(square: Square) -> Color32 {
+        let coord = Coord::from(square);
+        if (coord.x() + coord.y()).is_multiple_of(2) {
+            Color32::from_rgb(200, 170, 250)
+        } else {
+            Color32::from_rgb(150, 75, 150)
         }
     }
 
@@ -168,8 +181,18 @@ add.w..a
             if ui.allocate_rect(rect, Sense::click()).clicked() {
                 self.click_square(square);
             }
-            ui.painter()
-                .rect_filled(rect, 0.0, Self::square_color(square));
+            let selected = match self.next_move_state {
+                NextMoveState::HumanRegular {
+                    from: Some(ShortMoveFrom::Square(from)),
+                } => from == square,
+                _ => false,
+            };
+            let color = if selected {
+                Self::selected_square_color(square)
+            } else {
+                Self::square_color(square)
+            };
+            ui.painter().rect_filled(rect, 0.0, color);
             if let Some(cpiece) = self.position.square(square) {
                 self.draw_piece(ui, square, cpiece);
             }
@@ -182,15 +205,35 @@ add.w..a
             if ui.allocate_rect(rect, Sense::click()).clicked() {
                 self.click_captured(cpiece);
             }
-            ui.painter().rect_filled(
-                rect,
-                0.0,
-                Self::square_color(Square::from_index(cpiece.piece().index())),
-            );
+            let selected = match self.next_move_state {
+                NextMoveState::HumanRegular {
+                    from: Some(ShortMoveFrom::Piece(from_cpiece)),
+                } => cpiece == from_cpiece,
+                _ => false,
+            };
+            let square = Square::from_index(cpiece.piece().index());
+            let color = if selected {
+                Self::selected_square_color(square)
+            } else {
+                Self::square_color(square)
+            };
+            ui.painter().rect_filled(rect, 0.0, color);
             let num = self.position.num_captured(cpiece);
             if num > 0 {
                 self.draw_captured_piece(ui, cpiece, num);
             }
+        }
+    }
+
+    fn start_next_move(&mut self) {
+        match self.position.stage() {
+            Stage::Opening => {
+                self.next_move_state = unimplemented!();
+            }
+            Stage::Regular => {
+                self.next_move_state = NextMoveState::HumanRegular { from: None };
+            }
+            Stage::End => {}
         }
     }
 
@@ -244,11 +287,59 @@ add.w..a
     }
 
     fn click_square(&mut self, square: Square) {
-        println!("Clicked on square {square}");
+        #[allow(clippy::single_match)]
+        match self.next_move_state {
+            NextMoveState::HumanRegular {
+                from: ref mut option_from,
+            } => match *option_from {
+                None => {
+                    if let Some(cpiece) = self.position.square(square)
+                        && cpiece.color() == self.position.to_move()
+                    {
+                        *option_from = Some(ShortMoveFrom::Square(square));
+                    }
+                }
+                Some(from) => {
+                    if from == ShortMoveFrom::Square(square) {
+                        *option_from = None;
+                    } else {
+                        let short_move = ShortMove::Regular { from, to: square };
+                        if let Ok(mov) = self.position.move_from_short_move(short_move) {
+                            self.make_move(mov);
+                        }
+                    }
+                }
+            },
+            _ => {}
+        }
     }
 
     fn click_captured(&mut self, cpiece: ColoredPiece) {
-        println!("Clicked on captured {cpiece}");
+        #[allow(clippy::single_match)]
+        match self.next_move_state {
+            NextMoveState::HumanRegular {
+                from: ref mut option_from,
+            } => match *option_from {
+                None => {
+                    if cpiece.color() == self.position.to_move()
+                        && self.position.num_captured(cpiece) > 0
+                    {
+                        *option_from = Some(ShortMoveFrom::Piece(cpiece));
+                    }
+                }
+                Some(from) => {
+                    if from == ShortMoveFrom::Piece(cpiece) {
+                        *option_from = None;
+                    }
+                }
+            },
+            _ => {}
+        }
+    }
+
+    fn make_move(&mut self, mov: Move) {
+        self.position = self.position.make_move(mov).expect("Invalid move");
+        self.start_next_move();
     }
 }
 
