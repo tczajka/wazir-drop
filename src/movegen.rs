@@ -3,7 +3,7 @@ use std::iter;
 use crate::{
     enums::{EnumMap, SimpleEnumExt},
     smallvec::SmallVec,
-    Bitboard, Color, InvalidMove, Piece, SetupMove, Square,
+    Bitboard, Color, InvalidMove, Piece, Position, RegularMove, SetupMove, Square, Stage,
 };
 
 static MOVE_BITBOARD_TABLE: EnumMap<Piece, EnumMap<Square, Bitboard>> = calc_move_bitboard_table();
@@ -103,4 +103,37 @@ impl Iterator for SetupMoveIterator {
         }
         self.mov
     }
+}
+
+// Generate all pseudomoves.
+// Includes non-escapes and suicides.
+pub fn pseudomoves(position: Position) -> impl Iterator<Item = RegularMove> {
+    captures(position)
+        .chain(pseudojumps(position))
+        .chain(drops(position))
+}
+
+// Generate all captures
+// If in check, includes non-escapes.
+pub fn captures(position: Position) -> impl Iterator<Item = RegularMove> {
+    assert!(position.stage() == Stage::Regular);
+    let me = position.to_move();
+    let opp = me.opposite();
+    let opp_mask = position.occupied_by(opp);
+    iter::empty()
+    // TODO: Implement.
+}
+
+// Generate all pseudojumps (not captures).
+// Includes non-escapes and suicides.
+pub fn pseudojumps(position: Position) -> impl Iterator<Item = RegularMove> {
+    // TODO: Implement.
+    iter::empty()
+}
+
+// Piece drops.
+// If in check, these are non-escapes.
+pub fn drops(position: Position) -> impl Iterator<Item = RegularMove> {
+    // TODO: Implement.
+    iter::empty()
 }

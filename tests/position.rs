@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{enums::SimpleEnumExt, Move, Position, ShortMove, Stage};
+use wazir_drop::{enums::SimpleEnumExt, Color, Move, Position, ShortMove, Stage};
 
 #[test]
 fn test_stage_display_round_trip() {
@@ -462,5 +462,67 @@ AaFA.DDA
 a.a...f.
 add.w..a
 ",
+    );
+}
+
+#[test]
+fn test_occupied_by() {
+    let position = Position::from_str(
+        "\
+regular
+red
+AFf
+.W.A.D.D
+AaFA.DDA
+..A.A.A.
+......A.
+...a.a.d
+..d..nN.
+a.a...f.
+add.w..a
+",
+    )
+    .unwrap();
+
+    assert_eq!(
+        position.occupied_by(Color::Red).to_string(),
+        "\
+.x.x.x.x
+x.xx.xxx
+..x.x.x.
+......x.
+........
+......x.
+........
+........
+"
+    );
+
+    assert_eq!(
+        position.occupied_by(Color::Blue).to_string(),
+        "\
+........
+.x......
+........
+........
+...x.x.x
+..x..x..
+x.x...x.
+xxx.x..x
+"
+    );
+
+    assert_eq!(
+        position.empty_squares().to_string(),
+        "\
+x.x.x.x.
+....x...
+xx.x.x.x
+xxxxxx.x
+xxx.x.x.
+xx.xx..x
+.x.xxx.x
+...x.xx.
+"
     );
 }

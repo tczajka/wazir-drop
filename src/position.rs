@@ -84,6 +84,22 @@ impl Position {
         self.piece_maps[cpiece]
     }
 
+    pub fn occupied_by(&self, color: Color) -> Bitboard {
+        let mut bitboard = Bitboard::EMPTY;
+        for piece in Piece::all() {
+            bitboard |= self.piece_map(piece.with_color(color));
+        }
+        bitboard
+    }
+
+    pub fn empty_squares(&self) -> Bitboard {
+        let mut occupied = Bitboard::EMPTY;
+        for color in Color::all() {
+            occupied |= self.occupied_by(color);
+        }
+        !occupied
+    }
+
     pub fn num_captured(&self, cpiece: ColoredPiece) -> usize {
         self.captured[cpiece].into()
     }
