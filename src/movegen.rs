@@ -1,4 +1,10 @@
-use crate::{enums::EnumMap, Bitboard, Color, InvalidMove, Piece, SetupMove, Square};
+use std::iter;
+
+use crate::{
+    enums::{EnumMap, SimpleEnumExt},
+    smallvec::SmallVec,
+    Bitboard, Color, InvalidMove, Piece, SetupMove, Square,
+};
 
 static MOVE_BITBOARD_TABLE: EnumMap<Piece, EnumMap<Square, Bitboard>> = calc_move_bitboard_table();
 
@@ -46,26 +52,55 @@ const fn calc_move_bitboard(piece: Piece, square: Square) -> Bitboard {
     bitboard
 }
 
-fn setup_moves(color: Color) -> impl Iterator<Item = SetupMove> {
-    SetupMoveIterator {
-        first: true,
-        mov: SetupMove {
-            color,
-            pieces: [Piece::Wazir; SetupMove::SIZE],
-        },
-    }
+pub fn setup_moves(color: Color) -> impl Iterator<Item = SetupMove> {
+    SetupMoveIterator { color, mov: None }
 }
 
 #[derive(Debug)]
 struct SetupMoveIterator {
-    first: bool,
-    mov: SetupMove,
+    color: Color,
+    mov: Option<SetupMove>,
 }
 
 impl Iterator for SetupMoveIterator {
     type Item = SetupMove;
 
     fn next(&mut self) -> Option<Self::Item> {
-        todo!()
+        match self.mov {
+            None => {
+                let pieces: SmallVec<Piece, { SetupMove::SIZE }> = Piece::all()
+                    .flat_map(|piece| iter::repeat_n(piece, piece.initial_count()))
+                    .collect();
+                let pieces = (&pieces[..]).try_into().unwrap();
+                self.mov = Some(SetupMove {
+                    color: self.color,
+                    pieces,
+                });
+            }
+            Some(ref mut mov) => {
+                let mut i = SetupMove::SIZE - 1;
+                loop {
+                    // mov.pieces[i..] is in non-ascending order
+                    if i == 0 {
+                        return None;
+                    }
+                    i -= 1;
+                    if mov.pieces[i] < mov.pieces[i + 1] {
+                        break;
+                    }
+                }
+                // mov.pieces[i] < mov.pieces[i+1] >= ...
+                let mut j = i + 1;
+                while j != SetupMove::SIZE - 1 && mov.pieces[i] < mov.pieces[j + 1] {
+                    j += 1;
+                }
+                // mov.pieces[i] < mov.pieces[j]
+                // mov.pieces[i] >= mov.pieces[j+1]
+                mov.pieces.swap(i, j);
+                mov.pieces[i + 1..].reverse();
+                self.mov = Some(*mov);
+            }
+        }
+        self.mov
     }
 }

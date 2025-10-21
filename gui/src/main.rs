@@ -5,11 +5,11 @@ use eframe::{
         SidePanel, Theme, Ui, Vec2, ViewportBuilder, include_image,
     },
 };
-use std::iter;
 use wazir_drop::{
     Color, ColoredPiece, Coord, Move, Piece, Position, SetupMove, ShortMove, ShortMoveFrom, Square,
     Stage,
     enums::{EnumMap, SimpleEnumExt},
+    movegen,
 };
 
 fn main() {
@@ -230,25 +230,14 @@ impl WazirDropApp {
     fn start_next_move(&mut self) {
         self.next_move_state = match self.position.stage() {
             Stage::Setup => NextMoveState::HumanSetup {
-                setup: Self::default_setup_move(self.position.to_move()),
+                setup: movegen::setup_moves(self.position.to_move())
+                    .next()
+                    .unwrap(),
                 swap_from: None,
             },
             Stage::Regular => NextMoveState::HumanRegular { from: None },
             Stage::End => NextMoveState::EndOfGame,
         };
-    }
-
-    fn default_setup_move(color: Color) -> SetupMove {
-        let pieces: Vec<Piece> = Piece::all()
-            .flat_map(|piece| iter::repeat_n(piece, piece.initial_count()))
-            .collect();
-
-        let mov = SetupMove {
-            color,
-            pieces: pieces.try_into().unwrap(),
-        };
-        mov.validate_pieces().expect("Invalid default setup move");
-        mov
     }
 
     fn draw_piece(&self, ui: &mut Ui, square: Square, piece: ColoredPiece) {

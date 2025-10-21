@@ -13,3 +13,9 @@ fn test_smallvec() {
     assert_eq!(vec.pop(), None);
     assert!(vec.is_empty());
 }
+
+#[test]
+fn test_from_iter() {
+    let vec = SmallVec::<u32, 3>::from_iter([1, 2, 3]);
+    assert_eq!(&vec[..], &[1, 2, 3]);
+}

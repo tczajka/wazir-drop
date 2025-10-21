@@ -1,4 +1,4 @@
-use wazir_drop::{movegen, Piece, Square};
+use wazir_drop::{movegen, Color, Piece, Square};
 
 #[test]
 fn test_move_bitboard() {
@@ -94,4 +94,15 @@ fn test_validate_from_to() {
     assert!(movegen::validate_from_to(Piece::Alfil, Square::D4, Square::D5).is_err());
     assert!(movegen::validate_from_to(Piece::Knight, Square::A4, Square::B2).is_ok());
     assert!(movegen::validate_from_to(Piece::Knight, Square::A4, Square::C6).is_err());
+}
+
+#[test]
+fn test_setup_moves() {
+    let mut count: u32 = 0;
+    for mov in movegen::setup_moves(Color::Red) {
+        mov.validate_pieces().unwrap();
+        count += 1;
+    }
+    // 16! / (8! 4! 2! 1! 1!) = 10810800
+    assert_eq!(count, 10810800);
 }

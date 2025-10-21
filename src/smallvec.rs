@@ -70,3 +70,13 @@ impl<T, const N: usize> DerefMut for SmallVec<T, N> {
         unsafe { &mut *(&mut self.data[..self.len] as *mut [MaybeUninit<T>] as *mut [T]) }
     }
 }
+
+impl<T, const N: usize> FromIterator<T> for SmallVec<T, N> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let mut vec = Self::new();
+        for item in iter {
+            vec.push(item);
+        }
+        vec
+    }
+}
