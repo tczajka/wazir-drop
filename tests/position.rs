@@ -10,6 +10,26 @@ fn test_stage_display_round_trip() {
 }
 
 #[test]
+fn test_position_initial() {
+    assert_eq!(
+        Position::initial().to_string(),
+        "\
+opening
+red
+
+........
+........
+........
+........
+........
+........
+........
+........
+"
+    );
+}
+
+#[test]
 fn test_display_from_str() {
     // Opening.
     let s = "\

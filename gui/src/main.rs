@@ -1,13 +1,14 @@
 use eframe::{
     App,
     egui::{
-        self, Align2, CentralPanel, Color32, FontId, Image, Pos2, Rect, Sense, SidePanel, Theme,
-        Ui, Vec2, ViewportBuilder, include_image,
+        self, Align2, CentralPanel, Color32, FontId, Image, Pos2, Rect, ScrollArea, Sense,
+        SidePanel, Theme, Ui, Vec2, ViewportBuilder, include_image,
     },
 };
-use std::str::FromStr;
+use std::iter;
 use wazir_drop::{
-    Color, ColoredPiece, Coord, Move, Piece, Position, ShortMove, ShortMoveFrom, Square, Stage,
+    Color, ColoredPiece, Coord, Move, OpeningMove, Piece, Position, ShortMove, ShortMoveFrom,
+    Square, Stage,
     enums::{EnumMap, SimpleEnumExt},
 };
 
@@ -30,6 +31,7 @@ struct WazirDropApp {
     tile_size: f32,
     position: Position,
     next_move_state: NextMoveState,
+    history: Vec<HistoryEntry>,
 }
 
 impl WazirDropApp {
@@ -39,23 +41,9 @@ impl WazirDropApp {
             reverse: false,
             piece_images: Self::piece_images(),
             tile_size: 0.0,
-            position: Position::from_str(
-                "\
-regular
-red
-AFFf
-.W.A.D.D
-Aa.A.DDA
-..A.A.A.
-......A.
-...a.a.d
-..d..nN.
-a.a...f.
-add.w..a
-",
-            )
-            .unwrap(),
-            next_move_state: NextMoveState::EndOfGame,
+            position: Position::initial(),
+            next_move_state: NextMoveState::EndOfGame, // temporary
+            history: Vec::new(),
         };
         app.start_next_move();
         app
@@ -176,15 +164,29 @@ add.w..a
     }
 
     fn update_board(&mut self, ui: &mut Ui) {
+        let position = match self.next_move_state {
+            NextMoveState::HumanOpening { opening, .. } => self
+                .position
+                .make_opening_move(opening)
+                .expect("Invalid opening move"),
+            _ => self.position,
+        };
+
         for square in Square::all() {
             let rect = self.square_rect(square);
             if ui.allocate_rect(rect, Sense::click()).clicked() {
                 self.click_square(square);
             }
             let selected = match self.next_move_state {
-                NextMoveState::HumanRegular {
-                    from: Some(ShortMoveFrom::Square(from)),
-                } => from == square,
+                NextMoveState::HumanRegular { from: Some(from) } => {
+                    let short_move = ShortMove::Regular { from, to: square };
+                    from == ShortMoveFrom::Square(square)
+                        || self.position.move_from_short_move(short_move).is_ok()
+                }
+                NextMoveState::HumanOpening {
+                    swap_from: Some(swap_from),
+                    ..
+                } => swap_from == square,
                 _ => false,
             };
             let color = if selected {
@@ -193,7 +195,7 @@ add.w..a
                 Self::square_color(square)
             };
             ui.painter().rect_filled(rect, 0.0, color);
-            if let Some(cpiece) = self.position.square(square) {
+            if let Some(cpiece) = position.square(square) {
                 self.draw_piece(ui, square, cpiece);
             }
         }
@@ -228,13 +230,29 @@ add.w..a
     fn start_next_move(&mut self) {
         match self.position.stage() {
             Stage::Opening => {
-                self.next_move_state = unimplemented!();
+                self.next_move_state = NextMoveState::HumanOpening {
+                    opening: Self::default_opening_move(self.position.to_move()),
+                    swap_from: None,
+                };
             }
             Stage::Regular => {
                 self.next_move_state = NextMoveState::HumanRegular { from: None };
             }
             Stage::End => {}
         }
+    }
+
+    fn default_opening_move(color: Color) -> OpeningMove {
+        let pieces: Vec<Piece> = Piece::all()
+            .flat_map(|piece| iter::repeat_n(piece, piece.initial_count()))
+            .collect();
+
+        let mov = OpeningMove {
+            color,
+            pieces: pieces.try_into().unwrap(),
+        };
+        mov.validate_pieces().expect("Invalid default opening move");
+        mov
     }
 
     fn draw_piece(&self, ui: &mut Ui, square: Square, piece: ColoredPiece) {
@@ -278,6 +296,15 @@ add.w..a
         }
     }
 
+    fn draw_history(&self, ui: &mut Ui) {
+        ui.heading("Moves");
+        ScrollArea::vertical().show(ui, |ui| {
+            for entry in self.history.iter() {
+                ui.label(entry.mov.to_string());
+            }
+        });
+    }
+
     fn pov_color(&self) -> Color {
         if self.reverse {
             Color::Blue
@@ -287,59 +314,76 @@ add.w..a
     }
 
     fn click_square(&mut self, square: Square) {
-        #[allow(clippy::single_match)]
         match self.next_move_state {
-            NextMoveState::HumanRegular {
-                from: ref mut option_from,
-            } => match *option_from {
-                None => {
-                    if let Some(cpiece) = self.position.square(square)
-                        && cpiece.color() == self.position.to_move()
-                    {
-                        *option_from = Some(ShortMoveFrom::Square(square));
-                    }
-                }
-                Some(from) => {
-                    if from == ShortMoveFrom::Square(square) {
-                        *option_from = None;
-                    } else {
-                        let short_move = ShortMove::Regular { from, to: square };
-                        if let Ok(mov) = self.position.move_from_short_move(short_move) {
-                            self.make_move(mov);
+            NextMoveState::HumanOpening {
+                ref mut opening,
+                ref mut swap_from,
+            } => {
+                if square.pov(opening.color).index() < OpeningMove::SIZE {
+                    match *swap_from {
+                        None => {
+                            *swap_from = Some(square);
+                        }
+                        Some(swap_from_square) => {
+                            opening.pieces.swap(
+                                swap_from_square.pov(opening.color).index(),
+                                square.pov(opening.color).index(),
+                            );
+                            *swap_from = None;
                         }
                     }
                 }
-            },
+            }
+            NextMoveState::HumanRegular { ref mut from } => {
+                if let Some(cpiece) = self.position.square(square)
+                    && cpiece.color() == self.position.to_move()
+                {
+                    if *from == Some(ShortMoveFrom::Square(square)) {
+                        *from = None;
+                    } else {
+                        *from = Some(ShortMoveFrom::Square(square));
+                    }
+                } else if let Some(from_square) = *from {
+                    let short_move = ShortMove::Regular {
+                        from: from_square,
+                        to: square,
+                    };
+                    if let Ok(mov) = self.position.move_from_short_move(short_move) {
+                        self.make_move(mov);
+                    }
+                }
+            }
             _ => {}
         }
     }
 
     fn click_captured(&mut self, cpiece: ColoredPiece) {
-        #[allow(clippy::single_match)]
-        match self.next_move_state {
-            NextMoveState::HumanRegular {
-                from: ref mut option_from,
-            } => match *option_from {
-                None => {
-                    if cpiece.color() == self.position.to_move()
-                        && self.position.num_captured(cpiece) > 0
-                    {
-                        *option_from = Some(ShortMoveFrom::Piece(cpiece));
-                    }
-                }
-                Some(from) => {
-                    if from == ShortMoveFrom::Piece(cpiece) {
-                        *option_from = None;
-                    }
-                }
-            },
-            _ => {}
+        if let NextMoveState::HumanRegular { ref mut from } = self.next_move_state
+            && cpiece.color() == self.position.to_move()
+            && self.position.num_captured(cpiece) > 0
+        {
+            if *from == Some(ShortMoveFrom::Piece(cpiece)) {
+                *from = None;
+            } else {
+                *from = Some(ShortMoveFrom::Piece(cpiece));
+            }
         }
     }
 
     fn make_move(&mut self, mov: Move) {
+        self.history.push(HistoryEntry {
+            position: self.position,
+            mov,
+        });
         self.position = self.position.make_move(mov).expect("Invalid move");
         self.start_next_move();
+    }
+
+    fn undo(&mut self) {
+        if let Some(entry) = self.history.pop() {
+            self.position = entry.position;
+            self.start_next_move();
+        }
     }
 }
 
@@ -347,11 +391,21 @@ impl App for WazirDropApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.set_theme(Theme::Light);
 
-        SidePanel::right("side panel")
-            .resizable(false)
-            .show(ctx, |ui| {
-                ui.checkbox(&mut self.reverse, "Reverse view");
-            });
+        SidePanel::right("side panel").show(ctx, |ui| {
+            ui.checkbox(&mut self.reverse, "Reverse view");
+
+            if let NextMoveState::HumanOpening { opening, .. } = &self.next_move_state
+                && ui.button("Make opening move").clicked()
+            {
+                self.make_move(Move::Opening(*opening));
+            }
+
+            if !self.history.is_empty() && ui.button("Undo").clicked() {
+                self.undo();
+            }
+
+            self.draw_history(ui);
+        });
 
         CentralPanel::default().show(ctx, |ui| self.update_chessboard(ui));
     }
@@ -359,6 +413,18 @@ impl App for WazirDropApp {
 
 #[derive(Debug)]
 enum NextMoveState {
-    HumanRegular { from: Option<ShortMoveFrom> },
+    HumanOpening {
+        opening: OpeningMove,
+        swap_from: Option<Square>,
+    },
+    HumanRegular {
+        from: Option<ShortMoveFrom>,
+    },
     EndOfGame,
+}
+
+#[derive(Debug)]
+struct HistoryEntry {
+    position: Position,
+    mov: Move,
 }

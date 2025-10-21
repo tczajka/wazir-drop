@@ -53,6 +53,16 @@ pub struct Position {
 }
 
 impl Position {
+    pub fn initial() -> Self {
+        Self::from_parts(
+            Stage::Opening,
+            Color::Red,
+            EnumMap::from_fn(|_| Bitboard::EMPTY),
+            EnumMap::from_fn(|_| 0),
+        )
+        .unwrap()
+    }
+
     pub fn stage(&self) -> Stage {
         self.stage
     }
