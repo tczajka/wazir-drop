@@ -1,4 +1,4 @@
-use crate::{enums::EnumMap, Bitboard, InvalidMove, Piece, Square};
+use crate::{enums::EnumMap, Bitboard, Color, InvalidMove, Piece, SetupMove, Square};
 
 static MOVE_BITBOARD_TABLE: EnumMap<Piece, EnumMap<Square, Bitboard>> = calc_move_bitboard_table();
 
@@ -44,4 +44,28 @@ const fn calc_move_bitboard(piece: Piece, square: Square) -> Bitboard {
         i += 1;
     }
     bitboard
+}
+
+fn setup_moves(color: Color) -> impl Iterator<Item = SetupMove> {
+    SetupMoveIterator {
+        first: true,
+        mov: SetupMove {
+            color,
+            pieces: [Piece::Wazir; SetupMove::SIZE],
+        },
+    }
+}
+
+#[derive(Debug)]
+struct SetupMoveIterator {
+    first: bool,
+    mov: SetupMove,
+}
+
+impl Iterator for SetupMoveIterator {
+    type Item = SetupMove;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        todo!()
+    }
 }
