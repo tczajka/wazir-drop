@@ -2,8 +2,8 @@ use crate::{
     enums::{EnumMap, SimpleEnumExt},
     impl_from_str_for_parsable, movegen,
     parser::{self, ParseError, Parser, ParserExt},
-    unsafe_simple_enum, Bitboard, Color, ColoredPiece, Coord, InvalidMove, Move, OpeningMove,
-    Piece, RegularMove, ShortMove, ShortMoveFrom, Square,
+    unsafe_simple_enum, Bitboard, Color, ColoredPiece, Coord, InvalidMove, Move, Piece,
+    RegularMove, SetupMove, ShortMove, ShortMoveFrom, Square,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -13,7 +13,7 @@ use std::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum Stage {
-    Opening,
+    Setup,
     Regular,
     End,
 }
@@ -22,8 +22,8 @@ unsafe_simple_enum!(Stage, 3);
 
 impl Stage {
     fn parser() -> impl Parser<Output = Self> {
-        parser::exact(b"opening")
-            .map(|_| Stage::Opening)
+        parser::exact(b"setup")
+            .map(|_| Stage::Setup)
             .or(parser::exact(b"regular").map(|_| Stage::Regular))
             .or(parser::exact(b"end").map(|_| Stage::End))
     }
@@ -34,7 +34,7 @@ impl_from_str_for_parsable!(Stage);
 impl Display for Stage {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Stage::Opening => write!(f, "opening"),
+            Stage::Setup => write!(f, "setup"),
             Stage::Regular => write!(f, "regular"),
             Stage::End => write!(f, "end"),
         }
@@ -55,7 +55,7 @@ pub struct Position {
 impl Position {
     pub fn initial() -> Self {
         Self::from_parts(
-            Stage::Opening,
+            Stage::Setup,
             Color::Red,
             EnumMap::from_fn(|_| Bitboard::EMPTY),
             EnumMap::from_fn(|_| 0),
@@ -103,7 +103,7 @@ impl Position {
 
     fn captured_parser() -> impl Parser<Output = EnumMap<ColoredPiece, u8>> {
         ColoredPiece::parser()
-            .repeat(0..=Color::COUNT * OpeningMove::SIZE)
+            .repeat(0..=Color::COUNT * SetupMove::SIZE)
             .map(move |pieces| {
                 let mut captured = EnumMap::from_fn(|_| 0);
                 for piece in pieces {
@@ -141,7 +141,7 @@ impl Position {
         captured: EnumMap<ColoredPiece, u8>,
     ) -> Result<Position, InvalidPosition> {
         // Verify total piece count.
-        if stage != Stage::Opening {
+        if stage != Stage::Setup {
             for piece in Piece::all() {
                 let mut count = 0;
                 for color in Color::all() {
@@ -156,7 +156,7 @@ impl Position {
         }
 
         match stage {
-            Stage::Opening => {
+            Stage::Setup => {
                 // Verify correct pieces placed in the right squares and nothing captured.
                 for cpiece in ColoredPiece::all() {
                     let want = if cpiece.color() < to_move {
@@ -199,12 +199,12 @@ impl Position {
 
     pub fn move_from_short_move(&self, short_move: ShortMove) -> Result<Move, InvalidMove> {
         match short_move {
-            ShortMove::Opening(mov) => {
-                if self.stage != Stage::Opening || mov.color != self.to_move {
+            ShortMove::Setup(mov) => {
+                if self.stage != Stage::Setup || mov.color != self.to_move {
                     return Err(InvalidMove);
                 }
                 mov.validate_pieces()?;
-                Ok(Move::Opening(mov))
+                Ok(Move::Setup(mov))
             }
             ShortMove::Regular { from, to } => {
                 if self.stage != Stage::Regular {
@@ -250,13 +250,13 @@ impl Position {
 
     pub fn make_move(&self, mov: Move) -> Result<Position, InvalidMove> {
         match mov {
-            Move::Opening(mov) => self.make_opening_move(mov),
+            Move::Setup(mov) => self.make_setup_move(mov),
             Move::Regular(mov) => self.make_regular_move(mov),
         }
     }
 
-    pub fn make_opening_move(&self, mov: OpeningMove) -> Result<Position, InvalidMove> {
-        if self.stage != Stage::Opening || mov.color != self.to_move {
+    pub fn make_setup_move(&self, mov: SetupMove) -> Result<Position, InvalidMove> {
+        if self.stage != Stage::Setup || mov.color != self.to_move {
             return Err(InvalidMove);
         }
         mov.validate_pieces()?;

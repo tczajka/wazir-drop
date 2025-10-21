@@ -14,18 +14,18 @@ use std::{
 pub struct InvalidMove;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct OpeningMove {
+pub struct SetupMove {
     pub color: Color,
     // From square 0 or square 63.
     pub pieces: [Piece; Self::SIZE],
 }
 
-impl OpeningMove {
+impl SetupMove {
     pub const SIZE: usize = 16;
 
     fn parser() -> impl Parser<Output = Self> {
         ColoredPiece::parser()
-            .repeat(OpeningMove::SIZE..=OpeningMove::SIZE)
+            .repeat(SetupMove::SIZE..=SetupMove::SIZE)
             .try_map(|colored_pieces| {
                 let color = colored_pieces[0].color();
                 if colored_pieces.iter().any(|p| p.color() != color) {
@@ -38,7 +38,7 @@ impl OpeningMove {
                         pieces.reverse();
                     }
                 }
-                Ok(OpeningMove { color, pieces })
+                Ok(SetupMove { color, pieces })
             })
     }
 
@@ -57,9 +57,9 @@ impl OpeningMove {
     }
 }
 
-impl_from_str_for_parsable!(OpeningMove);
+impl_from_str_for_parsable!(SetupMove);
 
-impl Display for OpeningMove {
+impl Display for SetupMove {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let color = self.color;
         let mut pieces = self.pieces;
@@ -133,13 +133,13 @@ impl Display for RegularMove {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Move {
-    Opening(OpeningMove),
+    Setup(SetupMove),
     Regular(RegularMove),
 }
 
 impl Move {
     pub fn parser() -> impl Parser<Output = Self> {
-        OpeningMove::parser()
+        SetupMove::parser()
             .map(Move::from)
             .or(RegularMove::parser().map(Move::from))
     }
@@ -147,9 +147,9 @@ impl Move {
 
 impl_from_str_for_parsable!(Move);
 
-impl From<OpeningMove> for Move {
-    fn from(mov: OpeningMove) -> Self {
-        Move::Opening(mov)
+impl From<SetupMove> for Move {
+    fn from(mov: SetupMove) -> Self {
+        Move::Setup(mov)
     }
 }
 
@@ -162,7 +162,7 @@ impl From<RegularMove> for Move {
 impl Display for Move {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Move::Opening(mov) => write!(f, "{mov}"),
+            Move::Setup(mov) => write!(f, "{mov}"),
             Move::Regular(mov) => write!(f, "{mov}"),
         }
     }
@@ -193,14 +193,14 @@ impl Display for ShortMoveFrom {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ShortMove {
-    Opening(OpeningMove),
+    Setup(SetupMove),
     Regular { from: ShortMoveFrom, to: Square },
 }
 
 impl ShortMove {
     pub fn parser() -> impl Parser<Output = Self> {
-        OpeningMove::parser()
-            .map(ShortMove::Opening)
+        SetupMove::parser()
+            .map(ShortMove::Setup)
             .or(ShortMoveFrom::parser()
                 .and(Square::parser())
                 .map(|(from, to)| ShortMove::Regular { from, to }))
@@ -212,7 +212,7 @@ impl_from_str_for_parsable!(ShortMove);
 impl Display for ShortMove {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            ShortMove::Opening(mov) => write!(f, "{mov}"),
+            ShortMove::Setup(mov) => write!(f, "{mov}"),
             ShortMove::Regular { from, to } => write!(f, "{from}{to}"),
         }
     }
@@ -221,7 +221,7 @@ impl Display for ShortMove {
 impl From<Move> for ShortMove {
     fn from(mov: Move) -> Self {
         match mov {
-            Move::Opening(mov) => ShortMove::Opening(mov),
+            Move::Setup(mov) => ShortMove::Setup(mov),
             Move::Regular(mov) => ShortMove::Regular {
                 from: match mov.from {
                     None => ShortMoveFrom::Piece(mov.colored_piece),

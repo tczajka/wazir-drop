@@ -14,7 +14,7 @@ fn test_position_initial() {
     assert_eq!(
         Position::initial().to_string(),
         "\
-opening
+setup
 red
 
 ........
@@ -33,7 +33,7 @@ red
 fn test_display_from_str() {
     // Opening.
     let s = "\
-opening
+setup
 red
 
 ........
@@ -48,9 +48,9 @@ red
     let position = Position::from_str(s).unwrap();
     assert_eq!(position.to_string(), s);
 
-    // Red has placed something before opening.
+    // Red has placed something before setup.
     let s = "\
-opening
+setup
 red
 
 W.......
@@ -65,7 +65,7 @@ W.......
     assert!(Position::from_str(s).is_err());
 
     let s = "\
-opening
+setup
 blue
 
 WNFFDDDD
@@ -80,9 +80,9 @@ AAAAAAAA
     let position = Position::from_str(s).unwrap();
     assert_eq!(position.to_string(), s);
 
-    // Invalid placement in opening.
+    // Invalid placement in setup.
     let s = "\
-opening
+setup
 blue
 
 WNFFDDDD
@@ -201,7 +201,7 @@ add.w..a
 #[test]
 fn test_move_from_short_move() {
     let s = "\
-opening
+setup
 red
 
 ........
@@ -275,7 +275,7 @@ add.w..a
 fn test_make_move() {
     let position = Position::from_str(
         "\
-opening
+setup
 red
 
 ........
@@ -296,7 +296,7 @@ red
     assert_eq!(
         position2.to_string(),
         "\
-opening
+setup
 blue
 
 AWNAADAD

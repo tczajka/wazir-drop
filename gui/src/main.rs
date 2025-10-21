@@ -7,8 +7,8 @@ use eframe::{
 };
 use std::iter;
 use wazir_drop::{
-    Color, ColoredPiece, Coord, Move, OpeningMove, Piece, Position, ShortMove, ShortMoveFrom,
-    Square, Stage,
+    Color, ColoredPiece, Coord, Move, Piece, Position, SetupMove, ShortMove, ShortMoveFrom, Square,
+    Stage,
     enums::{EnumMap, SimpleEnumExt},
 };
 
@@ -165,10 +165,10 @@ impl WazirDropApp {
 
     fn update_board(&mut self, ui: &mut Ui) {
         let position = match self.next_move_state {
-            NextMoveState::HumanOpening { opening, .. } => self
+            NextMoveState::HumanSetup { setup, .. } => self
                 .position
-                .make_opening_move(opening)
-                .expect("Invalid opening move"),
+                .make_setup_move(setup)
+                .expect("Invalid setup move"),
             _ => self.position,
         };
 
@@ -183,7 +183,7 @@ impl WazirDropApp {
                     from == ShortMoveFrom::Square(square)
                         || self.position.move_from_short_move(short_move).is_ok()
                 }
-                NextMoveState::HumanOpening {
+                NextMoveState::HumanSetup {
                     swap_from: Some(swap_from),
                     ..
                 } => swap_from == square,
@@ -229,8 +229,8 @@ impl WazirDropApp {
 
     fn start_next_move(&mut self) {
         self.next_move_state = match self.position.stage() {
-            Stage::Opening => NextMoveState::HumanOpening {
-                opening: Self::default_opening_move(self.position.to_move()),
+            Stage::Setup => NextMoveState::HumanSetup {
+                setup: Self::default_setup_move(self.position.to_move()),
                 swap_from: None,
             },
             Stage::Regular => NextMoveState::HumanRegular { from: None },
@@ -238,16 +238,16 @@ impl WazirDropApp {
         };
     }
 
-    fn default_opening_move(color: Color) -> OpeningMove {
+    fn default_setup_move(color: Color) -> SetupMove {
         let pieces: Vec<Piece> = Piece::all()
             .flat_map(|piece| iter::repeat_n(piece, piece.initial_count()))
             .collect();
 
-        let mov = OpeningMove {
+        let mov = SetupMove {
             color,
             pieces: pieces.try_into().unwrap(),
         };
-        mov.validate_pieces().expect("Invalid default opening move");
+        mov.validate_pieces().expect("Invalid default setup move");
         mov
     }
 
@@ -311,19 +311,19 @@ impl WazirDropApp {
 
     fn click_square(&mut self, square: Square) {
         match self.next_move_state {
-            NextMoveState::HumanOpening {
-                ref mut opening,
+            NextMoveState::HumanSetup {
+                ref mut setup,
                 ref mut swap_from,
             } => {
-                if square.pov(opening.color).index() < OpeningMove::SIZE {
+                if square.pov(setup.color).index() < SetupMove::SIZE {
                     match *swap_from {
                         None => {
                             *swap_from = Some(square);
                         }
                         Some(swap_from_square) => {
-                            opening.pieces.swap(
-                                swap_from_square.pov(opening.color).index(),
-                                square.pov(opening.color).index(),
+                            setup.pieces.swap(
+                                swap_from_square.pov(setup.color).index(),
+                                square.pov(setup.color).index(),
                             );
                             *swap_from = None;
                         }
@@ -400,10 +400,10 @@ impl App for WazirDropApp {
                 self.new_game();
             }
 
-            if let NextMoveState::HumanOpening { opening, .. } = &self.next_move_state
-                && ui.button("Make opening move").clicked()
+            if let NextMoveState::HumanSetup { setup, .. } = &self.next_move_state
+                && ui.button("Make setup move").clicked()
             {
-                self.make_move(Move::Opening(*opening));
+                self.make_move(Move::Setup(*setup));
             }
 
             if !self.history.is_empty() && ui.button("Undo").clicked() {
@@ -419,8 +419,8 @@ impl App for WazirDropApp {
 
 #[derive(Debug)]
 enum NextMoveState {
-    HumanOpening {
-        opening: OpeningMove,
+    HumanSetup {
+        setup: SetupMove,
         swap_from: Option<Square>,
     },
     HumanRegular {

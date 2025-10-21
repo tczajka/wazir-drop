@@ -1,23 +1,23 @@
 use std::str::FromStr;
 use wazir_drop::{
-    enums::SimpleEnumExt, parser::ParseError, Move, OpeningMove, Piece, RegularMove, ShortMove,
+    enums::SimpleEnumExt, parser::ParseError, Move, SetupMove, Piece, RegularMove, ShortMove,
 };
 
 #[test]
 fn test_opening_move_size_matches_piece_initial_count() {
     let num_pieces = Piece::all().map(Piece::initial_count).sum();
-    assert_eq!(OpeningMove::SIZE, num_pieces);
+    assert_eq!(SetupMove::SIZE, num_pieces);
 }
 
 #[test]
 fn test_opening_move_display_from_str() {
-    let mov = OpeningMove::from_str("AWNAADADAFFAADDA").unwrap();
+    let mov = SetupMove::from_str("AWNAADADAFFAADDA").unwrap();
     assert_eq!(mov.to_string(), "AWNAADADAFFAADDA");
-    let mov = OpeningMove::from_str("aaaaaffdaddadnwa").unwrap();
+    let mov = SetupMove::from_str("aaaaaffdaddadnwa").unwrap();
     assert_eq!(mov.to_string(), "aaaaaffdaddadnwa");
 
-    assert_eq!(OpeningMove::from_str("W"), Err(ParseError));
-    assert_eq!(OpeningMove::from_str("AWNAADADAFFAADDa"), Err(ParseError));
+    assert_eq!(SetupMove::from_str("W"), Err(ParseError));
+    assert_eq!(SetupMove::from_str("AWNAADADAFFAADDa"), Err(ParseError));
 }
 
 #[test]
@@ -60,8 +60,8 @@ fn test_short_move_display_from_str() {
 
 #[test]
 fn test_opening_move_validate_pieces() {
-    let mov = OpeningMove::from_str("AWNAADADAFFAADDA").unwrap();
+    let mov = SetupMove::from_str("AWNAADADAFFAADDA").unwrap();
     assert!(mov.validate_pieces().is_ok());
-    let mov = OpeningMove::from_str("AWNAADADAFFAADDN").unwrap();
+    let mov = SetupMove::from_str("AWNAADADAFFAADDN").unwrap();
     assert!(mov.validate_pieces().is_err());
 }
