@@ -228,18 +228,14 @@ impl WazirDropApp {
     }
 
     fn start_next_move(&mut self) {
-        match self.position.stage() {
-            Stage::Opening => {
-                self.next_move_state = NextMoveState::HumanOpening {
-                    opening: Self::default_opening_move(self.position.to_move()),
-                    swap_from: None,
-                };
-            }
-            Stage::Regular => {
-                self.next_move_state = NextMoveState::HumanRegular { from: None };
-            }
-            Stage::End => {}
-        }
+        self.next_move_state = match self.position.stage() {
+            Stage::Opening => NextMoveState::HumanOpening {
+                opening: Self::default_opening_move(self.position.to_move()),
+                swap_from: None,
+            },
+            Stage::Regular => NextMoveState::HumanRegular { from: None },
+            Stage::End => NextMoveState::EndOfGame,
+        };
     }
 
     fn default_opening_move(color: Color) -> OpeningMove {
@@ -379,6 +375,12 @@ impl WazirDropApp {
         self.start_next_move();
     }
 
+    fn new_game(&mut self) {
+        self.position = Position::initial();
+        self.history.clear();
+        self.start_next_move();
+    }
+
     fn undo(&mut self) {
         if let Some(entry) = self.history.pop() {
             self.position = entry.position;
@@ -393,6 +395,10 @@ impl App for WazirDropApp {
 
         SidePanel::right("side panel").show(ctx, |ui| {
             ui.checkbox(&mut self.reverse, "Reverse view");
+
+            if ui.button("New Game").clicked() {
+                self.new_game();
+            }
 
             if let NextMoveState::HumanOpening { opening, .. } = &self.next_move_state
                 && ui.button("Make opening move").clicked()
