@@ -1,10 +1,10 @@
 use crate::{
-    board::Board,
     enums::{EnumMap, SimpleEnumExt},
+    error::Invalid,
     impl_from_str_for_parsable, movegen,
     parser::{self, ParseError, Parser, ParserExt},
-    unsafe_simple_enum, Bitboard, Color, ColoredPiece, InvalidMove, Move, Piece, RegularMove,
-    SetupMove, Square,
+    unsafe_simple_enum, Bitboard, Board, Color, ColoredPiece, InvalidMove, Move, Piece,
+    RegularMove, SetupMove, Square,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -38,9 +38,6 @@ impl Display for Stage {
         }
     }
 }
-
-#[derive(Debug, Clone, Copy)]
-pub struct InvalidPosition;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Position {
@@ -118,7 +115,7 @@ impl Position {
         to_move: Color,
         board: Board,
         captured: EnumMap<ColoredPiece, usize>,
-    ) -> Result<Position, InvalidPosition> {
+    ) -> Result<Position, Invalid> {
         let mut position = Position::initial();
         position.stage = stage;
         position.to_move = to_move;
@@ -126,7 +123,7 @@ impl Position {
 
         for (cpiece, &num_captured) in captured.iter() {
             for _ in 0..num_captured {
-                position.add_captured(cpiece).map_err(|_| InvalidPosition)?;
+                position.add_captured(cpiece)?;
             }
         }
 
@@ -140,7 +137,7 @@ impl Position {
                     count += position.num_captured(cpiece);
                 }
                 if count != Color::COUNT * piece.initial_count() {
-                    return Err(InvalidPosition);
+                    return Err(Invalid);
                 }
             }
         }
@@ -159,7 +156,7 @@ impl Position {
                         || !squares.is_subset_of(cpiece.color().initial_squares())
                         || position.num_captured(cpiece) != 0
                     {
-                        return Err(InvalidPosition);
+                        return Err(Invalid);
                     }
                 }
             }
@@ -167,7 +164,7 @@ impl Position {
                 // Verify one wazir per color on the board.
                 for color in Color::all() {
                     if position.piece_map(Piece::Wazir.with_color(color)).count() != 1 {
-                        return Err(InvalidPosition);
+                        return Err(Invalid);
                     }
                 }
             }
@@ -177,7 +174,7 @@ impl Position {
                 if position.piece_map(wazir_opp).count() != 1
                     || position.num_captured(wazir_opp) != 1
                 {
-                    return Err(InvalidPosition);
+                    return Err(Invalid);
                 }
             }
         }
@@ -223,7 +220,9 @@ impl Position {
         let mut new_position = *self;
         match mov.from {
             None => {
-                new_position.remove_captured(mov.colored_piece)?;
+                new_position
+                    .remove_captured(mov.colored_piece)
+                    .map_err(|_| InvalidMove)?;
             }
             Some(from) => {
                 movegen::validate_from_to(piece, from, mov.to)?;
@@ -238,7 +237,9 @@ impl Position {
                 .board
                 .remove_piece(mov.to, captured.with_color(opp))
                 .map_err(|_| InvalidMove)?;
-            new_position.add_captured(captured.with_color(me))?;
+            new_position
+                .add_captured(captured.with_color(me))
+                .map_err(|_| InvalidMove)?;
             if captured == Piece::Wazir {
                 new_position.stage = Stage::End;
             }
@@ -251,19 +252,19 @@ impl Position {
         Ok(new_position)
     }
 
-    fn add_captured(&mut self, cpiece: ColoredPiece) -> Result<(), InvalidMove> {
+    fn add_captured(&mut self, cpiece: ColoredPiece) -> Result<(), Invalid> {
         let c = &mut self.captured[cpiece];
         if usize::from(*c) >= Color::COUNT * cpiece.piece().initial_count() {
-            return Err(InvalidMove);
+            return Err(Invalid);
         }
         *c += 1;
         Ok(())
     }
 
-    fn remove_captured(&mut self, cpiece: ColoredPiece) -> Result<(), InvalidMove> {
+    fn remove_captured(&mut self, cpiece: ColoredPiece) -> Result<(), Invalid> {
         let c = &mut self.captured[cpiece];
         if *c == 0 {
-            return Err(InvalidMove);
+            return Err(Invalid);
         }
         *c -= 1;
         Ok(())

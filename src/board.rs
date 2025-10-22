@@ -1,5 +1,6 @@
 use crate::{
     enums::{EnumMap, SimpleEnumExt},
+    error::Invalid,
     impl_from_str_for_parsable,
     parser::{self, Parser, ParserExt},
     Bitboard, Color, ColoredPiece, Coord, Square,
@@ -40,10 +41,10 @@ impl Board {
         self.piece_maps[cpiece]
     }
 
-    pub fn place_piece(&mut self, square: Square, cpiece: ColoredPiece) -> Result<(), ()> {
+    pub fn place_piece(&mut self, square: Square, cpiece: ColoredPiece) -> Result<(), Invalid> {
         let s = &mut self.squares[square];
         if s.is_some() {
-            return Err(());
+            return Err(Invalid);
         }
         *s = Some(cpiece);
         self.occupied_by[cpiece.color()].add(square);
@@ -52,10 +53,10 @@ impl Board {
         Ok(())
     }
 
-    pub fn remove_piece(&mut self, square: Square, cpiece: ColoredPiece) -> Result<(), ()> {
+    pub fn remove_piece(&mut self, square: Square, cpiece: ColoredPiece) -> Result<(), Invalid> {
         let s = &mut self.squares[square];
         if *s != Some(cpiece) {
-            return Err(());
+            return Err(Invalid);
         }
         *s = None;
         self.occupied_by[cpiece.color()].remove(square);
@@ -63,6 +64,7 @@ impl Board {
         self.piece_maps[cpiece].remove(square);
         Ok(())
     }
+
     pub fn parser() -> impl Parser<Output = Self> {
         ColoredPiece::parser()
             .map(Some)

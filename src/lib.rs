@@ -4,6 +4,7 @@
 
 pub mod arrays;
 pub mod enums;
+pub mod error;
 pub mod parser;
 pub mod smallvec;
 
@@ -17,8 +18,9 @@ mod position;
 mod square;
 
 pub use bitboard::{Bitboard, BitboardIterator};
+pub use board::Board;
 pub use color::Color;
 pub use moves::{InvalidMove, Move, RegularMove, SetupMove, ShortMove, ShortMoveFrom};
 pub use piece::{ColoredPiece, Piece};
-pub use position::{InvalidPosition, Position, Stage};
+pub use position::{Position, Stage};
 pub use square::{Coord, Direction, Square};
