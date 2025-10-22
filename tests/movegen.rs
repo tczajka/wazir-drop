@@ -1,7 +1,10 @@
 use std::str::FromStr;
 
 use wazir_drop::{
-    movegen::{move_bitboard, move_from_short_move, setup_moves, validate_from_to},
+    movegen::{
+        captures, drops, move_bitboard, move_from_short_move, pseudojumps, setup_moves,
+        validate_from_to,
+    },
     Color, Piece, Position, ShortMove, Square,
 };
 
@@ -172,4 +175,87 @@ fn test_setup_moves() {
     }
     // 16! / (8! 4! 2! 1! 1!) = 10810800
     assert_eq!(count, 10810800);
+}
+
+#[test]
+fn test_captures() {
+    let position = Position::from_str(
+        "\
+regular
+red
+AFf
+.W.A.D.D
+AfFA.DDA
+..A.A.A.
+......A.
+...a..ad
+..d..nN.
+a.a...a.
+add.w..a
+",
+    )
+    .unwrap();
+
+    let moves: Vec<String> = captures(&position).map(|mov| mov.to_string()).collect();
+    assert_eq!(&moves, &["Ac5xae7", "Nf7xah8", "Wa2xfb2"]);
+}
+
+#[test]
+fn test_pseudojumps() {
+    let position = Position::from_str(
+        "\
+regular
+red
+AAAAAAAAddFf
+.W...DD.
+.fF.....
+......A.
+........
+...a..ad
+..d..nN.
+a.a...a.
+add.w..a
+",
+    )
+    .unwrap();
+
+    let moves: Vec<String> = pseudojumps(&position).map(|mov| mov.to_string()).collect();
+    assert_eq!(
+        &moves,
+        &[
+            "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Da7-a5", "Fb3-a4", "Fb3-c2",
+            "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-g5", "Nf7-h6", "Wa2-a1", "Wa2-a3"
+        ]
+    );
+}
+
+#[test]
+fn test_drops() {
+    let position = Position::from_str(
+        "\
+regular
+red
+Af
+FW.A.D.D
+AfFA.DDA
+..A.A.A.
+......A.
+...a..ad
+..d..nN.
+a.a...a.
+add.w..a
+",
+    )
+    .unwrap();
+
+    let moves: Vec<String> = drops(&position).map(|mov| mov.to_string()).collect();
+    assert_eq!(
+        &moves,
+        &[
+            "A@a3", "A@a5", "A@a7", "A@b5", "A@c1", "A@c2", "A@c4", "A@c6", "A@c8", "A@d1", "A@d2",
+            "A@d3", "A@d4", "A@d5", "A@d6", "A@d8", "A@e1", "A@e2", "A@e3", "A@e5", "A@e6", "A@f1",
+            "A@f2", "A@f4", "A@f5", "A@f8", "A@g2", "A@g4", "A@g5", "A@g6", "A@g8", "A@h4", "A@h6",
+            "A@h7",
+        ]
+    );
 }

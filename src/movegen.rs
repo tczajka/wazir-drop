@@ -160,30 +160,31 @@ impl Iterator for SetupMoveIterator {
     }
 }
 
-// Generate all pseudomoves.
-// Includes non-escapes and suicides.
+/// Generate all pseudomoves.
+/// Includes non-escapes and suicides.
 pub fn pseudomoves(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
     captures(position)
         .chain(pseudojumps(position))
         .chain(drops(position))
 }
 
-// Generate all captures
-// If in check, includes non-escapes.
+/// Generate all captures
+/// If in check, includes non-escapes.
 pub fn captures(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
     assert!(position.stage() == Stage::Regular);
     let me = position.to_move();
     let opp = me.opposite();
     let opp_mask = position.occupied_by(opp);
     Piece::all().flat_map(move |piece| {
+        let colored_piece = piece.with_color(me);
         position
-            .piece_map(piece.with_color(me))
+            .piece_map(colored_piece)
             .into_iter()
             .flat_map(move |from| {
                 (move_bitboard(piece, from) & opp_mask)
                     .into_iter()
                     .map(move |to| RegularMove {
-                        colored_piece: piece.with_color(me),
+                        colored_piece,
                         from: Some(from),
                         captured: Some(position.square(to).unwrap().piece()),
                         to,
@@ -192,16 +193,45 @@ pub fn captures(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
     })
 }
 
-// Generate all pseudojumps (not captures).
-// Includes non-escapes and suicides.
+/// Generate all pseudojumps (not captures).
+/// Includes non-escapes and suicides.
 pub fn pseudojumps(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
-    // TODO: Implement.
-    iter::empty()
+    assert!(position.stage() == Stage::Regular);
+    let me = position.to_move();
+    let empty = position.empty_squares();
+    Piece::all().flat_map(move |piece| {
+        let colored_piece = piece.with_color(me);
+        position
+            .piece_map(colored_piece)
+            .into_iter()
+            .flat_map(move |from| {
+                (move_bitboard(piece, from) & empty)
+                    .into_iter()
+                    .map(move |to| RegularMove {
+                        colored_piece,
+                        from: Some(from),
+                        captured: None,
+                        to,
+                    })
+            })
+    })
 }
 
-// Piece drops.
-// If in check, these are non-escapes.
+/// Piece drops.
+/// If in check, these are non-escapes.
 pub fn drops(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
-    // TODO: Implement.
-    iter::empty()
+    assert!(position.stage() == Stage::Regular);
+    let me = position.to_move();
+    let empty = position.empty_squares();
+    Piece::all()
+        .map(move |piece| piece.with_color(me))
+        .filter(move |&cpiece| position.num_captured(cpiece) > 0)
+        .flat_map(move |colored_piece| {
+            empty.into_iter().map(move |to| RegularMove {
+                colored_piece,
+                from: None,
+                captured: None,
+                to,
+            })
+        })
 }
