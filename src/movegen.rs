@@ -123,7 +123,7 @@ impl Iterator for SetupMoveIterator {
         match self.mov {
             None => {
                 let pieces: SmallVec<Piece, { SetupMove::SIZE }> = Piece::all()
-                    .flat_map(|piece| iter::repeat_n(piece, piece.initial_count()))
+                    .flat_map(|piece| iter::repeat(piece).take(piece.initial_count()))
                     .collect();
                 let pieces = (&pieces[..]).try_into().unwrap();
                 self.mov = Some(SetupMove {
