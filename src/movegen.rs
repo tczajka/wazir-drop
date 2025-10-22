@@ -122,6 +122,7 @@ impl Iterator for SetupMoveIterator {
     fn next(&mut self) -> Option<Self::Item> {
         match self.mov {
             None => {
+                #[allow(clippy::manual_repeat_n)]
                 let pieces: SmallVec<Piece, { SetupMove::SIZE }> = Piece::all()
                     .flat_map(|piece| iter::repeat(piece).take(piece.initial_count()))
                     .collect();
