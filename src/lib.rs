@@ -10,6 +10,7 @@ pub mod smallvec;
 
 mod bitboard;
 mod board;
+mod captured;
 mod color;
 pub mod movegen;
 mod moves;
@@ -19,6 +20,7 @@ mod square;
 
 pub use bitboard::{Bitboard, BitboardIterator};
 pub use board::Board;
+pub use captured::Captured;
 pub use color::Color;
 pub use moves::{InvalidMove, Move, RegularMove, SetupMove, ShortMove, ShortMoveFrom};
 pub use piece::{ColoredPiece, Piece};

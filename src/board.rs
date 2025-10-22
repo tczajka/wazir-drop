@@ -70,7 +70,7 @@ impl Board {
             .map(Some)
             .or(parser::exact(b".").map(|_| None))
             .repeat(Coord::WIDTH..=Coord::WIDTH)
-            .then_ignore(parser::exact(b"\n"))
+            .then_ignore(parser::endl())
             .repeat(Coord::HEIGHT..=Coord::HEIGHT)
             .map(move |pieces| {
                 let mut board = Board::empty();

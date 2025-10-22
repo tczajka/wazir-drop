@@ -184,6 +184,10 @@ pub fn exact<'a>(s: &'a [u8]) -> impl Parser<Output = ()> + 'a {
     Exact { s }
 }
 
+pub fn endl() -> impl Parser<Output = ()> {
+    exact(b"\n")
+}
+
 #[derive(Debug, Clone, Copy)]
 struct And<P1: Parser, P2: Parser> {
     p1: P1,

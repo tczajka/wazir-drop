@@ -44,6 +44,15 @@ fn test_exact() {
 }
 
 #[test]
+fn test_endl() {
+    let p = parser::endl();
+    let result = p.parse(b"\nabc").unwrap();
+    assert_eq!(result.remaining, b"abc");
+
+    assert!(p.parse(b"abc\n").is_err());
+}
+
+#[test]
 fn test_and() {
     let p = parser::byte().and(parser::byte());
 
