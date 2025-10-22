@@ -39,7 +39,7 @@ impl Display for Stage {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Position {
     stage: Stage,
     to_move: Color,
@@ -175,7 +175,7 @@ impl Position {
             return Err(InvalidMove);
         }
         mov.validate_pieces()?;
-        let mut new_position = *self;
+        let mut new_position = self.clone();
         for (i, &piece) in mov.pieces.iter().enumerate() {
             let square = Square::from_index(i).pov(mov.color);
             new_position
@@ -196,7 +196,7 @@ impl Position {
         if self.stage != Stage::Regular || mov.colored_piece.color() != me {
             return Err(InvalidMove);
         }
-        let mut new_position = *self;
+        let mut new_position = self.clone();
         match mov.from {
             None => {
                 new_position

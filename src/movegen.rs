@@ -1,4 +1,5 @@
 use crate::{
+    either::Either,
     enums::{EnumMap, SimpleEnumExt},
     smallvec::SmallVec,
     Bitboard, Color, InvalidMove, Move, Piece, Position, RegularMove, SetupMove, ShortMove,
@@ -160,9 +161,17 @@ impl Iterator for SetupMoveIterator {
     }
 }
 
-/// Generate all pseudomoves.
+pub fn pseudomoves(position: &Position) -> impl Iterator<Item = Move> + '_ {
+    match position.stage() {
+        Stage::Setup => Either::Left(setup_moves(position.to_move()).map(Move::Setup)),
+        Stage::Regular => Either::Right(regular_pseudomoves(position).map(Move::Regular)),
+        Stage::End => panic!("End of game"),
+    }
+}
+
+/// Generate all regularpseudomoves.
 /// Includes non-escapes and suicides.
-pub fn pseudomoves(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
+pub fn regular_pseudomoves(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
     captures(position)
         .chain(pseudojumps(position))
         .chain(drops(position))

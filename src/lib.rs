@@ -3,6 +3,7 @@
 #![deny(clippy::default_trait_access)]
 
 pub mod arrays;
+pub mod either;
 pub mod enums;
 pub mod error;
 pub mod parser;
@@ -15,6 +16,7 @@ mod color;
 pub mod movegen;
 mod moves;
 mod piece;
+mod player;
 mod position;
 mod square;
 
@@ -24,5 +26,6 @@ pub use captured::Captured;
 pub use color::Color;
 pub use moves::{InvalidMove, Move, RegularMove, SetupMove, ShortMove, ShortMoveFrom};
 pub use piece::{ColoredPiece, Piece};
+pub use player::Player;
 pub use position::{Position, Stage};
 pub use square::{Coord, Direction, Square};

@@ -5,4 +5,4 @@ edition = "2021"
 
 [workspace]
 resolver = "3"
-members = ["gui"]
+members = ["gui", "random-player"]

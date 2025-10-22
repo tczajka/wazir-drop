@@ -169,7 +169,7 @@ impl WazirDropApp {
                 .position
                 .make_setup_move(setup)
                 .expect("Invalid setup move"),
-            _ => self.position,
+            _ => self.position.clone(),
         };
 
         for square in Square::all() {
@@ -357,7 +357,7 @@ impl WazirDropApp {
 
     fn make_move(&mut self, mov: Move) {
         self.history.push(HistoryEntry {
-            position: self.position,
+            position: self.position.clone(),
             mov,
         });
         self.position = self.position.make_move(mov).expect("Invalid move");
