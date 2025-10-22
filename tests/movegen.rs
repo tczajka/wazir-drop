@@ -1,9 +1,14 @@
-use wazir_drop::{movegen, Color, Piece, Square};
+use std::str::FromStr;
+
+use wazir_drop::{
+    movegen::{move_bitboard, move_from_short_move, setup_moves, validate_from_to},
+    Color, Piece, Position, ShortMove, Square,
+};
 
 #[test]
 fn test_move_bitboard() {
     assert_eq!(
-        movegen::move_bitboard(Piece::Alfil, Square::D4).to_string(),
+        move_bitboard(Piece::Alfil, Square::D4).to_string(),
         "\
 ........
 .x...x..
@@ -17,7 +22,7 @@ fn test_move_bitboard() {
     );
 
     assert_eq!(
-        movegen::move_bitboard(Piece::Dabbaba, Square::D4).to_string(),
+        move_bitboard(Piece::Dabbaba, Square::D4).to_string(),
         "\
 ........
 ...x....
@@ -31,7 +36,7 @@ fn test_move_bitboard() {
     );
 
     assert_eq!(
-        movegen::move_bitboard(Piece::Ferz, Square::D4).to_string(),
+        move_bitboard(Piece::Ferz, Square::D4).to_string(),
         "\
 ........
 ........
@@ -45,7 +50,7 @@ fn test_move_bitboard() {
     );
 
     assert_eq!(
-        movegen::move_bitboard(Piece::Knight, Square::D4).to_string(),
+        move_bitboard(Piece::Knight, Square::D4).to_string(),
         "\
 ........
 ..x.x...
@@ -59,7 +64,7 @@ fn test_move_bitboard() {
     );
 
     assert_eq!(
-        movegen::move_bitboard(Piece::Wazir, Square::D4).to_string(),
+        move_bitboard(Piece::Wazir, Square::D4).to_string(),
         "\
 ........
 ........
@@ -74,7 +79,7 @@ fn test_move_bitboard() {
 
     // From a corner.
     assert_eq!(
-        movegen::move_bitboard(Piece::Knight, Square::H8).to_string(),
+        move_bitboard(Piece::Knight, Square::H8).to_string(),
         "\
 ........
 ........
@@ -90,16 +95,78 @@ fn test_move_bitboard() {
 
 #[test]
 fn test_validate_from_to() {
-    assert!(movegen::validate_from_to(Piece::Alfil, Square::D4, Square::F6).is_ok());
-    assert!(movegen::validate_from_to(Piece::Alfil, Square::D4, Square::D5).is_err());
-    assert!(movegen::validate_from_to(Piece::Knight, Square::A4, Square::B2).is_ok());
-    assert!(movegen::validate_from_to(Piece::Knight, Square::A4, Square::C6).is_err());
+    assert!(validate_from_to(Piece::Alfil, Square::D4, Square::F6).is_ok());
+    assert!(validate_from_to(Piece::Alfil, Square::D4, Square::D5).is_err());
+    assert!(validate_from_to(Piece::Knight, Square::A4, Square::B2).is_ok());
+    assert!(validate_from_to(Piece::Knight, Square::A4, Square::C6).is_err());
+}
+
+#[test]
+fn test_move_from_short_move() {
+    let position = Position::from_str(
+        "\
+setup
+red
+
+........
+........
+........
+........
+........
+........
+........
+........
+",
+    )
+    .unwrap();
+    let mov =
+        move_from_short_move(&position, ShortMove::from_str("AWNAADADAFFAADDA").unwrap()).unwrap();
+    assert_eq!(mov.to_string(), "AWNAADADAFFAADDA");
+
+    assert!(
+        move_from_short_move(&position, ShortMove::from_str("AWNAADADAFFAADDN").unwrap()).is_err()
+    );
+    assert!(
+        move_from_short_move(&position, ShortMove::from_str("awnaadadaffaadda").unwrap()).is_err()
+    );
+
+    let position = Position::from_str(
+        "\
+regular
+red
+AFf
+.W.A.D.D
+AaFA.DDA
+..A.A.A.
+......A.
+...a.a.d
+..d..nN.
+a.a...f.
+add.w..a
+",
+    )
+    .unwrap();
+
+    let mov = move_from_short_move(&position, ShortMove::from_str("Aa1").unwrap()).unwrap();
+    assert_eq!(mov.to_string(), "A@a1");
+    let mov = move_from_short_move(&position, ShortMove::from_str("a2a3").unwrap()).unwrap();
+    assert_eq!(mov.to_string(), "Wa2-a3");
+    let mov = move_from_short_move(&position, ShortMove::from_str("a2b2").unwrap()).unwrap();
+    assert_eq!(mov.to_string(), "Wa2xab2");
+
+    assert!(
+        move_from_short_move(&position, ShortMove::from_str("AWNAADADAFFAADDA").unwrap()).is_err()
+    );
+    assert!(move_from_short_move(&position, ShortMove::from_str("fa1").unwrap()).is_err());
+    assert!(move_from_short_move(&position, ShortMove::from_str("a2c2").unwrap()).is_err());
+    assert!(move_from_short_move(&position, ShortMove::from_str("b3a4").unwrap()).is_err());
+    assert!(move_from_short_move(&position, ShortMove::from_str("Na1").unwrap()).is_err());
 }
 
 #[test]
 fn test_setup_moves() {
     let mut count: u32 = 0;
-    for mov in movegen::setup_moves(Color::Red) {
+    for mov in setup_moves(Color::Red) {
         mov.validate_pieces().unwrap();
         count += 1;
     }

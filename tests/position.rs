@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{enums::SimpleEnumExt, Color, Move, Position, ShortMove, Stage};
+use wazir_drop::{enums::SimpleEnumExt, Color, Move, Position, Stage};
 
 #[test]
 fn test_stage_display_round_trip() {
@@ -196,79 +196,6 @@ a.a...f.
 add.w..a
 ";
     assert!(Position::from_str(s).is_err());
-}
-
-#[test]
-fn test_move_from_short_move() {
-    let s = "\
-setup
-red
-
-........
-........
-........
-........
-........
-........
-........
-........
-";
-    let position = Position::from_str(s).unwrap();
-    let mov = position
-        .move_from_short_move(ShortMove::from_str("AWNAADADAFFAADDA").unwrap())
-        .unwrap();
-    assert_eq!(mov.to_string(), "AWNAADADAFFAADDA");
-
-    assert!(position
-        .move_from_short_move(ShortMove::from_str("AWNAADADAFFAADDN").unwrap())
-        .is_err());
-    assert!(position
-        .move_from_short_move(ShortMove::from_str("awnaadadaffaadda").unwrap())
-        .is_err());
-
-    let s = "\
-regular
-red
-AFf
-.W.A.D.D
-AaFA.DDA
-..A.A.A.
-......A.
-...a.a.d
-..d..nN.
-a.a...f.
-add.w..a
-";
-    let position = Position::from_str(s).unwrap();
-
-    let mov = position
-        .move_from_short_move(ShortMove::from_str("Aa1").unwrap())
-        .unwrap();
-    assert_eq!(mov.to_string(), "A@a1");
-    let mov = position
-        .move_from_short_move(ShortMove::from_str("a2a3").unwrap())
-        .unwrap();
-    assert_eq!(mov.to_string(), "Wa2-a3");
-    let mov = position
-        .move_from_short_move(ShortMove::from_str("a2b2").unwrap())
-        .unwrap();
-    assert_eq!(mov.to_string(), "Wa2xab2");
-
-    assert!(position
-        .move_from_short_move(ShortMove::from_str("AWNAADADAFFAADDA").unwrap())
-        .is_err());
-    assert!(position
-        .move_from_short_move(ShortMove::from_str("fa1").unwrap())
-        .is_err());
-    assert!(position
-        .move_from_short_move(ShortMove::from_str("a2c2").unwrap())
-        .is_err());
-    assert!(position
-        .move_from_short_move(ShortMove::from_str("b3a4").unwrap())
-        .is_err());
-    assert!(position
-        .move_from_short_move(ShortMove::from_str("Na1").unwrap())
-        .is_err());
 }
 
 #[test]

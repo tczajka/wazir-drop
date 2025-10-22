@@ -1,10 +1,10 @@
-use std::iter;
-
 use crate::{
     enums::{EnumMap, SimpleEnumExt},
     smallvec::SmallVec,
-    Bitboard, Color, InvalidMove, Piece, Position, RegularMove, SetupMove, Square, Stage,
+    Bitboard, Color, InvalidMove, Move, Piece, Position, RegularMove, SetupMove, ShortMove,
+    ShortMoveFrom, Square, Stage,
 };
+use std::iter;
 
 static MOVE_BITBOARD_TABLE: EnumMap<Piece, EnumMap<Square, Bitboard>> = calc_move_bitboard_table();
 
@@ -50,6 +50,60 @@ const fn calc_move_bitboard(piece: Piece, square: Square) -> Bitboard {
         i += 1;
     }
     bitboard
+}
+
+pub fn move_from_short_move(
+    position: &Position,
+    short_move: ShortMove,
+) -> Result<Move, InvalidMove> {
+    match short_move {
+        ShortMove::Setup(mov) => {
+            if position.stage() != Stage::Setup || mov.color != position.to_move() {
+                return Err(InvalidMove);
+            }
+            mov.validate_pieces()?;
+            Ok(Move::Setup(mov))
+        }
+        ShortMove::Regular { from, to } => {
+            if position.stage() != Stage::Regular {
+                return Err(InvalidMove);
+            }
+
+            let captured = match position.square(to) {
+                None => None,
+                Some(captured) => {
+                    if captured.color() != position.to_move().opposite() {
+                        return Err(InvalidMove);
+                    }
+                    Some(captured.piece())
+                }
+            };
+
+            let (colored_piece, from) = match from {
+                ShortMoveFrom::Piece(cpiece) => {
+                    if captured.is_some() || position.num_captured(cpiece) == 0 {
+                        return Err(InvalidMove);
+                    }
+                    (cpiece, None)
+                }
+                ShortMoveFrom::Square(square) => {
+                    let piece = position.square(square).ok_or(InvalidMove)?;
+                    validate_from_to(piece.piece(), square, to)?;
+                    (piece, Some(square))
+                }
+            };
+
+            if colored_piece.color() != position.to_move() {
+                return Err(InvalidMove);
+            }
+            Ok(Move::Regular(RegularMove {
+                colored_piece,
+                from,
+                captured,
+                to,
+            }))
+        }
+    }
 }
 
 pub fn setup_moves(color: Color) -> impl Iterator<Item = SetupMove> {
@@ -107,7 +161,7 @@ impl Iterator for SetupMoveIterator {
 
 // Generate all pseudomoves.
 // Includes non-escapes and suicides.
-pub fn pseudomoves(position: Position) -> impl Iterator<Item = RegularMove> {
+pub fn pseudomoves(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
     captures(position)
         .chain(pseudojumps(position))
         .chain(drops(position))
@@ -115,25 +169,38 @@ pub fn pseudomoves(position: Position) -> impl Iterator<Item = RegularMove> {
 
 // Generate all captures
 // If in check, includes non-escapes.
-pub fn captures(position: Position) -> impl Iterator<Item = RegularMove> {
+pub fn captures(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
     assert!(position.stage() == Stage::Regular);
     let me = position.to_move();
     let opp = me.opposite();
     let opp_mask = position.occupied_by(opp);
-    iter::empty()
-    // TODO: Implement.
+    Piece::all().flat_map(move |piece| {
+        position
+            .piece_map(piece.with_color(me))
+            .into_iter()
+            .flat_map(move |from| {
+                (move_bitboard(piece, from) & opp_mask)
+                    .into_iter()
+                    .map(move |to| RegularMove {
+                        colored_piece: piece.with_color(me),
+                        from: Some(from),
+                        captured: Some(position.square(to).unwrap().piece()),
+                        to,
+                    })
+            })
+    })
 }
 
 // Generate all pseudojumps (not captures).
 // Includes non-escapes and suicides.
-pub fn pseudojumps(position: Position) -> impl Iterator<Item = RegularMove> {
+pub fn pseudojumps(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
     // TODO: Implement.
     iter::empty()
 }
 
 // Piece drops.
 // If in check, these are non-escapes.
-pub fn drops(position: Position) -> impl Iterator<Item = RegularMove> {
+pub fn drops(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
     // TODO: Implement.
     iter::empty()
 }
