@@ -6,11 +6,20 @@ use crate::{
 };
 use std::{
     array,
+    error::Error,
     fmt::{self, Display, Formatter},
 };
 
 #[derive(Debug, Clone, Copy)]
 pub struct InvalidMove;
+
+impl Display for InvalidMove {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid move")
+    }
+}
+
+impl Error for InvalidMove {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SetupMove {
