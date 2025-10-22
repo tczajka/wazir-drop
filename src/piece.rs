@@ -3,10 +3,7 @@ use crate::{
     parser::{self, ParseError, Parser, ParserExt},
     unsafe_simple_enum, Color, Direction,
 };
-use std::{
-    fmt::{self, Display, Formatter},
-    str::FromStr,
-};
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(u8)]

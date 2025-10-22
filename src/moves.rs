@@ -7,7 +7,6 @@ use crate::{
 use std::{
     array,
     fmt::{self, Display, Formatter},
-    str::FromStr,
 };
 
 #[derive(Debug, Clone, Copy)]

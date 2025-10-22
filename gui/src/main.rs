@@ -181,7 +181,7 @@ impl WazirDropApp {
                 NextMoveState::HumanRegular { from: Some(from) } => {
                     let short_move = ShortMove::Regular { from, to: square };
                     from == ShortMoveFrom::Square(square)
-                        || self.position.move_from_short_move(short_move).is_ok()
+                        || movegen::move_from_short_move(&self.position, short_move).is_ok()
                 }
                 NextMoveState::HumanSetup {
                     swap_from: Some(swap_from),
@@ -333,7 +333,7 @@ impl WazirDropApp {
                         from: from_square,
                         to: square,
                     };
-                    if let Ok(mov) = self.position.move_from_short_move(short_move) {
+                    if let Ok(mov) = movegen::move_from_short_move(&self.position, short_move) {
                         self.make_move(mov);
                     }
                 }

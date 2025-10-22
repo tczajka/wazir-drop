@@ -8,6 +8,7 @@ pub mod parser;
 pub mod smallvec;
 
 mod bitboard;
+mod board;
 mod color;
 pub mod movegen;
 mod moves;

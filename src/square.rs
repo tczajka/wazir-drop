@@ -3,10 +3,7 @@ use crate::{
     parser::{self, ParseError, Parser, ParserExt},
     unsafe_simple_enum, Color,
 };
-use std::{
-    fmt::{self, Display, Formatter},
-    str::FromStr,
-};
+use std::fmt::{self, Display, Formatter};
 
 #[rustfmt::skip]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

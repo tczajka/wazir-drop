@@ -1,14 +1,12 @@
 use crate::{
+    board::Board,
     enums::{EnumMap, SimpleEnumExt},
     impl_from_str_for_parsable, movegen,
     parser::{self, ParseError, Parser, ParserExt},
-    unsafe_simple_enum, Bitboard, Color, ColoredPiece, Coord, InvalidMove, Move, Piece,
-    RegularMove, SetupMove, Square,
+    unsafe_simple_enum, Bitboard, Color, ColoredPiece, InvalidMove, Move, Piece, RegularMove,
+    SetupMove, Square,
 };
-use std::{
-    fmt::{self, Display, Formatter},
-    str::FromStr,
-};
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
@@ -48,10 +46,7 @@ pub struct InvalidPosition;
 pub struct Position {
     stage: Stage,
     to_move: Color,
-    squares: EnumMap<Square, Option<ColoredPiece>>,
-    occupied_by: EnumMap<Color, Bitboard>,
-    empty_squares: Bitboard,
-    piece_maps: EnumMap<ColoredPiece, Bitboard>,
+    board: Board,
     captured: EnumMap<ColoredPiece, u8>,
 }
 
@@ -60,10 +55,7 @@ impl Position {
         Self {
             stage: Stage::Setup,
             to_move: Color::Red,
-            squares: EnumMap::from_fn(|_| None),
-            occupied_by: EnumMap::from_fn(|_| Bitboard::EMPTY),
-            empty_squares: !Bitboard::EMPTY,
-            piece_maps: EnumMap::from_fn(|_| Bitboard::EMPTY),
+            board: Board::empty(),
             captured: EnumMap::from_fn(|_| 0),
         }
     }
@@ -77,19 +69,19 @@ impl Position {
     }
 
     pub fn square(&self, square: Square) -> Option<ColoredPiece> {
-        self.squares[square]
-    }
-
-    pub fn piece_map(&self, cpiece: ColoredPiece) -> Bitboard {
-        self.piece_maps[cpiece]
+        self.board.square(square)
     }
 
     pub fn occupied_by(&self, color: Color) -> Bitboard {
-        self.occupied_by[color]
+        self.board.occupied_by(color)
     }
 
     pub fn empty_squares(&self) -> Bitboard {
-        self.empty_squares
+        self.board.empty_squares()
+    }
+
+    pub fn piece_map(&self, cpiece: ColoredPiece) -> Bitboard {
+        self.board.piece_map(cpiece)
     }
 
     pub fn num_captured(&self, cpiece: ColoredPiece) -> usize {
@@ -103,9 +95,9 @@ impl Position {
             .then_ignore(parser::exact(b"\n"))
             .and(Self::captured_parser())
             .then_ignore(parser::exact(b"\n"))
-            .and(Self::board_parser())
-            .try_map(|(((stage, to_move), captured), squares)| {
-                Self::from_parts(stage, to_move, squares, captured).map_err(|_| ParseError)
+            .and(Board::parser())
+            .try_map(|(((stage, to_move), captured), board)| {
+                Self::from_parts(stage, to_move, board, captured).map_err(|_| ParseError)
             })
     }
 
@@ -121,36 +113,16 @@ impl Position {
             })
     }
 
-    fn board_parser() -> impl Parser<Output = EnumMap<Square, Option<ColoredPiece>>> {
-        ColoredPiece::parser()
-            .map(Some)
-            .or(parser::exact(b".").map(|_| None))
-            .repeat(Coord::WIDTH..=Coord::WIDTH)
-            .then_ignore(parser::exact(b"\n"))
-            .repeat(Coord::HEIGHT..=Coord::HEIGHT)
-            .map(move |board| {
-                EnumMap::from_fn(|square| {
-                    let coord = Coord::from(square);
-                    board[coord.y()][coord.x()]
-                })
-            })
-    }
-
     fn from_parts(
         stage: Stage,
         to_move: Color,
-        squares: EnumMap<Square, Option<ColoredPiece>>,
+        board: Board,
         captured: EnumMap<ColoredPiece, usize>,
     ) -> Result<Position, InvalidPosition> {
         let mut position = Position::initial();
         position.stage = stage;
         position.to_move = to_move;
-
-        for (square, &cpiece) in squares.iter() {
-            if let Some(cpiece) = cpiece {
-                position.place_piece(square, cpiece).unwrap();
-            }
-        }
+        position.board = board;
 
         for (cpiece, &num_captured) in captured.iter() {
             for _ in 0..num_captured {
@@ -229,7 +201,10 @@ impl Position {
         let mut new_position = *self;
         for (i, &piece) in mov.pieces.iter().enumerate() {
             let square = Square::from_index(i).pov(mov.color);
-            new_position.place_piece(square, piece.with_color(me))?;
+            new_position
+                .board
+                .place_piece(square, piece.with_color(me))
+                .unwrap();
         }
         new_position.to_move = opp;
         if opp == Color::Red {
@@ -252,43 +227,28 @@ impl Position {
             }
             Some(from) => {
                 movegen::validate_from_to(piece, from, mov.to)?;
-                new_position.remove_piece(from, mov.colored_piece)?;
+                new_position
+                    .board
+                    .remove_piece(from, mov.colored_piece)
+                    .map_err(|_| InvalidMove)?;
             }
         }
         if let Some(captured) = mov.captured {
-            new_position.remove_piece(mov.to, captured.with_color(opp))?;
+            new_position
+                .board
+                .remove_piece(mov.to, captured.with_color(opp))
+                .map_err(|_| InvalidMove)?;
             new_position.add_captured(captured.with_color(me))?;
             if captured == Piece::Wazir {
                 new_position.stage = Stage::End;
             }
         }
-        new_position.place_piece(mov.to, mov.colored_piece)?;
+        new_position
+            .board
+            .place_piece(mov.to, mov.colored_piece)
+            .map_err(|_| InvalidMove)?;
         new_position.to_move = opp;
         Ok(new_position)
-    }
-
-    fn place_piece(&mut self, square: Square, cpiece: ColoredPiece) -> Result<(), InvalidMove> {
-        let s = &mut self.squares[square];
-        if s.is_some() {
-            return Err(InvalidMove);
-        }
-        *s = Some(cpiece);
-        self.occupied_by[cpiece.color()].add(square);
-        self.empty_squares.remove(square);
-        self.piece_maps[cpiece].add(square);
-        Ok(())
-    }
-
-    fn remove_piece(&mut self, square: Square, cpiece: ColoredPiece) -> Result<(), InvalidMove> {
-        let s = &mut self.squares[square];
-        if *s != Some(cpiece) {
-            return Err(InvalidMove);
-        }
-        *s = None;
-        self.occupied_by[cpiece.color()].remove(square);
-        self.empty_squares.add(square);
-        self.piece_maps[cpiece].remove(square);
-        Ok(())
     }
 
     fn add_captured(&mut self, cpiece: ColoredPiece) -> Result<(), InvalidMove> {
@@ -322,16 +282,7 @@ impl Display for Position {
             }
         }
         writeln!(f)?;
-        for y in 0..Coord::HEIGHT {
-            for x in 0..Coord::WIDTH {
-                let square = Coord::new(x, y).into();
-                match self.square(square) {
-                    None => write!(f, ".")?,
-                    Some(cpiece) => write!(f, "{cpiece}")?,
-                }
-            }
-            writeln!(f)?;
-        }
+        write!(f, "{}", self.board)?;
         Ok(())
     }
 }

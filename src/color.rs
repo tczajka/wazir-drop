@@ -1,12 +1,9 @@
 use crate::{
     impl_from_str_for_parsable,
-    parser::{self, ParseError, Parser, ParserExt},
+    parser::{self, Parser, ParserExt},
     unsafe_simple_enum, Bitboard,
 };
-use std::{
-    fmt::{self, Display, Formatter},
-    str::FromStr,
-};
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(u8)]
