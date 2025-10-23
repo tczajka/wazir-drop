@@ -3,6 +3,7 @@
 #![deny(clippy::default_trait_access)]
 
 pub mod arrays;
+pub mod clock;
 pub mod either;
 pub mod enums;
 pub mod error;
@@ -24,7 +25,9 @@ pub use bitboard::{Bitboard, BitboardIterator};
 pub use board::Board;
 pub use captured::Captured;
 pub use color::Color;
-pub use moves::{InvalidMove, Move, RegularMove, SetupMove, ShortMove, ShortMoveFrom};
+pub use moves::{
+    InvalidMove, Move, RegularMove, SetupMove, ShortMove, ShortMoveFrom, MAX_MOVES_IN_GAME,
+};
 pub use piece::{ColoredPiece, Piece};
 pub use player::Player;
 pub use position::{Position, Stage};

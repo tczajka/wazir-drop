@@ -1,5 +1,5 @@
-use rand::{SeedableRng, rngs::StdRng, seq::IteratorRandom};
-use wazir_drop::{Color, Move, Player, Position, movegen};
+use rand::{SeedableRng, rngs::StdRng};
+use wazir_drop::{Color, Move, Player, Position, clock::Timer, movegen};
 
 #[derive(Debug)]
 pub struct RandomPlayer {
@@ -13,9 +13,7 @@ impl Player for RandomPlayer {
         }
     }
 
-    fn make_move(&mut self, position: &Position) -> Move {
-        movegen::pseudomoves(position)
-            .choose(&mut self.rng)
-            .expect("Stalemate")
+    fn make_move(&mut self, position: &Position, _timer: &Timer) -> Move {
+        movegen::random_move(position, &mut self.rng)
     }
 }

@@ -1,8 +1,9 @@
 [package]
-name = "random-player"
+name = "referee"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 wazir-drop = { path = "..", features = ["rand"] }
+random-player = { path = "../random-player" }
 rand = "0.9.2"
