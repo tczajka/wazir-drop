@@ -1,5 +1,5 @@
-use wazir_drop::Position;
+use wazir_drop::{run_cli, MainPlayerFactory};
 
 fn main() {
-    println!("Hello, world!");
+    run_cli(&MainPlayerFactory::new());
 }

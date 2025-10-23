@@ -29,7 +29,7 @@ mod square;
 pub use bitboard::{Bitboard, BitboardIterator};
 pub use board::Board;
 pub use captured::Captured;
-pub use cli::{cli, CliCommand};
+pub use cli::{run_cli, CliCommand};
 pub use color::Color;
 pub use constants::{DEFAULT_TIME_LIMIT, MAX_MOVES_IN_GAME, TIME_MARGIN};
 pub use main_player::{MainPlayer, MainPlayerFactory};

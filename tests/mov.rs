@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use wazir_drop::{
-    enums::SimpleEnumExt, parser::ParseError, Move, SetupMove, Piece, RegularMove, ShortMove,
+    enums::SimpleEnumExt, parser::ParseError, Move, Piece, RegularMove, SetupMove, ShortMove,
 };
 
 #[test]

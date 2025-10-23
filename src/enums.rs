@@ -8,7 +8,7 @@ pub trait SimpleEnum: Sized {
     fn from_index(value: usize) -> Self;
 }
 
-/// SAFETY: enum!(Type, length) requires that `Type` is a #[repr(u8)] simple enum, and `length` is the number of variants.
+/// SAFETY: unsafe_simple_enum!(Type, length) requires that `Type` is a `#[repr(u8)]`` simple enum, and `length` is the number of variants.
 #[macro_export]
 macro_rules! unsafe_simple_enum {
     {$name:ty, $n:literal} => {

@@ -33,7 +33,7 @@ pub fn write(level: Level, message: fmt::Arguments) {
     if level < logger.level {
         return;
     }
-    write!(logger.writer, "{message}").unwrap();
+    writeln!(logger.writer, "{message}").unwrap();
 }
 
 pub fn flush() {

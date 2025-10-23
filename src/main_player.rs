@@ -20,6 +20,13 @@ impl Player for MainPlayer {
 #[derive(Debug)]
 pub struct MainPlayerFactory;
 
+impl MainPlayerFactory {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        Self
+    }
+}
+
 impl PlayerFactory for MainPlayerFactory {
     fn create(
         &self,
