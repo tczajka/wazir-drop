@@ -1,5 +1,27 @@
 use rand::{SeedableRng, rngs::StdRng};
-use wazir_drop::{Move, Player, Position, clock::Timer, movegen};
+use std::time::Duration;
+use wazir_drop::{Color, Move, Player, PlayerFactory, Position, clock::Timer, movegen};
+
+#[derive(Debug)]
+pub struct RandomPlayerFactory;
+
+impl RandomPlayerFactory {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl PlayerFactory for RandomPlayerFactory {
+    fn create(
+        &self,
+        _color: Color,
+        _opening: &[Move],
+        _time_limit: Option<Duration>,
+    ) -> Box<dyn Player> {
+        Box::new(RandomPlayer::new())
+    }
+}
 
 #[derive(Debug)]
 pub struct RandomPlayer {
@@ -7,16 +29,11 @@ pub struct RandomPlayer {
 }
 
 impl RandomPlayer {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             rng: StdRng::from_os_rng(),
         }
-    }
-}
-
-impl Default for RandomPlayer {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

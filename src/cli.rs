@@ -1,7 +1,7 @@
 use crate::{
     impl_from_str_for_parsable,
     parser::{self, Parser, ParserExt},
-    Move, Player, ShortMove,
+    Move, PlayerFactory, ShortMove,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -51,4 +51,4 @@ impl Display for CliCommand {
     }
 }
 
-pub fn cli(mut player: Box<dyn Player>) {}
+pub fn cli(_player_factory: &dyn PlayerFactory) {}

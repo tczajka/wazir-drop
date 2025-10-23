@@ -7,6 +7,7 @@ pub struct Stopwatch {
 }
 
 impl Stopwatch {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             snapshot: Duration::ZERO,
@@ -29,12 +30,6 @@ impl Stopwatch {
             Some(start_instant) => self.snapshot + start_instant.elapsed(),
             None => self.snapshot,
         }
-    }
-}
-
-impl Default for Stopwatch {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

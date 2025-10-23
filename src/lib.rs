@@ -33,6 +33,6 @@ pub use color::Color;
 pub use constants::{DEFAULT_TIME_LIMIT, MAX_MOVES_IN_GAME, TIME_MARGIN};
 pub use moves::{InvalidMove, Move, RegularMove, SetupMove, ShortMove, ShortMoveFrom};
 pub use piece::{ColoredPiece, Piece};
-pub use player::Player;
+pub use player::{Player, PlayerFactory};
 pub use position::{Position, Stage};
 pub use square::{Coord, Direction, Square};
