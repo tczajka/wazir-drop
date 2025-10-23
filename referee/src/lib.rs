@@ -23,7 +23,8 @@ pub struct FinishedGame {
     pub time_left: EnumMap<Color, Duration>,
 }
 
-pub fn run_game<PlayerRed: Player, PlayerBlue: Player>(
+pub fn run_game(
+    mut players: EnumMap<Color, Box<dyn Player>>,
     opening: &[Move],
     time_limit: EnumMap<Color, Duration>,
 ) -> FinishedGame {
@@ -31,25 +32,23 @@ pub fn run_game<PlayerRed: Player, PlayerBlue: Player>(
     let mut moves = opening.to_vec();
     let mut winner = None;
 
+    let mut timers = EnumMap::from_fn(|color| Timer::new(time_limit[color]));
+
+    for (color, player) in players.iter_mut() {
+        timers[color].start();
+        player.init(color, opening, &timers[color]);
+        timers[color].stop();
+    }
     for &mov in opening {
         position = position.make_move(mov).expect("Invalid opening move");
     }
-    let mut timers = EnumMap::from_fn(|color| Timer::new(time_limit[color]));
-
-    let mut players: EnumMap<Color, Box<dyn Player>> = EnumMap::from_fn(|color| {
-        timers[color].start();
-        let player: Box<dyn Player> = match color {
-            Color::Red => Box::new(PlayerRed::new(color, opening)),
-            Color::Blue => Box::new(PlayerBlue::new(color, opening)),
-        };
-        timers[color].stop();
-        player
-    });
 
     loop {
         let color = position.to_move();
+        let opp = color.opposite();
+
         if position.stage() == Stage::End {
-            winner = Some(color.opposite());
+            winner = Some(opp);
             break;
         }
         if moves.len() >= MAX_MOVES_IN_GAME {
@@ -59,9 +58,9 @@ pub fn run_game<PlayerRed: Player, PlayerBlue: Player>(
         let mov = players[color].make_move(&position, &timers[color]);
         timers[color].stop();
 
-        timers[color.opposite()].start();
-        players[color.opposite()].opponent_move(&position, mov);
-        timers[color.opposite()].stop();
+        timers[opp].start();
+        players[opp].opponent_move(&position, mov, &timers[opp]);
+        timers[opp].stop();
 
         moves.push(mov);
         position = position.make_move(mov).expect("Invalid move");
