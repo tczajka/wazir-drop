@@ -188,6 +188,23 @@ pub fn endl() -> impl Parser<Output = ()> {
     exact(b"\n")
 }
 
+pub fn u32() -> impl Parser<Output = u32> {
+    byte()
+        .try_map(|b| match b {
+            b'0'..=b'9' => Ok(u32::from(b - b'0')),
+            _ => Err(ParseError),
+        })
+        .repeat(1..)
+        .try_map(|digits| {
+            let mut res = 0u32;
+            for digit in digits {
+                res = res.checked_mul(10).ok_or(ParseError)?;
+                res = res.checked_add(digit).ok_or(ParseError)?;
+            }
+            Ok(res)
+        })
+}
+
 #[derive(Debug, Clone, Copy)]
 struct And<P1: Parser, P2: Parser> {
     p1: P1,
@@ -300,6 +317,7 @@ macro_rules! impl_from_str_for_parsable {
             type Err = $crate::parser::ParseError;
 
             fn from_str(s: &str) -> Result<Self, Self::Err> {
+                use $crate::parser::ParserExt;
                 Self::parser().parse_all(s.as_bytes())
             }
         }
