@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use rand::{SeedableRng, rngs::StdRng};
 use random_player::RandomPlayer;
 use wazir_drop::{Player, enums::EnumMap};
@@ -15,10 +13,6 @@ fn test_referee() {
             player
         });
 
-        _ = referee::run_game(
-            players,
-            &opening,
-            EnumMap::from_fn(|_| Duration::from_secs(1)),
-        );
+        _ = referee::run_game(players, &opening, EnumMap::from_fn(|_| None));
     }
 }

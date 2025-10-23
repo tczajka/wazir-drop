@@ -2,7 +2,8 @@ use std::time::Duration;
 
 use rand::rngs::StdRng;
 use wazir_drop::{
-    Color, MAX_MOVES_IN_GAME, Move, Player, Position, Stage, clock::Timer, enums::EnumMap, movegen,
+    Color, DEFAULT_TIME_LIMIT, MAX_MOVES_IN_GAME, Move, Player, Position, Stage, clock::Timer,
+    enums::EnumMap, movegen,
 };
 
 pub fn random_opening(len: usize, rng: &mut StdRng) -> Vec<Move> {
@@ -26,17 +27,18 @@ pub struct FinishedGame {
 pub fn run_game(
     mut players: EnumMap<Color, Box<dyn Player>>,
     opening: &[Move],
-    time_limit: EnumMap<Color, Duration>,
+    time_limit: EnumMap<Color, Option<Duration>>,
 ) -> FinishedGame {
     let mut position = Position::initial();
     let mut moves = opening.to_vec();
     let mut winner = None;
 
-    let mut timers = EnumMap::from_fn(|color| Timer::new(time_limit[color]));
+    let mut timers =
+        EnumMap::from_fn(|color| Timer::new(time_limit[color].unwrap_or(DEFAULT_TIME_LIMIT)));
 
     for (color, player) in players.iter_mut() {
         timers[color].start();
-        player.init(color, opening, &timers[color]);
+        player.init(color, opening, time_limit[color]);
         timers[color].stop();
     }
     for &mov in opening {

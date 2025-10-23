@@ -14,6 +14,7 @@ mod bitboard;
 mod board;
 mod captured;
 mod color;
+mod constants;
 pub mod movegen;
 mod moves;
 mod piece;
@@ -25,9 +26,8 @@ pub use bitboard::{Bitboard, BitboardIterator};
 pub use board::Board;
 pub use captured::Captured;
 pub use color::Color;
-pub use moves::{
-    InvalidMove, Move, RegularMove, SetupMove, ShortMove, ShortMoveFrom, MAX_MOVES_IN_GAME,
-};
+pub use constants::{DEFAULT_TIME_LIMIT, MAX_MOVES_IN_GAME, TIME_MARGIN};
+pub use moves::{InvalidMove, Move, RegularMove, SetupMove, ShortMove, ShortMoveFrom};
 pub use piece::{ColoredPiece, Piece};
 pub use player::Player;
 pub use position::{Position, Stage};

@@ -10,8 +10,6 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
-pub const MAX_MOVES_IN_GAME: usize = 102;
-
 #[derive(Debug, Clone, Copy)]
 pub struct InvalidMove;
 
