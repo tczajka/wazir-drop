@@ -1,8 +1,4 @@
-use std::{
-    error::Error,
-    fmt::{self, Display, Formatter},
-    ops::{Bound, RangeBounds},
-};
+use std::ops::{Bound, RangeBounds};
 
 #[derive(Debug, Clone, Copy)]
 pub struct ParseSuccess<'a, T> {
@@ -12,14 +8,6 @@ pub struct ParseSuccess<'a, T> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ParseError;
-
-impl Display for ParseError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "Parse error")
-    }
-}
-
-impl Error for ParseError {}
 
 pub type ParseResult<'a, T> = Result<ParseSuccess<'a, T>, ParseError>;
 

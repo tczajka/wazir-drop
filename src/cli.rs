@@ -7,7 +7,6 @@ use crate::{
     platform, Color, Move, PlayerFactory, Position, ShortMove, DEFAULT_TIME_LIMIT,
 };
 use std::{
-    error::Error,
     fmt::{self, Display, Formatter},
     io::{self, BufRead, Write},
     process::ExitCode,
@@ -68,8 +67,6 @@ enum CliError {
     InvalidPlayerMove(Move),
     InvalidOpponentMove(ShortMove),
 }
-
-impl Error for CliError {}
 
 impl Display for CliError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
