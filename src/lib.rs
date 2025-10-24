@@ -1,7 +1,3 @@
-#![deny(unsafe_op_in_unsafe_fn)]
-#![deny(unused_results)]
-#![deny(clippy::default_trait_access)]
-
 pub mod arrays;
 pub mod clock;
 pub mod either;

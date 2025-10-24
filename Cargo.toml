@@ -8,3 +8,13 @@ rand = { version = "0.9.2", optional = true }
 [workspace]
 resolver = "3"
 members = ["external-player", "gui", "random-player", "referee"]
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+unused_results = "deny"
+
+[workspace.lints.clippy]
+default_trait_access = "deny"
+
+[lints]
+workspace = true

@@ -131,7 +131,7 @@ impl WazirDropApp {
                 y
             };
             let name = char::from(b'a' + y as u8);
-            ui.painter().text(
+            _ = ui.painter().text(
                 Pos2::new(
                     0.7 * self.tile_size,
                     (y_on_screen as f32 + 1.5) * self.tile_size,
@@ -150,7 +150,7 @@ impl WazirDropApp {
                 x
             };
             let name = char::from(b'1' + x as u8);
-            ui.painter().text(
+            _ = ui.painter().text(
                 Pos2::new(
                     (x_on_screen as f32 + 1.5) * self.tile_size,
                     0.7 * self.tile_size,
@@ -194,7 +194,7 @@ impl WazirDropApp {
             } else {
                 Self::square_color(square)
             };
-            ui.painter().rect_filled(rect, 0.0, color);
+            _ = ui.painter().rect_filled(rect, 0.0, color);
             if let Some(cpiece) = position.square(square) {
                 self.draw_piece(ui, square, cpiece);
             }
@@ -219,7 +219,7 @@ impl WazirDropApp {
             } else {
                 Self::square_color(square)
             };
-            ui.painter().rect_filled(rect, 0.0, color);
+            _ = ui.painter().rect_filled(rect, 0.0, color);
             let num = self.position.num_captured(cpiece);
             if num > 0 {
                 self.draw_captured_piece(ui, cpiece, num);
@@ -250,9 +250,10 @@ impl WazirDropApp {
         image.paint_at(ui, rect);
         if num > 1 {
             let pos = rect.left_top() + 0.8 * rect.size();
-            ui.painter()
+            _ = ui
+                .painter()
                 .circle_filled(pos, 0.2 * self.tile_size, Color32::GREEN);
-            ui.painter().text(
+            _ = ui.painter().text(
                 pos,
                 Align2::CENTER_CENTER,
                 num.to_string(),
@@ -275,17 +276,18 @@ impl WazirDropApp {
                 Color::Blue => Color32::BLACK,
             };
             let pos = Pos2::new(x, y);
-            ui.painter()
+            _ = ui
+                .painter()
                 .circle_filled(pos, 0.12 * self.tile_size, Color32::BLACK);
-            ui.painter().circle_filled(pos, 0.1 * self.tile_size, color);
+            _ = ui.painter().circle_filled(pos, 0.1 * self.tile_size, color);
         }
     }
 
     fn draw_history(&self, ui: &mut Ui) {
-        ui.heading("Moves");
-        ScrollArea::vertical().show(ui, |ui| {
+        _ = ui.heading("Moves");
+        _ = ScrollArea::vertical().show(ui, |ui| {
             for entry in self.history.iter() {
-                ui.label(entry.mov.to_string());
+                _ = ui.label(entry.mov.to_string());
             }
         });
     }
@@ -382,8 +384,8 @@ impl App for WazirDropApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.set_theme(Theme::Light);
 
-        SidePanel::right("side panel").show(ctx, |ui| {
-            ui.checkbox(&mut self.reverse, "Reverse view");
+        _ = SidePanel::right("side panel").show(ctx, |ui| {
+            _ = ui.checkbox(&mut self.reverse, "Reverse view");
 
             if ui.button("New Game").clicked() {
                 self.new_game();
@@ -402,7 +404,7 @@ impl App for WazirDropApp {
             self.draw_history(ui);
         });
 
-        CentralPanel::default().show(ctx, |ui| self.update_chessboard(ui));
+        _ = CentralPanel::default().show(ctx, |ui| self.update_chessboard(ui));
     }
 }
 

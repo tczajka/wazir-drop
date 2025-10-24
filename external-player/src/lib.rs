@@ -89,7 +89,8 @@ impl Player for ExternalPlayer {
 impl Drop for ExternalPlayer {
     fn drop(&mut self) {
         self.send_command(CliCommand::Quit);
-        self.subprocess
+        _ = self
+            .subprocess
             .wait()
             .unwrap_or_else(|e| panic!("Failed to wait for external player to quit: {e}"));
     }

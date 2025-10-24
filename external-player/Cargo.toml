@@ -4,3 +4,6 @@ edition = "2024"
 
 [dependencies]
 wazir-drop = { path = ".." }
+
+[lints]
+workspace = true

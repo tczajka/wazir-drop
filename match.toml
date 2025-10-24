@@ -1,0 +1,17 @@
+num_cpus = 31
+log_dir = "logs"
+
+[player.random]
+type = "Random"
+
+[player.main]
+type = "Main"
+
+[player.wazir-drop]
+type = "External"
+path = "target/release/wazir-drop"
+
+[[match]]
+players = ["main", "random"]
+opening_length = 2
+num_rounds = 5

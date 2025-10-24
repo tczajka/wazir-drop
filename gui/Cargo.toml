@@ -6,3 +6,6 @@ edition = "2024"
 wazir-drop = { path = ".." }
 eframe = "0.33.0"
 egui_extras = { version = "0.33.0", features = ["svg"] }
+
+[lints]
+workspace = true
