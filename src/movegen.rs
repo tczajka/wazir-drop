@@ -7,6 +7,9 @@ use crate::{
 };
 use std::iter;
 
+#[cfg(feature = "rand")]
+use rand::{seq::IteratorRandom, seq::SliceRandom, Rng};
+
 static MOVE_BITBOARD_TABLE: EnumMap<Piece, EnumMap<Square, Bitboard>> = calc_move_bitboard_table();
 
 pub fn move_bitboard(piece: Piece, square: Square) -> Bitboard {
@@ -246,23 +249,21 @@ pub fn drops(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
 }
 
 #[cfg(feature = "rand")]
-pub fn random_setup(color: Color, rng: &mut rand::rngs::StdRng) -> SetupMove {
-    use rand::seq::SliceRandom;
+pub fn random_setup<RNG: Rng>(color: Color, rng: &mut RNG) -> SetupMove {
     let mut mov = setup_moves(color).next().unwrap();
     mov.pieces.shuffle(rng);
     mov
 }
 
 #[cfg(feature = "rand")]
-pub fn random_regular(position: &Position, rng: &mut rand::rngs::StdRng) -> RegularMove {
-    use rand::seq::IteratorRandom;
+pub fn random_regular<RNG: Rng>(position: &Position, rng: &mut RNG) -> RegularMove {
     regular_pseudomoves(position)
         .choose(rng)
         .expect("Stalemate")
 }
 
 #[cfg(feature = "rand")]
-pub fn random_move(position: &Position, rng: &mut rand::rngs::StdRng) -> Move {
+pub fn random_move<RNG: rand::Rng>(position: &Position, rng: &mut RNG) -> Move {
     match position.stage() {
         Stage::Setup => Move::Setup(random_setup(position.to_move(), rng)),
         Stage::Regular => Move::Regular(random_regular(position, rng)),

@@ -8,7 +8,7 @@ pub trait Player {
 }
 
 /// It can create players.
-pub trait PlayerFactory {
+pub trait PlayerFactory: Send + Sync {
     fn create(
         &self,
         game_id: &str,
