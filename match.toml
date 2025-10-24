@@ -12,6 +12,6 @@ type = "External"
 path = "target/release/wazir-drop"
 
 [[match]]
-players = ["main", "random"]
+players = ["wazir-drop", "random"]
 opening_length = 2
-num_rounds = 5
+num_rounds = 10000
