@@ -1027,6 +1027,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "external-player"
+version = "0.0.0"
+dependencies = [
+ "wazir-drop",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

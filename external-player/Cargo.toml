@@ -1,0 +1,6 @@
+[package]
+name = "external-player"
+edition = "2024"
+
+[dependencies]
+wazir-drop = { path = ".." }

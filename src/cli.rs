@@ -1,10 +1,11 @@
 use crate::{
+    Color, DEFAULT_TIME_LIMIT, Move, PlayerFactory, Position, ShortMove,
     clock::{Stopwatch, Timer},
     impl_from_str_for_parsable,
     log::{self, Level},
     movegen,
     parser::{self, Parser, ParserExt},
-    platform, Color, Move, PlayerFactory, Position, ShortMove, DEFAULT_TIME_LIMIT,
+    platform,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -125,7 +126,7 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
             break;
         }
         let command = CliCommand::parser()
-            .then_ignore(parser::endl().repeat(0..=1))
+            .then_ignore(parser::endl())
             .parse_all(&command_buffer)
             .map_err(|_| CliError::InvalidCommand(command_buffer.clone()))?;
 

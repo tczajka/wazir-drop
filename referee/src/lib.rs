@@ -61,12 +61,16 @@ pub fn run_game(
         let mov = players[color].make_move(&position, &timers[color]);
         timers[color].stop();
 
-        timers[opp].start();
-        players[opp].opponent_move(&position, mov, &timers[opp]);
-        timers[opp].stop();
-
         moves.push(mov);
-        position = position.make_move(mov).expect("Invalid move");
+        let new_position = position.make_move(mov).expect("Invalid move");
+
+        if new_position.stage() != Stage::End {
+            timers[opp].start();
+            players[opp].opponent_move(&position, mov, &timers[opp]);
+            timers[opp].stop();
+        }
+
+        position = new_position;
     }
 
     FinishedGame {
