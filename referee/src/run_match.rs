@@ -94,7 +94,10 @@ pub fn run_match<RNG: Rng>(
                     match_result.min_time_left[i] = match_result.min_time_left[i]
                         .min(finished_game.time_left[Color::from_index(i ^ red_player_idx)]);
                 }
-                log::info!("{game_id} score {player0_score}");
+                log::info!(
+                    "{game_id} score {running_score}",
+                    running_score = match_result.player0_score
+                );
             });
         }
     }
