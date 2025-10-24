@@ -52,13 +52,15 @@ impl ExternalPlayer {
         Ok(this)
     }
 
+    fn try_send_command(&mut self, command: CliCommand) -> Result<(), io::Error> {
+        writeln!(self.stdin, "{command}")?;
+        self.stdin.flush()?;
+        Ok(())
+    }
+
     fn send_command(&mut self, command: CliCommand) {
-        || -> Result<(), io::Error> {
-            writeln!(self.stdin, "{command}")?;
-            self.stdin.flush()?;
-            Ok(())
-        }()
-        .unwrap_or_else(|e| panic!("Failed to send command: {e}"))
+        self.try_send_command(command)
+            .unwrap_or_else(|e| panic!("Failed to send command: {e}"));
     }
 
     fn read_move(&mut self) -> ShortMove {
@@ -88,7 +90,7 @@ impl Player for ExternalPlayer {
 
 impl Drop for ExternalPlayer {
     fn drop(&mut self) {
-        self.send_command(CliCommand::Quit);
+        _ = self.try_send_command(CliCommand::Quit);
         _ = self
             .subprocess
             .wait()

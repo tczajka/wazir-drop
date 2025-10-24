@@ -103,9 +103,7 @@ fn run_matches(config: &Config, config_dir: &Path, log_dir: &Path) -> Result<(),
     for match_config in config.r#match.iter() {
         for player_name in match_config.players.iter() {
             if !player_factories.contains_key(player_name) {
-                let error = format!("Player {player_name} not found");
-                log::error!("{error}");
-                return Err(error.into());
+                return Err(format!("Player {player_name} not found").into());
             }
         }
     }
