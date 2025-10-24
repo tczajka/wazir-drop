@@ -191,6 +191,7 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
         };
 
         let mov = player.make_move(&position, &timer);
+        let short_move = ShortMove::from(mov);
         position = position
             .make_move(mov)
             .map_err(|_| CliError::InvalidPlayerMove(mov))?;
@@ -202,7 +203,7 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
         }
         opp_stopwatch.as_mut().unwrap().start();
 
-        writeln!(stdout, "{mov}")?;
+        writeln!(stdout, "{short_move}")?;
         stdout.flush()?;
     }
     log::flush();
