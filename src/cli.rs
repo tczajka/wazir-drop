@@ -1,11 +1,10 @@
 use crate::{
-    Color, DEFAULT_TIME_LIMIT, Move, PlayerFactory, Position, ShortMove,
     clock::{Stopwatch, Timer},
     impl_from_str_for_parsable,
     log::{self, Level},
     movegen,
     parser::{self, Parser, ParserExt},
-    platform,
+    platform, Color, Move, PlayerFactory, Position, ShortMove, DEFAULT_TIME_LIMIT,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -156,7 +155,7 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
                     return Err(CliError::StartCommandTooLate);
                 }
                 timer.start();
-                player = Some(player_factory.create(Color::Red, &opening, time_limit));
+                player = Some(player_factory.create("", Color::Red, &opening, time_limit));
                 log::info!("init {} ms", timer.get().as_millis());
             }
             CliCommand::OpponentMove(short_move) => {
@@ -171,7 +170,7 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
                 log::info!("opp {mov}");
 
                 if player.is_none() {
-                    player = Some(player_factory.create(Color::Blue, &opening, time_limit));
+                    player = Some(player_factory.create("", Color::Blue, &opening, time_limit));
                     log::info!("init {} ms", timer.get().as_millis());
                 }
 

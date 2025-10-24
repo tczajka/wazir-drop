@@ -11,6 +11,6 @@ fn test_referee() {
 
     for opening_len in [0, 2] {
         let opening = referee::random_opening(opening_len, &mut rng);
-        _ = referee::run_game(player_factories, &opening, time_limits);
+        _ = referee::run_game("", player_factories, &opening, time_limits);
     }
 }

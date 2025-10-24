@@ -97,15 +97,17 @@ impl Drop for ExternalPlayer {
 
 #[derive(Debug)]
 pub struct ExternalPlayerFactory {
+    name: String,
     path: PathBuf,
-    log_path: PathBuf,
+    log_dir: PathBuf,
 }
 
 impl ExternalPlayerFactory {
-    pub fn new(path: &Path, log_path: &Path) -> Self {
+    pub fn new(name: &str, path: &Path, log_dir: &Path) -> Self {
         Self {
+            name: name.to_string(),
             path: path.to_path_buf(),
-            log_path: log_path.to_path_buf(),
+            log_dir: log_dir.to_path_buf(),
         }
     }
 }
@@ -113,15 +115,18 @@ impl ExternalPlayerFactory {
 impl PlayerFactory for ExternalPlayerFactory {
     fn create(
         &self,
+        game_id: &str,
         color: Color,
         opening: &[Move],
         time_limit: std::option::Option<Duration>,
     ) -> Box<dyn Player> {
-        let player =
-            match ExternalPlayer::new(&self.path, &self.log_path, color, opening, time_limit) {
-                Ok(player) => player,
-                Err(e) => panic!("Failed to run external player: {e}"),
-            };
+        let log_path = self
+            .log_dir
+            .join(format!("{name}-{game_id}-{color}.log", name = self.name));
+        let player = match ExternalPlayer::new(&self.path, &log_path, color, opening, time_limit) {
+            Ok(player) => player,
+            Err(e) => panic!("Failed to run external player: {e}"),
+        };
         Box::new(player)
     }
 }

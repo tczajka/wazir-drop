@@ -15,6 +15,7 @@ impl RandomPlayerFactory {
 impl PlayerFactory for RandomPlayerFactory {
     fn create(
         &self,
+        _game_id: &str,
         _color: Color,
         _opening: &[Move],
         _time_limit: Option<Duration>,

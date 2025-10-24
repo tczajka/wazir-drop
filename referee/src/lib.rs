@@ -24,6 +24,7 @@ pub struct FinishedGame {
 }
 
 pub fn run_game(
+    game_id: &str,
     player_factories: EnumMap<Color, &dyn PlayerFactory>,
     opening: &[Move],
     time_limit: EnumMap<Color, Option<Duration>>,
@@ -37,7 +38,7 @@ pub fn run_game(
 
     let mut players = EnumMap::from_fn(|color| {
         timers[color].start();
-        let player = player_factories[color].create(color, opening, time_limit[color]);
+        let player = player_factories[color].create(game_id, color, opening, time_limit[color]);
         timers[color].stop();
         player
     });

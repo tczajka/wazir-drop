@@ -11,6 +11,7 @@ pub trait Player {
 pub trait PlayerFactory {
     fn create(
         &self,
+        game_id: &str,
         color: Color,
         opening: &[Move],
         time_limit: Option<Duration>,
