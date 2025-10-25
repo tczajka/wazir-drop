@@ -3,7 +3,9 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-pub trait Array: Index<usize, Output = Self::Element> + IndexMut<usize> {
+pub trait Array:
+    Index<usize, Output = Self::Element> + IndexMut<usize> + IntoIterator<Item = Self::Element>
+{
     type Element;
     const LENGTH: usize;
 

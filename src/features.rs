@@ -14,27 +14,27 @@ pub trait Features {
     ///
     /// If it's too complicated, returns `None`. Caller should fall back to `all_features`.
     fn diff(
-        position: &Position,
         mov: Move,
+        new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)> {
         match mov {
-            Move::Setup(mov) => Self::diff_setup(position, mov, color)
+            Move::Setup(mov) => Self::diff_setup(mov, new_position, color)
                 .map(|(added, removed)| (Either::Left(added), Either::Left(removed))),
-            Move::Regular(mov) => Self::diff_regular(position, mov, color)
+            Move::Regular(mov) => Self::diff_regular(mov, new_position, color)
                 .map(|(added, removed)| (Either::Right(added), Either::Right(removed))),
         }
     }
 
     fn diff_setup(
-        position: &Position,
         mov: SetupMove,
+        new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)>;
 
     fn diff_regular(
-        position: &Position,
         mov: RegularMove,
+        new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)>;
 }
@@ -50,8 +50,8 @@ impl Features for PieceSquareFeatures {
     }
 
     fn diff_setup(
-        position: &Position,
         mov: SetupMove,
+        new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)> {
         // TODO: Implement.
@@ -59,8 +59,8 @@ impl Features for PieceSquareFeatures {
     }
 
     fn diff_regular(
-        position: &Position,
         mov: RegularMove,
+        new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)> {
         // TODO: Implement.

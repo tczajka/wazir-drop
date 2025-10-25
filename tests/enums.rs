@@ -50,3 +50,13 @@ fn test_iter_mut() {
     assert!(matches!(iter.next(), Some((Foo::C, &mut 2))));
     assert!(iter.next().is_none());
 }
+
+#[test]
+fn test_into_iter() {
+    let map: EnumMap<Foo, usize> = EnumMap::from_fn(Foo::index);
+    let mut iter = map.into_iter();
+    assert!(matches!(iter.next(), Some((Foo::A, 0))));
+    assert!(matches!(iter.next(), Some((Foo::B, 1))));
+    assert!(matches!(iter.next(), Some((Foo::C, 2))));
+    assert!(iter.next().is_none());
+}

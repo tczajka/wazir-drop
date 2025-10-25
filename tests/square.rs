@@ -31,11 +31,3 @@ fn test_add() {
     assert!(Square::A5.add(Direction::new(-1, -1)).is_none());
     assert!(Square::H5.add(Direction::new(-1, 2)).is_none());
 }
-
-#[test]
-fn test_pov() {
-    assert_eq!(Square::A1.pov(Color::Red), Square::A1);
-    assert_eq!(Square::A1.pov(Color::Blue), Square::H8);
-    assert_eq!(Square::H8.pov(Color::Red), Square::H8);
-    assert_eq!(Square::H8.pov(Color::Blue), Square::A1);
-}

@@ -76,6 +76,14 @@ impl<K: SimpleEnum, V> EnumMap<K, V> {
         Self { array }
     }
 
+    #[allow(clippy::should_implement_trait)]
+    pub fn into_iter(self) -> impl Iterator<Item = (K, V)> {
+        self.array
+            .into_iter()
+            .enumerate()
+            .map(|(i, v)| (K::from_index(i), v))
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (K, &V)> {
         self.array
             .as_slice()
