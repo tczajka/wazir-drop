@@ -4,7 +4,7 @@ use crate::{
     impl_from_str_for_parsable, movegen,
     parser::{self, ParseError, Parser, ParserExt},
     unsafe_simple_enum, Bitboard, Board, Captured, Color, ColoredPiece, InvalidMove, Move, Piece,
-    RegularMove, SetupMove, Square,
+    RegularMove, SetupMove, Square, Symmetry,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -176,8 +176,9 @@ impl Position {
         }
         mov.validate_pieces()?;
         let mut new_position = self.clone();
+        let symmetry = Symmetry::pov(me).inverse();
         for (i, &piece) in mov.pieces.iter().enumerate() {
-            let square = Square::from_index(i).pov(mov.color);
+            let square = symmetry.apply(Square::from_index(i));
             new_position
                 .board
                 .place_piece(square, piece.with_color(me))

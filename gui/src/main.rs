@@ -7,7 +7,7 @@ use eframe::{
 };
 use wazir_drop::{
     Color, ColoredPiece, Coord, Move, Piece, Position, SetupMove, ShortMove, ShortMoveFrom, Square,
-    Stage,
+    Stage, Symmetry,
     enums::{EnumMap, SimpleEnumExt},
     movegen,
 };
@@ -97,7 +97,7 @@ impl WazirDropApp {
     }
 
     fn square_rect(&self, square: Square) -> Rect {
-        let coord = Coord::from(square.pov(self.pov_color()));
+        let coord = Coord::from(self.symmetry().apply(square));
         Rect::from_min_size(
             Pos2::new(
                 (coord.x() + 1) as f32 * self.tile_size,
@@ -266,7 +266,7 @@ impl WazirDropApp {
     fn draw_to_move(&self, ui: &mut Ui) {
         if self.position.stage() != Stage::End {
             let x = 1.1 * self.tile_size;
-            let y = if self.position.to_move() == self.pov_color() {
+            let y = if (self.position.to_move() == Color::Red) != self.reverse {
                 0.8 * self.tile_size
             } else {
                 ((Coord::HEIGHT + 1) as f32 + 0.2) * self.tile_size
@@ -292,11 +292,11 @@ impl WazirDropApp {
         });
     }
 
-    fn pov_color(&self) -> Color {
+    fn symmetry(&self) -> Symmetry {
         if self.reverse {
-            Color::Blue
+            Symmetry::Rotate180
         } else {
-            Color::Red
+            Symmetry::Identity
         }
     }
 
@@ -306,16 +306,18 @@ impl WazirDropApp {
                 ref mut setup,
                 ref mut swap_from,
             } => {
-                if square.pov(setup.color).index() < SetupMove::SIZE {
+                let piece_index = Symmetry::pov(setup.color).inverse().apply(square).index();
+                if piece_index < SetupMove::SIZE {
                     match *swap_from {
                         None => {
                             *swap_from = Some(square);
                         }
                         Some(swap_from_square) => {
-                            setup.pieces.swap(
-                                swap_from_square.pov(setup.color).index(),
-                                square.pov(setup.color).index(),
-                            );
+                            let swap_from_index = Symmetry::pov(setup.color)
+                                .inverse()
+                                .apply(swap_from_square)
+                                .index();
+                            setup.pieces.swap(swap_from_index, piece_index);
                             *swap_from = None;
                         }
                     }

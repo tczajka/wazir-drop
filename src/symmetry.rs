@@ -1,4 +1,4 @@
-use crate::{enums::EnumMap, unsafe_simple_enum, Coord, Square};
+use crate::{enums::EnumMap, unsafe_simple_enum, Color, Coord, Square};
 
 /// Apply FlipX, FlipY and SwapXY in that order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -37,6 +37,14 @@ impl Symmetry {
 
     pub fn normalize(square: Square) -> (Self, NormalizedSquare) {
         NORMALIZE_TABLE[square]
+    }
+
+    /// The symmetry that puts the given player on top.
+    pub fn pov(color: Color) -> Self {
+        match color {
+            Color::Red => Self::Identity,
+            Color::Blue => Self::Rotate180,
+        }
     }
 }
 

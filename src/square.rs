@@ -1,7 +1,7 @@
 use crate::{
     impl_from_str_for_parsable,
     parser::{self, ParseError, Parser, ParserExt},
-    unsafe_simple_enum, Color, Symmetry,
+    unsafe_simple_enum,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -36,13 +36,6 @@ impl Square {
 
     pub fn parser() -> impl Parser<Output = Self> {
         Coord::parser().map(|coord| coord.into())
-    }
-
-    pub fn pov(self, color: Color) -> Self {
-        match color {
-            Color::Red => self,
-            Color::Blue => Symmetry::Rotate180.apply(self),
-        }
     }
 }
 

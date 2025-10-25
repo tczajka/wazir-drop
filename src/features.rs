@@ -1,6 +1,9 @@
 use std::iter;
 
-use crate::{enums::EnumMap, Color, Move, NormalizedSquare, Piece, Position, SetupMove, Square};
+use crate::{
+    either::Either, enums::EnumMap, Color, Move, NormalizedSquare, Piece, Position, RegularMove,
+    SetupMove,
+};
 
 pub trait Features {
     const COUNT: usize;
@@ -14,10 +17,29 @@ pub trait Features {
         position: &Position,
         mov: Move,
         color: Color,
+    ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)> {
+        match mov {
+            Move::Setup(mov) => Self::diff_setup(position, mov, color)
+                .map(|(added, removed)| (Either::Left(added), Either::Left(removed))),
+            Move::Regular(mov) => Self::diff_regular(position, mov, color)
+                .map(|(added, removed)| (Either::Right(added), Either::Right(removed))),
+        }
+    }
+
+    fn diff_setup(
+        position: &Position,
+        mov: SetupMove,
+        color: Color,
+    ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)>;
+
+    fn diff_regular(
+        position: &Position,
+        mov: RegularMove,
+        color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)>;
 }
 
-struct PieceSquareFeatures;
+enum PieceSquareFeatures {}
 
 impl Features for PieceSquareFeatures {
     const COUNT: usize = NormalizedSquare::COUNT + NUM_CAPTURED_INDEXES;
@@ -27,9 +49,18 @@ impl Features for PieceSquareFeatures {
         iter::empty()
     }
 
-    fn diff(
+    fn diff_setup(
         position: &Position,
-        mov: Move,
+        mov: SetupMove,
+        color: Color,
+    ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)> {
+        // TODO: Implement.
+        Some((iter::empty(), iter::empty()))
+    }
+
+    fn diff_regular(
+        position: &Position,
+        mov: RegularMove,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)> {
         // TODO: Implement.
