@@ -1,6 +1,6 @@
 use std::iter;
 
-use crate::{enums::EnumMap, Color, Move, Piece, Position, SetupMove, Square};
+use crate::{enums::EnumMap, Color, Move, NormalizedSquare, Piece, Position, SetupMove, Square};
 
 pub trait Features {
     const COUNT: usize;
@@ -20,7 +20,7 @@ pub trait Features {
 struct PieceSquareFeatures;
 
 impl Features for PieceSquareFeatures {
-    const COUNT: usize = Square::COUNT + NUM_CAPTURED_INDEXES;
+    const COUNT: usize = NormalizedSquare::COUNT + NUM_CAPTURED_INDEXES;
 
     fn all(position: &Position, color: Color) -> impl Iterator<Item = usize> {
         // TODO: Implement.
