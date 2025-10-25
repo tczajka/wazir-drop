@@ -21,6 +21,7 @@ mod piece;
 mod player;
 mod position;
 mod square;
+mod symmetry;
 
 pub use bitboard::{Bitboard, BitboardIterator};
 pub use board::Board;
@@ -34,3 +35,4 @@ pub use piece::{ColoredPiece, Piece};
 pub use player::{Player, PlayerFactory};
 pub use position::{Position, Stage};
 pub use square::{Coord, Direction, Square};
+pub use symmetry::{NormalizedSquare, Symmetry};
