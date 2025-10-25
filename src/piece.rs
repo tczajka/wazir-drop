@@ -18,7 +18,7 @@ pub enum Piece {
 unsafe_simple_enum!(Piece, 5);
 
 impl Piece {
-    pub fn initial_count(self) -> usize {
+    pub const fn initial_count(self) -> usize {
         match self {
             Self::Alfil => 8,
             Self::Dabbaba => 4,

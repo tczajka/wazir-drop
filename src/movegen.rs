@@ -10,8 +10,6 @@ use std::iter;
 #[cfg(feature = "rand")]
 use rand::{seq::IteratorRandom, seq::SliceRandom, Rng};
 
-static MOVE_BITBOARD_TABLE: EnumMap<Piece, EnumMap<Square, Bitboard>> = calc_move_bitboard_table();
-
 pub fn move_bitboard(piece: Piece, square: Square) -> Bitboard {
     MOVE_BITBOARD_TABLE[piece][square]
 }
@@ -23,7 +21,7 @@ pub fn validate_from_to(piece: Piece, from: Square, to: Square) -> Result<(), In
     Ok(())
 }
 
-const fn calc_move_bitboard_table() -> EnumMap<Piece, EnumMap<Square, Bitboard>> {
+static MOVE_BITBOARD_TABLE: EnumMap<Piece, EnumMap<Square, Bitboard>> = {
     let mut table = [EnumMap::from_array([Bitboard::EMPTY; Square::COUNT]); Piece::COUNT];
     let mut piece_idx = 0;
     while piece_idx != Piece::COUNT {
@@ -31,7 +29,7 @@ const fn calc_move_bitboard_table() -> EnumMap<Piece, EnumMap<Square, Bitboard>>
         piece_idx += 1;
     }
     EnumMap::from_array(table)
-}
+};
 
 const fn calc_move_bitboard_table_for_piece(piece: Piece) -> EnumMap<Square, Bitboard> {
     let mut table = [Bitboard::EMPTY; Square::COUNT];

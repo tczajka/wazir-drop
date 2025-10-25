@@ -87,9 +87,7 @@ impl From<NormalizedSquare> for Square {
     }
 }
 
-static INVERSE_TABLE: EnumMap<Symmetry, Symmetry> = compute_inverse_table();
-
-const fn compute_inverse_table() -> EnumMap<Symmetry, Symmetry> {
+static INVERSE_TABLE: EnumMap<Symmetry, Symmetry> = {
     let mut table = [Symmetry::Identity; Symmetry::COUNT];
     let mut symmetry_idx = 0;
     while symmetry_idx != Symmetry::COUNT {
@@ -97,7 +95,7 @@ const fn compute_inverse_table() -> EnumMap<Symmetry, Symmetry> {
         symmetry_idx += 1;
     }
     EnumMap::from_array(table)
-}
+};
 
 const fn compute_inverse(symmetry: Symmetry) -> Symmetry {
     let (mut flip_x, mut flip_y, swap_xy) = symmetry.to_bits();
@@ -107,9 +105,7 @@ const fn compute_inverse(symmetry: Symmetry) -> Symmetry {
     Symmetry::from_bits(flip_x, flip_y, swap_xy)
 }
 
-static APPLY_TABLE: EnumMap<Symmetry, EnumMap<Square, Square>> = compute_apply_table();
-
-const fn compute_apply_table() -> EnumMap<Symmetry, EnumMap<Square, Square>> {
+static APPLY_TABLE: EnumMap<Symmetry, EnumMap<Square, Square>> = {
     let mut table = [EnumMap::from_array([Square::A1; Square::COUNT]); Symmetry::COUNT];
     let mut symmetry_idx = 0;
     while symmetry_idx != Symmetry::COUNT {
@@ -117,7 +113,7 @@ const fn compute_apply_table() -> EnumMap<Symmetry, EnumMap<Square, Square>> {
         symmetry_idx += 1;
     }
     EnumMap::from_array(table)
-}
+};
 
 const fn compute_apply_table_for_symmetry(symmetry: Symmetry) -> EnumMap<Square, Square> {
     let mut table = [Square::A1; Square::COUNT];
@@ -146,9 +142,7 @@ const fn compute_apply(symmetry: Symmetry, square: Square) -> Square {
     Square::from_coord(Coord::new(x, y))
 }
 
-static NORMALIZE_TABLE: EnumMap<Square, (Symmetry, NormalizedSquare)> = compute_normalize_table();
-
-const fn compute_normalize_table() -> EnumMap<Square, (Symmetry, NormalizedSquare)> {
+static NORMALIZE_TABLE: EnumMap<Square, (Symmetry, NormalizedSquare)> = {
     let mut table = [(Symmetry::Identity, NormalizedSquare::A1); Square::COUNT];
     let mut square_idx = 0;
     while square_idx != Square::COUNT {
@@ -156,7 +150,7 @@ const fn compute_normalize_table() -> EnumMap<Square, (Symmetry, NormalizedSquar
         square_idx += 1;
     }
     EnumMap::from_array(table)
-}
+};
 
 const fn compute_normalize(square: Square) -> (Symmetry, NormalizedSquare) {
     let mut symmetry_idx = 0;

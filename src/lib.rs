@@ -14,6 +14,7 @@ mod captured;
 mod cli;
 mod color;
 mod constants;
+mod features;
 mod main_player;
 pub mod movegen;
 mod moves;
