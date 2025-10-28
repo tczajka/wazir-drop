@@ -43,6 +43,6 @@ pub use piece::{ColoredPiece, Piece};
 pub use player::{Player, PlayerFactory};
 pub use position::{Position, Stage};
 pub use score::Score;
-pub use search::Search;
+pub use search::{Search, Variation};
 pub use square::{Coord, Direction, Square};
 pub use symmetry::{NormalizedSquare, Symmetry};

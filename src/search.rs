@@ -3,6 +3,7 @@ use crate::{
 };
 use std::{
     fmt::{self, Display, Formatter},
+    ops::Deref,
     rc::Rc,
     time::Instant,
 };
@@ -108,8 +109,8 @@ struct SearchStats {
 }
 
 pub struct Variation {
-    moves: SmallVec<RegularMove, { Self::MAX_LEN }>,
-    truncated: bool,
+    pub moves: SmallVec<RegularMove, { Self::MAX_LEN }>,
+    pub truncated: bool,
 }
 
 impl Variation {
@@ -139,6 +140,14 @@ impl Variation {
         }
 
         res
+    }
+}
+
+impl Deref for Variation {
+    type Target = [RegularMove];
+
+    fn deref(&self) -> &Self::Target {
+        &self.moves
     }
 }
 
