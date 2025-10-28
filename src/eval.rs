@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{enums::EnumMap, Color, Features, InvalidMove, Move, Position, RegularMove, SetupMove};
 
 pub trait Evaluator {
@@ -12,17 +14,17 @@ pub trait Evaluator {
 }
 
 #[derive(Debug, Clone)]
-pub struct EvaluatedPosition<'a, E: Evaluator + 'a> {
-    evaluator: &'a E,
+pub struct EvaluatedPosition<E: Evaluator> {
+    evaluator: Rc<E>,
     position: Position,
     accumulators: EnumMap<Color, E::Accumulator>,
 }
 
-impl<'a, E: Evaluator + 'a> EvaluatedPosition<'a, E> {
-    pub fn new(evaluator: &'a E, position: Position) -> Self {
+impl<E: Evaluator> EvaluatedPosition<E> {
+    pub fn new(evaluator: &Rc<E>, position: Position) -> Self {
         let accumulators = EnumMap::from_fn(|color| Self::refresh(evaluator, &position, color));
         Self {
-            evaluator,
+            evaluator: Rc::clone(evaluator),
             position,
             accumulators,
         }
@@ -77,7 +79,7 @@ impl<'a, E: Evaluator + 'a> EvaluatedPosition<'a, E> {
         let position = self.position.make_setup_move(mov)?;
         let accumulators = EnumMap::from_fn(|color| {
             Self::update(
-                self.evaluator,
+                &self.evaluator,
                 &self.accumulators[color],
                 &position,
                 color,
@@ -85,7 +87,7 @@ impl<'a, E: Evaluator + 'a> EvaluatedPosition<'a, E> {
             )
         });
         Ok(Self {
-            evaluator: self.evaluator,
+            evaluator: self.evaluator.clone(),
             position,
             accumulators,
         })
@@ -95,7 +97,7 @@ impl<'a, E: Evaluator + 'a> EvaluatedPosition<'a, E> {
         let position = self.position.make_regular_move(mov)?;
         let accumulators = EnumMap::from_fn(|color| {
             Self::update(
-                self.evaluator,
+                &self.evaluator,
                 &self.accumulators[color],
                 &position,
                 color,
@@ -105,7 +107,7 @@ impl<'a, E: Evaluator + 'a> EvaluatedPosition<'a, E> {
             )
         });
         Ok(Self {
-            evaluator: self.evaluator,
+            evaluator: self.evaluator.clone(),
             position,
             accumulators,
         })

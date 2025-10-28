@@ -24,6 +24,7 @@ mod piece;
 mod player;
 mod position;
 mod score;
+mod search;
 mod square;
 mod symmetry;
 
@@ -42,5 +43,6 @@ pub use piece::{ColoredPiece, Piece};
 pub use player::{Player, PlayerFactory};
 pub use position::{Position, Stage};
 pub use score::Score;
+pub use search::Search;
 pub use square::{Coord, Direction, Square};
 pub use symmetry::{NormalizedSquare, Symmetry};

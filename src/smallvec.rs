@@ -3,7 +3,6 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-#[derive(Debug)]
 pub struct SmallVec<T, const N: usize> {
     len: usize,
     data: [MaybeUninit<T>; N],
@@ -96,7 +95,6 @@ impl<T, const N: usize> IntoIterator for SmallVec<T, N> {
     }
 }
 
-#[derive(Debug)]
 pub struct SmallVecIter<T, const N: usize> {
     v: SmallVec<T, N>,
     index: usize,
