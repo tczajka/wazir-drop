@@ -1,7 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{
-    enums::SimpleEnumExt, parser::ParseError, Move, Piece, RegularMove, SetupMove, ShortMove,
-};
+use wazir_drop::{enums::SimpleEnumExt, Move, Piece, RegularMove, SetupMove, ShortMove};
 
 #[test]
 fn test_opening_move_size_matches_piece_initial_count() {
@@ -16,8 +14,8 @@ fn test_opening_move_display_from_str() {
     let mov = SetupMove::from_str("aaaaaffdaddadnwa").unwrap();
     assert_eq!(mov.to_string(), "aaaaaffdaddadnwa");
 
-    assert_eq!(SetupMove::from_str("W"), Err(ParseError));
-    assert_eq!(SetupMove::from_str("AWNAADADAFFAADDa"), Err(ParseError));
+    assert!(SetupMove::from_str("W").is_err());
+    assert!(SetupMove::from_str("AWNAADADAFFAADDa").is_err());
 }
 
 #[test]
@@ -29,8 +27,8 @@ fn test_regular_move_display_from_str() {
     let mov = RegularMove::from_str("Da1xna3").unwrap();
     assert_eq!(mov.to_string(), "Da1xna3");
 
-    assert_eq!(RegularMove::from_str("Aa1"), Err(ParseError));
-    assert_eq!(RegularMove::from_str("Da1xNa3"), Err(ParseError));
+    assert!(RegularMove::from_str("Aa1").is_err());
+    assert!(RegularMove::from_str("Da1xNa3").is_err());
 }
 
 #[test]

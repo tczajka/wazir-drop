@@ -12,7 +12,7 @@ fn test_opposite() {
 fn test_display_round_trip() {
     for color in Color::all() {
         let name = color.to_string();
-        assert_eq!(Color::from_str(&name), Ok(color));
+        assert_eq!(Color::from_str(&name).unwrap(), color);
     }
 }
 

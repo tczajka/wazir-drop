@@ -5,7 +5,7 @@ use wazir_drop::{enums::SimpleEnumExt, Move, Position, Stage};
 fn test_stage_display_round_trip() {
     for stage in Stage::all() {
         let name = stage.to_string();
-        assert_eq!(Stage::from_str(&name), Ok(stage));
+        assert_eq!(Stage::from_str(&name).unwrap(), stage);
     }
 }
 

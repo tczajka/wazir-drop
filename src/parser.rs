@@ -6,7 +6,7 @@ pub struct ParseSuccess<'a, T> {
     pub remaining: &'a [u8],
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy)]
 pub struct ParseError;
 
 pub type ParseResult<'a, T> = Result<ParseSuccess<'a, T>, ParseError>;

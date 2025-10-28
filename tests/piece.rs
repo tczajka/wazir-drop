@@ -14,7 +14,7 @@ fn test_all_non_wazir() {
 fn test_colored_piece_display_round_trip() {
     for cpiece in ColoredPiece::all() {
         let name = cpiece.to_string();
-        assert_eq!(ColoredPiece::from_str(&name), Ok(cpiece));
+        assert_eq!(ColoredPiece::from_str(&name).unwrap(), cpiece);
     }
 }
 

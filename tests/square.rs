@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{parser::ParseError, Direction, Square};
+use wazir_drop::{Direction, Square};
 
 #[test]
 fn test_display() {
@@ -12,17 +12,17 @@ fn test_display() {
 
 #[test]
 fn test_from_str() {
-    assert_eq!(Square::from_str("a1"), Ok(Square::A1));
-    assert_eq!(Square::from_str("a8"), Ok(Square::A8));
-    assert_eq!(Square::from_str("h1"), Ok(Square::H1));
-    assert_eq!(Square::from_str("h8"), Ok(Square::H8));
-    assert_eq!(Square::from_str("c5"), Ok(Square::C5));
-    assert_eq!(Square::from_str("c9"), Err(ParseError));
-    assert_eq!(Square::from_str("i1"), Err(ParseError));
-    assert_eq!(Square::from_str("a0"), Err(ParseError));
-    assert_eq!(Square::from_str("a9"), Err(ParseError));
-    assert_eq!(Square::from_str("ab"), Err(ParseError));
-    assert_eq!(Square::from_str("a10"), Err(ParseError));
+    assert_eq!(Square::from_str("a1").unwrap(), Square::A1);
+    assert_eq!(Square::from_str("a8").unwrap(), Square::A8);
+    assert_eq!(Square::from_str("h1").unwrap(), Square::H1);
+    assert_eq!(Square::from_str("h8").unwrap(), Square::H8);
+    assert_eq!(Square::from_str("c5").unwrap(), Square::C5);
+    assert!(Square::from_str("c9").is_err());
+    assert!(Square::from_str("i1").is_err());
+    assert!(Square::from_str("a0").is_err());
+    assert!(Square::from_str("a9").is_err());
+    assert!(Square::from_str("ab").is_err());
+    assert!(Square::from_str("a10").is_err());
 }
 
 #[test]

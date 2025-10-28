@@ -3,7 +3,7 @@ use wazir_drop::parser::{self, Parser, ParserExt};
 #[test]
 fn test_parse_all() {
     let p = parser::byte();
-    assert_eq!(p.parse_all(b"a"), Ok(b'a'));
+    assert_eq!(p.parse_all(b"a").unwrap(), b'a');
     assert!(p.parse_all(b"ab").is_err());
 }
 
