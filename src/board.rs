@@ -12,7 +12,7 @@ pub struct Board {
     squares: EnumMap<Square, Option<ColoredPiece>>,
     occupied_by: EnumMap<Color, Bitboard>,
     empty_squares: Bitboard,
-    piece_maps: EnumMap<ColoredPiece, Bitboard>,
+    piece_map: EnumMap<ColoredPiece, Bitboard>,
 }
 
 impl Board {
@@ -21,7 +21,7 @@ impl Board {
             squares: EnumMap::from_fn(|_| None),
             occupied_by: EnumMap::from_fn(|_| Bitboard::EMPTY),
             empty_squares: !Bitboard::EMPTY,
-            piece_maps: EnumMap::from_fn(|_| Bitboard::EMPTY),
+            piece_map: EnumMap::from_fn(|_| Bitboard::EMPTY),
         }
     }
 
@@ -37,8 +37,8 @@ impl Board {
         self.empty_squares
     }
 
-    pub fn piece_map(&self, cpiece: ColoredPiece) -> Bitboard {
-        self.piece_maps[cpiece]
+    pub fn occupied_by_piece(&self, cpiece: ColoredPiece) -> Bitboard {
+        self.piece_map[cpiece]
     }
 
     pub fn place_piece(&mut self, square: Square, cpiece: ColoredPiece) -> Result<(), Invalid> {
@@ -49,7 +49,7 @@ impl Board {
         *s = Some(cpiece);
         self.occupied_by[cpiece.color()].add(square);
         self.empty_squares.remove(square);
-        self.piece_maps[cpiece].add(square);
+        self.piece_map[cpiece].add(square);
         Ok(())
     }
 
@@ -61,7 +61,7 @@ impl Board {
         *s = None;
         self.occupied_by[cpiece.color()].remove(square);
         self.empty_squares.add(square);
-        self.piece_maps[cpiece].remove(square);
+        self.piece_map[cpiece].remove(square);
         Ok(())
     }
 

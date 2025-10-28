@@ -1,8 +1,10 @@
 use std::iter;
 
 use crate::{
-    either::Either, enums::EnumMap, Color, Move, NormalizedSquare, Piece, Position, RegularMove,
-    SetupMove,
+    either::Either,
+    enums::{EnumMap, SimpleEnumExt},
+    smallvec::SmallVec,
+    Color, Move, NormalizedSquare, Piece, Position, RegularMove, SetupMove, Square, Symmetry,
 };
 
 pub trait Features {
@@ -39,23 +41,52 @@ pub trait Features {
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)>;
 }
 
-enum PieceSquareFeatures {}
+pub enum PieceSquareFeatures {}
+
+impl PieceSquareFeatures {
+    const CAPTURED_OFFSET: usize = Piece::COUNT * NormalizedSquare::COUNT;
+
+    fn board_feature(piece: Piece, square: Square) -> usize {
+        let (_, normalized_square) = Symmetry::normalize(square);
+        piece.index() * NormalizedSquare::COUNT + normalized_square.index()
+    }
+
+    fn captured_feature(piece: Piece, index: usize) -> usize {
+        Self::CAPTURED_OFFSET + captured_index(piece, index)
+    }
+}
 
 impl Features for PieceSquareFeatures {
-    const COUNT: usize = NormalizedSquare::COUNT + NUM_CAPTURED_INDEXES;
+    const COUNT: usize = Piece::COUNT * NormalizedSquare::COUNT + NUM_CAPTURED_INDEXES;
 
     fn all(position: &Position, color: Color) -> impl Iterator<Item = usize> {
-        // TODO: Implement.
-        iter::empty()
+        Piece::all()
+            .flat_map(move |piece| {
+                position
+                    .occupied_by_piece(piece.with_color(color))
+                    .into_iter()
+                    .map(move |square| Self::board_feature(piece, square))
+            })
+            .chain(Piece::all_non_wazir().flat_map(move |piece| {
+                let offset = Self::captured_feature(piece, 0);
+                (0..position.num_captured(piece.with_color(color))).map(move |index| offset + index)
+            }))
     }
 
     fn diff_setup(
         mov: SetupMove,
-        new_position: &Position,
+        _new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)> {
-        // TODO: Implement.
-        Some((iter::empty(), iter::empty()))
+        let mut added: SmallVec<usize, { SetupMove::SIZE }> = SmallVec::new();
+        if mov.color == color {
+            let symmetry = Symmetry::pov(color);
+            for (index, &piece) in mov.pieces.iter().enumerate() {
+                let square = symmetry.apply(Square::from_index(index));
+                added.push(Self::board_feature(piece, square));
+            }
+        };
+        Some((added.into_iter(), iter::empty()))
     }
 
     fn diff_regular(
@@ -63,8 +94,37 @@ impl Features for PieceSquareFeatures {
         new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)> {
-        // TODO: Implement.
-        Some((iter::empty(), iter::empty()))
+        // piece, captured
+        let mut added: SmallVec<usize, 2> = SmallVec::new();
+        let mut removed: Option<usize> = None;
+        if mov.colored_piece.color() == color {
+            let piece = mov.colored_piece.piece();
+            match mov.from {
+                Some(from) => {
+                    removed = Some(Self::board_feature(piece, from));
+                }
+                None => {
+                    // Note: This is a drop, so we're not capturing the same piece again.
+                    removed = Some(Self::captured_feature(
+                        piece,
+                        new_position.num_captured(mov.colored_piece),
+                    ));
+                }
+            }
+            added.push(Self::board_feature(piece, mov.to));
+            if let Some(captured_piece) = mov.captured {
+                if captured_piece != Piece::Wazir {
+                    // This is a capture, so we didn't drop the same piece.
+                    added.push(Self::captured_feature(
+                        captured_piece,
+                        new_position.num_captured(captured_piece.with_color(color)) - 1,
+                    ));
+                }
+            }
+        } else if let Some(captured_piece) = mov.captured {
+            removed = Some(Self::board_feature(captured_piece, mov.to));
+        }
+        Some((added.into_iter(), removed.into_iter()))
     }
 }
 
@@ -72,6 +132,7 @@ impl Features for PieceSquareFeatures {
 const NUM_CAPTURED_INDEXES: usize = Color::COUNT * (SetupMove::SIZE - 1);
 
 fn captured_index(piece: Piece, index: usize) -> usize {
+    assert!(piece != Piece::Wazir);
     CAPTURED_OFFSET_TABLE[piece] + index
 }
 

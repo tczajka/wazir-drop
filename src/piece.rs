@@ -28,6 +28,10 @@ impl Piece {
         }
     }
 
+    pub fn all_non_wazir() -> impl Iterator<Item = Self> {
+        (0..Piece::Wazir.index()).map(Self::from_index)
+    }
+
     pub const fn directions(self) -> &'static [Direction] {
         const ALFIL: [Direction; 4] = [
             Direction::new(-2, -2),

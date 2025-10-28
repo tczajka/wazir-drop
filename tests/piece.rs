@@ -1,5 +1,14 @@
 use std::str::FromStr;
-use wazir_drop::{enums::SimpleEnumExt, ColoredPiece};
+use wazir_drop::{enums::SimpleEnumExt, ColoredPiece, Piece};
+
+#[test]
+fn test_all_non_wazir() {
+    let pieces: Vec<Piece> = Piece::all_non_wazir().collect();
+    assert_eq!(
+        pieces,
+        vec![Piece::Alfil, Piece::Dabbaba, Piece::Ferz, Piece::Knight]
+    );
+}
 
 #[test]
 fn test_colored_piece_display_round_trip() {

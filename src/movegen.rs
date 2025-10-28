@@ -185,7 +185,7 @@ pub fn captures(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
     Piece::all().flat_map(move |piece| {
         let colored_piece = piece.with_color(me);
         position
-            .piece_map(colored_piece)
+            .occupied_by_piece(colored_piece)
             .into_iter()
             .flat_map(move |from| {
                 (move_bitboard(piece, from) & opp_mask)
@@ -209,7 +209,7 @@ pub fn pseudojumps(position: &Position) -> impl Iterator<Item = RegularMove> + '
     Piece::all().flat_map(move |piece| {
         let colored_piece = piece.with_color(me);
         position
-            .piece_map(colored_piece)
+            .occupied_by_piece(colored_piece)
             .into_iter()
             .flat_map(move |from| {
                 (move_bitboard(piece, from) & empty)

@@ -146,7 +146,7 @@ xx.xx..x
 }
 
 #[test]
-fn test_piece_map() {
+fn test_occupied_by_piece() {
     let board = Board::from_str(
         "\
 .W.A.D.D
@@ -162,7 +162,9 @@ add.w..a
     .unwrap();
 
     assert_eq!(
-        board.piece_map(ColoredPiece::RedDabbaba).to_string(),
+        board
+            .occupied_by_piece(ColoredPiece::RedDabbaba)
+            .to_string(),
         "\
 .....x.x
 .....xx.

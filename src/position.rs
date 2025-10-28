@@ -77,8 +77,8 @@ impl Position {
         self.board.empty_squares()
     }
 
-    pub fn piece_map(&self, cpiece: ColoredPiece) -> Bitboard {
-        self.board.piece_map(cpiece)
+    pub fn occupied_by_piece(&self, cpiece: ColoredPiece) -> Bitboard {
+        self.board.occupied_by_piece(cpiece)
     }
 
     pub fn num_captured(&self, cpiece: ColoredPiece) -> usize {
@@ -110,7 +110,7 @@ impl Position {
                 let mut count = 0;
                 for color in Color::all() {
                     let cpiece = piece.with_color(color);
-                    count += board.piece_map(cpiece).count();
+                    count += board.occupied_by_piece(cpiece).count();
                     count += captured.get(cpiece);
                 }
                 if count != Color::COUNT * piece.initial_count() {
@@ -128,7 +128,7 @@ impl Position {
                     } else {
                         0
                     };
-                    let squares = board.piece_map(cpiece);
+                    let squares = board.occupied_by_piece(cpiece);
                     if squares.count() != want
                         || !squares.is_subset_of(cpiece.color().initial_squares())
                         || captured.get(cpiece) != 0
@@ -140,7 +140,11 @@ impl Position {
             Stage::Regular => {
                 // Verify one wazir per color on the board.
                 for color in Color::all() {
-                    if board.piece_map(Piece::Wazir.with_color(color)).count() != 1 {
+                    if board
+                        .occupied_by_piece(Piece::Wazir.with_color(color))
+                        .count()
+                        != 1
+                    {
                         return Err(Invalid);
                     }
                 }
@@ -148,7 +152,7 @@ impl Position {
             Stage::End => {
                 // Verify opposite wazir on the board and one captured.
                 let wazir_opp = Piece::Wazir.with_color(to_move.opposite());
-                if board.piece_map(wazir_opp).count() != 1 || captured.get(wazir_opp) != 1 {
+                if board.occupied_by_piece(wazir_opp).count() != 1 || captured.get(wazir_opp) != 1 {
                     return Err(Invalid);
                 }
             }

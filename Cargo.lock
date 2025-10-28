@@ -3664,6 +3664,10 @@ dependencies = [
 [[package]]
 name = "wazir-drop"
 version = "0.0.0"
+dependencies = [
+ "extra",
+ "rand 0.9.2",
+]
 
 [[package]]
 name = "web-sys"

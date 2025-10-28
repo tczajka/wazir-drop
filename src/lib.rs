@@ -30,6 +30,7 @@ pub use captured::Captured;
 pub use cli::{run_cli, CliCommand};
 pub use color::Color;
 pub use constants::{DEFAULT_TIME_LIMIT, MAX_MOVES_IN_GAME, TIME_MARGIN};
+pub use features::{Features, PieceSquareFeatures};
 pub use main_player::{MainPlayer, MainPlayerFactory};
 pub use moves::{InvalidMove, Move, RegularMove, SetupMove, ShortMove, ShortMoveFrom};
 pub use piece::{ColoredPiece, Piece};
