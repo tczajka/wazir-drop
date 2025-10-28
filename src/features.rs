@@ -8,40 +8,46 @@ use crate::{
 };
 
 pub trait Features {
-    const COUNT: usize;
+    fn count(&self) -> usize;
 
-    fn all(position: &Position, color: Color) -> impl Iterator<Item = usize>;
+    fn all(&self, position: &Position, color: Color) -> impl Iterator<Item = usize>;
 
     /// Returns (added features, removed features).
     ///
     /// If it's too complicated, returns `None`. Caller should fall back to `all_features`.
     fn diff(
+        &self,
         mov: Move,
         new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)> {
         match mov {
-            Move::Setup(mov) => Self::diff_setup(mov, new_position, color)
+            Move::Setup(mov) => self
+                .diff_setup(mov, new_position, color)
                 .map(|(added, removed)| (Either::Left(added), Either::Left(removed))),
-            Move::Regular(mov) => Self::diff_regular(mov, new_position, color)
+            Move::Regular(mov) => self
+                .diff_regular(mov, new_position, color)
                 .map(|(added, removed)| (Either::Right(added), Either::Right(removed))),
         }
     }
 
     fn diff_setup(
+        &self,
         mov: SetupMove,
         new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)>;
 
     fn diff_regular(
+        &self,
         mov: RegularMove,
         new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)>;
 }
 
-pub enum PieceSquareFeatures {}
+#[derive(Debug)]
+pub struct PieceSquareFeatures;
 
 impl PieceSquareFeatures {
     const CAPTURED_OFFSET: usize = Piece::COUNT * NormalizedSquare::COUNT;
@@ -57,9 +63,11 @@ impl PieceSquareFeatures {
 }
 
 impl Features for PieceSquareFeatures {
-    const COUNT: usize = Piece::COUNT * NormalizedSquare::COUNT + NUM_CAPTURED_INDEXES;
+    fn count(&self) -> usize {
+        Piece::COUNT * NormalizedSquare::COUNT + NUM_CAPTURED_INDEXES
+    }
 
-    fn all(position: &Position, color: Color) -> impl Iterator<Item = usize> {
+    fn all(&self, position: &Position, color: Color) -> impl Iterator<Item = usize> {
         Piece::all()
             .flat_map(move |piece| {
                 position
@@ -74,6 +82,7 @@ impl Features for PieceSquareFeatures {
     }
 
     fn diff_setup(
+        &self,
         mov: SetupMove,
         _new_position: &Position,
         color: Color,
@@ -90,6 +99,7 @@ impl Features for PieceSquareFeatures {
     }
 
     fn diff_regular(
+        &self,
         mov: RegularMove,
         new_position: &Position,
         color: Color,

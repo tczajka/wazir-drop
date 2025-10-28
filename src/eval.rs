@@ -1,16 +1,14 @@
 use crate::{enums::EnumMap, Color, Features, InvalidMove, Move, Position, RegularMove, SetupMove};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Score(i32);
-
 pub trait Evaluator {
     type Accumulator: Clone;
     type Features: Features;
 
+    fn features(&self) -> &Self::Features;
     fn new_accumulator(&self) -> Self::Accumulator;
     fn add_feature(&self, accumulator: &mut Self::Accumulator, feature: usize);
     fn remove_feature(&self, accumulator: &mut Self::Accumulator, feature: usize);
-    fn evaluate(&self, accumulators: &EnumMap<Color, Self::Accumulator>, to_move: Color) -> Score;
+    fn evaluate(&self, accumulators: &EnumMap<Color, Self::Accumulator>, to_move: Color) -> i32;
 }
 
 #[derive(Debug, Clone)]
@@ -30,9 +28,13 @@ impl<'a, E: Evaluator> EvaluatedPosition<'a, E> {
         }
     }
 
+    pub fn position(&self) -> &Position {
+        &self.position
+    }
+
     fn refresh(evaluator: &E, position: &Position, color: Color) -> E::Accumulator {
         let mut acc = evaluator.new_accumulator();
-        for feature in E::Features::all(position, color) {
+        for feature in evaluator.features().all(position, color) {
             evaluator.add_feature(&mut acc, feature);
         }
         acc
@@ -79,7 +81,7 @@ impl<'a, E: Evaluator> EvaluatedPosition<'a, E> {
                 &self.accumulators[color],
                 &position,
                 color,
-                E::Features::diff_setup(mov, &position, color),
+                self.evaluator.features().diff_setup(mov, &position, color),
             )
         });
         Ok(Self {
@@ -97,7 +99,9 @@ impl<'a, E: Evaluator> EvaluatedPosition<'a, E> {
                 &self.accumulators[color],
                 &position,
                 color,
-                E::Features::diff_regular(mov, &position, color),
+                self.evaluator
+                    .features()
+                    .diff_regular(mov, &position, color),
             )
         });
         Ok(Self {
@@ -107,7 +111,7 @@ impl<'a, E: Evaluator> EvaluatedPosition<'a, E> {
         })
     }
 
-    pub fn evaluate(&self) -> Score {
+    pub fn evaluate(&self) -> i32 {
         self.evaluator
             .evaluate(&self.accumulators, self.position.to_move())
     }
