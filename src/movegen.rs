@@ -7,9 +7,6 @@ use crate::{
 };
 use std::iter;
 
-#[cfg(feature = "rand")]
-use rand::{seq::IteratorRandom, seq::SliceRandom, Rng};
-
 pub fn move_bitboard(piece: Piece, square: Square) -> Bitboard {
     MOVE_BITBOARD_TABLE[piece][square]
 }
@@ -244,27 +241,4 @@ pub fn drops(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
                 to,
             })
         })
-}
-
-#[cfg(feature = "rand")]
-pub fn random_setup<RNG: Rng>(color: Color, rng: &mut RNG) -> SetupMove {
-    let mut mov = setup_moves(color).next().unwrap();
-    mov.pieces.shuffle(rng);
-    mov
-}
-
-#[cfg(feature = "rand")]
-pub fn random_regular<RNG: Rng>(position: &Position, rng: &mut RNG) -> RegularMove {
-    regular_pseudomoves(position)
-        .choose(rng)
-        .expect("Stalemate")
-}
-
-#[cfg(feature = "rand")]
-pub fn random_move<RNG: rand::Rng>(position: &Position, rng: &mut RNG) -> Move {
-    match position.stage() {
-        Stage::Setup => Move::Setup(random_setup(position.to_move(), rng)),
-        Stage::Regular => Move::Regular(random_regular(position, rng)),
-        Stage::End => panic!("End of game"),
-    }
 }

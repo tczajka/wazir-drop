@@ -3,16 +3,18 @@ name = "referee"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.5.50", features = ["derive"] }
 external-player = { path = "../external-player" }
+extra = { path = "../extra" }
+wazir-drop = { path = ".." }
+random-player = { path = "../random-player" }
+
+clap = { version = "4.5.50", features = ["derive"] }
 log = "0.4.28"
 rand = "0.9.2"
-random-player = { path = "../random-player" }
 serde = { version = "1.0.228", features = ["derive"] }
 simplelog = "0.12.2"
 threadpool = "1.8.1"
 toml = "0.9.8"
-wazir-drop = { path = "..", features = ["rand"] }
 
 [lints]
 workspace = true

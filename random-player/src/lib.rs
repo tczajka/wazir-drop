@@ -1,6 +1,7 @@
+use extra::moverand;
 use rand::{SeedableRng, rngs::StdRng};
 use std::time::Duration;
-use wazir_drop::{Color, Move, Player, PlayerFactory, Position, clock::Timer, movegen};
+use wazir_drop::{Color, Move, Player, PlayerFactory, Position, clock::Timer};
 
 #[derive(Debug)]
 pub struct RandomPlayerFactory;
@@ -40,6 +41,6 @@ impl RandomPlayer {
 
 impl Player for RandomPlayer {
     fn make_move(&mut self, position: &Position, _timer: &Timer) -> Move {
-        movegen::random_move(position, &mut self.rng)
+        moverand::random_move(position, &mut self.rng)
     }
 }

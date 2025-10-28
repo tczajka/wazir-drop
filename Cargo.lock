@@ -1139,6 +1139,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "extra"
+version = "0.0.0"
+dependencies = [
+ "rand 0.9.2",
+ "wazir-drop",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2708,6 +2716,7 @@ dependencies = [
 name = "random-player"
 version = "0.0.0"
 dependencies = [
+ "extra",
  "rand 0.9.2",
  "wazir-drop",
 ]
@@ -2748,6 +2757,7 @@ version = "0.0.0"
 dependencies = [
  "clap",
  "external-player",
+ "extra",
  "log",
  "rand 0.9.2",
  "random-player",
@@ -3654,9 +3664,6 @@ dependencies = [
 [[package]]
 name = "wazir-drop"
 version = "0.0.0"
-dependencies = [
- "rand 0.9.2",
-]
 
 [[package]]
 name = "web-sys"
