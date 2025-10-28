@@ -17,6 +17,16 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 
+    pub fn clear(&mut self) {
+        let len = self.len;
+        self.len = 0;
+        for item in &mut self.data[..len] {
+            unsafe {
+                item.assume_init_drop();
+            }
+        }
+    }
+
     pub fn push(&mut self, value: T) {
         assert!(self.len < N);
         _ = self.data[self.len].write(value);
@@ -49,11 +59,7 @@ impl<T, const N: usize> Default for SmallVec<T, N> {
 
 impl<T, const N: usize> Drop for SmallVec<T, N> {
     fn drop(&mut self) {
-        for item in &mut self.data[..self.len] {
-            unsafe {
-                item.assume_init_drop();
-            }
-        }
+        self.clear();
     }
 }
 
@@ -78,5 +84,47 @@ impl<T, const N: usize> FromIterator<T> for SmallVec<T, N> {
             vec.push(item);
         }
         vec
+    }
+}
+
+impl<T, const N: usize> IntoIterator for SmallVec<T, N> {
+    type Item = T;
+    type IntoIter = SmallVecIter<T, N>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        SmallVecIter { v: self, index: 0 }
+    }
+}
+
+#[derive(Debug)]
+pub struct SmallVecIter<T, const N: usize> {
+    v: SmallVec<T, N>,
+    index: usize,
+}
+
+impl<T, const N: usize> Iterator for SmallVecIter<T, N> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let index = self.index;
+        if index < self.v.len {
+            self.index += 1;
+            let item = unsafe { self.v.data[index].assume_init_read() };
+            Some(item)
+        } else {
+            None
+        }
+    }
+}
+
+impl<T, const N: usize> Drop for SmallVecIter<T, N> {
+    fn drop(&mut self) {
+        let len = self.v.len;
+        self.v.len = 0;
+        for item in &mut self.v.data[self.index..len] {
+            unsafe {
+                item.assume_init_drop();
+            }
+        }
     }
 }

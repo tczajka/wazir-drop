@@ -19,3 +19,10 @@ fn test_from_iter() {
     let vec = SmallVec::<u32, 3>::from_iter([1, 2, 3]);
     assert_eq!(&vec[..], &[1, 2, 3]);
 }
+
+#[test]
+fn test_into_iter() {
+    let vec = SmallVec::<String, 3>::from_iter(["a".to_string(), "b".to_string()]);
+    let v: Vec<String> = vec.into_iter().collect();
+    assert_eq!(v, vec!["a", "b"]);
+}
