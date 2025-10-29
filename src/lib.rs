@@ -17,7 +17,7 @@ mod constants;
 mod eval;
 mod features;
 mod linear_eval;
-mod linear_eval_piece_square_weights;
+pub mod linear_eval_piece_square_weights;
 mod main_player;
 pub mod movegen;
 mod moves;
