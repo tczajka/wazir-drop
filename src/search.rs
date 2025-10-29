@@ -208,7 +208,7 @@ impl SearchStats {
     pub fn new_node(&mut self) -> Result<(), Timeout> {
         self.nodes += 1;
         if let Some(deadline) = self.deadline {
-            if self.nodes.is_multiple_of(CHECK_TIMEOUT_NODES) && Instant::now() >= deadline {
+            if self.nodes % CHECK_TIMEOUT_NODES == 0 && Instant::now() >= deadline {
                 return Err(Timeout);
             }
         }
