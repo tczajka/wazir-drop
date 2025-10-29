@@ -204,6 +204,7 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
         }
         opp_stopwatch.as_mut().unwrap().start();
 
+        log::flush();
         writeln!(stdout, "{short_move}")?;
         stdout.flush()?;
     }
