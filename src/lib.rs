@@ -28,6 +28,7 @@ mod score;
 mod search;
 mod square;
 mod symmetry;
+mod zobrist;
 
 pub use bitboard::{Bitboard, BitboardIterator};
 pub use board::Board;

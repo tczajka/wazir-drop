@@ -1308,6 +1308,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "gen-zobrist"
+version = "0.0.0"
+dependencies = [
+ "rand 0.9.2",
+ "wazir-drop",
+]
+
+[[package]]
 name = "gethostname"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
