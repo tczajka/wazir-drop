@@ -7,55 +7,52 @@ use std::{
 pub struct Score(i32);
 
 impl Score {
-    const IMMEDIATE_WIN: Score = Score(1000000000);
-    const MAX_PLY: usize = 100_000_000;
-    pub const MIN_WIN: Score = Self::win(Self::MAX_PLY);
-    const MAX_EVAL: i32 = Self::MIN_WIN.prev().0;
+    pub const IMMEDIATE_WIN: Score = Score(1000000000);
+    pub const TOO_LONG: usize = 1000000;
+    pub const WIN_TOO_LONG: Score = Score(Self::IMMEDIATE_WIN.0 - Self::TOO_LONG as i32);
 
-    pub const fn win(ply: usize) -> Self {
-        let ply = if ply > Self::MAX_PLY {
-            Self::MAX_PLY
+    pub fn win(move_number: usize) -> Self {
+        if move_number > Self::TOO_LONG {
+            Self::WIN_TOO_LONG
         } else {
-            ply
-        };
-        Self(Self::IMMEDIATE_WIN.0 - ply as i32)
+            Self(Self::IMMEDIATE_WIN.0 - move_number as i32)
+        }
     }
 
-    pub fn loss(ply: usize) -> Self {
-        -Self::win(ply)
+    pub fn loss(move_number: usize) -> Self {
+        -Self::win(move_number)
     }
 
-    pub const fn next(self) -> Self {
+    pub fn next(self) -> Self {
         Self(self.0 + 1)
     }
 
-    pub const fn prev(self) -> Self {
+    pub fn prev(self) -> Self {
         Self(self.0 - 1)
     }
 
     pub fn from_eval(value: i32) -> Self {
-        Self(value.clamp(-Self::MAX_EVAL, Self::MAX_EVAL))
+        assert!(value < Self::WIN_TOO_LONG.0 && value > -Self::WIN_TOO_LONG.0);
+        Self(value)
     }
 
-    // Back by one ply, from the other side's perspective.
-    pub fn back(self) -> Self {
-        if self > Self::MIN_WIN {
-            -self.prev()
-        } else if self < -Self::MIN_WIN {
-            -self.next()
+    pub fn to_relative(self, move_number: usize) -> Self {
+        if self > Self::WIN_TOO_LONG {
+            Self(self.0 + move_number as i32).min(Self::IMMEDIATE_WIN)
+        } else if self < -Self::WIN_TOO_LONG {
+            Self(self.0 - move_number as i32).max(-Self::IMMEDIATE_WIN)
         } else {
-            -self
+            self
         }
     }
 
-    // Forward by one ply.
-    pub fn forward(self) -> Self {
-        if self >= Self::MIN_WIN {
-            -self.next()
-        } else if self <= -Self::MIN_WIN {
-            -self.prev()
+    pub fn to_absolute(self, move_number: usize) -> Self {
+        if self > Self::WIN_TOO_LONG {
+            Self(self.0 - move_number as i32).max(Self::WIN_TOO_LONG)
+        } else if self < -Self::WIN_TOO_LONG {
+            Self(self.0 + move_number as i32).min(-Self::WIN_TOO_LONG)
         } else {
-            -self
+            self
         }
     }
 }
@@ -70,9 +67,9 @@ impl Neg for Score {
 
 impl Display for Score {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if *self >= Self::MIN_WIN {
+        if *self >= Self::WIN_TOO_LONG {
             write!(f, "#{}", Self::IMMEDIATE_WIN.0 - self.0)
-        } else if *self <= -Self::MIN_WIN {
+        } else if *self <= -Self::WIN_TOO_LONG {
             write!(f, "-#{}", Self::IMMEDIATE_WIN.0 + self.0)
         } else {
             write!(f, "{}", self.0)

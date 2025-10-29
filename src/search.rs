@@ -1,5 +1,5 @@
 use crate::{
-    constants::{CHECK_TIMEOUT_NODES, MAX_SEARCH_DEPTH},
+    constants::{CHECK_TIMEOUT_NODES, MAX_MOVES_IN_GAME, MAX_SEARCH_DEPTH},
     movegen,
     smallvec::SmallVec,
     EvaluatedPosition, Evaluator, Outcome, Position, RegularMove, Score, Stage,
@@ -37,17 +37,21 @@ impl<E: Evaluator> Search<E> {
         let eposition = EvaluatedPosition::new(&self.evaluator, position.clone());
 
         let mut moves: Vec<(RegularMove, Score)> = Vec::new();
-        let mut pv = Variation::new();
+        let mut pv = Variation::empty();
         let mut best_score = Score::loss(0);
 
         for mov in movegen::regular_pseudomoves(eposition.position()) {
             let epos2 = eposition.make_regular_move(mov).unwrap();
-            let alpha = Score::loss(1);
-            let beta = Score::win(1);
             let result = self
-                .qsearch(&epos2, beta.forward(), alpha.forward(), &mut stats)
+                .search(
+                    &epos2,
+                    -Score::IMMEDIATE_WIN,
+                    Score::IMMEDIATE_WIN,
+                    0,
+                    &mut stats,
+                )
                 .unwrap();
-            let score = result.score.back();
+            let score = -result.score;
             moves.push((mov, score));
             if score > best_score {
                 best_score = score;
@@ -65,41 +69,38 @@ impl<E: Evaluator> Search<E> {
         stats.deadline = deadline;
 
         'iterative_deepening: while depth < max_depth
-            && best_score > Score::loss(depth)
-            && best_score < Score::win(depth)
+            && best_score > -Score::WIN_TOO_LONG
+            && best_score < Score::WIN_TOO_LONG
         {
-            let alpha = Score::loss(depth + 1);
-            let beta = Score::win(depth + 1);
-
             let epos2 = eposition.make_regular_move(moves[0]).unwrap();
-            let Ok(result) =
-                self.search(&epos2, beta.forward(), alpha.forward(), depth, &mut stats)
-            else {
+            let Ok(result) = self.search(
+                &epos2,
+                -Score::IMMEDIATE_WIN,
+                Score::IMMEDIATE_WIN,
+                depth,
+                &mut stats,
+            ) else {
                 break;
             };
             depth += 1;
             root_moves_considered = 1;
             pv = result.pv.add_front(moves[0]);
-            best_score = result.score.back();
+            best_score = -result.score;
 
             while root_moves_considered < moves.len() {
-                if best_score >= beta {
-                    root_moves_considered = moves.len();
-                    break;
-                }
                 let mov = moves[root_moves_considered];
                 let epos2 = eposition.make_regular_move(mov).unwrap();
                 let Ok(result) = self.search(
                     &epos2,
-                    beta.forward(),
-                    best_score.forward(),
+                    -Score::IMMEDIATE_WIN,
+                    -best_score,
                     depth - 1,
                     &mut stats,
                 ) else {
                     break 'iterative_deepening;
                 };
                 root_moves_considered += 1;
-                let score = result.score.back();
+                let score = -result.score;
                 if score > best_score {
                     best_score = score;
                     pv = result.pv.add_front(mov);
@@ -126,36 +127,58 @@ impl<E: Evaluator> Search<E> {
         depth: usize,
         stats: &mut SearchStats,
     ) -> Result<PVResult, Timeout> {
-        if depth == 0 {
-            return self.qsearch(eposition, alpha, beta, stats);
-        }
-
         stats.new_node()?;
 
-        let mut result = PVResult {
-            score: Score::loss(0),
-            pv: Variation::new(),
-        };
+        // Leaf node.
+        if depth == 0 {
+            return Ok(PVResult {
+                score: Score::from_eval(eposition.evaluate()),
+                pv: Variation::empty(),
+            });
+        }
 
+        let move_number = eposition.position().move_number();
+
+        // Check whether game ended.
         if let Stage::End(outcome) = eposition.position().stage() {
-            if outcome == Outcome::Draw {
-                result.score = Score::from_eval(0);
-            }
-            return Ok(result);
+            let score = match outcome {
+                Outcome::Draw => Score::from_eval(0),
+                _ => Score::loss(move_number),
+            };
+            return Ok(PVResult {
+                score,
+                pv: Variation::empty(),
+            });
         }
 
-        if Score::loss(2) >= beta {
-            result.score = Score::loss(2);
-            result.pv.truncated = true;
-            return Ok(result);
+        // Endgame distance pruning.
+        {
+            let best_win = Score::win(move_number + 1);
+            if best_win <= alpha {
+                return Ok(PVResult {
+                    score: best_win,
+                    pv: Variation::empty_truncated(),
+                });
+            }
+            let worst_loss = Score::loss(move_number + 2);
+            if worst_loss >= beta {
+                return Ok(PVResult {
+                    score: worst_loss,
+                    pv: Variation::empty_truncated(),
+                });
+            }
         }
+
+        // Try all moves.
+        let mut result = PVResult {
+            score: -Score::IMMEDIATE_WIN,
+            pv: Variation::empty(),
+        };
 
         for mov in movegen::regular_pseudomoves(eposition.position()) {
             let epos2 = eposition.make_regular_move(mov).unwrap();
-            let alpha2 = alpha.max(result.score);
-            let result2 =
-                self.search(&epos2, beta.forward(), alpha2.forward(), depth - 1, stats)?;
-            let score = result2.score.back();
+            let result2 = self.search(&epos2, -beta, -alpha.max(result.score), depth - 1, stats)?;
+            let score = -result2.score;
             if score > result.score {
                 result.score = score;
                 result.pv = result2.pv.add_front(mov);
@@ -165,31 +188,6 @@ impl<E: Evaluator> Search<E> {
             }
         }
 
-        Ok(result)
-    }
-
-    fn qsearch(
-        &mut self,
-        eposition: &EvaluatedPosition<E>,
-        _alpha: Score,
-        _beta: Score,
-        stats: &mut SearchStats,
-    ) -> Result<PVResult, Timeout> {
-        stats.new_node()?;
-
-        let mut result = PVResult {
-            score: Score::loss(0),
-            pv: Variation::new(),
-        };
-
-        if let Stage::End(outcome) = eposition.position().stage() {
-            if outcome == Outcome::Draw {
-                result.score = Score::from_eval(0);
-            }
-            return Ok(result);
-        }
-
-        result.score = Score::from_eval(eposition.evaluate());
         Ok(result)
     }
 }
@@ -226,26 +224,30 @@ impl SearchStats {
 }
 
 pub struct Variation {
-    pub moves: SmallVec<RegularMove, { Self::MAX_LEN }>,
+    pub moves: SmallVec<RegularMove, MAX_MOVES_IN_GAME>,
     pub truncated: bool,
 }
 
 impl Variation {
-    const MAX_LEN: usize = 100;
-
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         Self {
             moves: SmallVec::new(),
             truncated: false,
         }
     }
 
+    pub fn empty_truncated() -> Self {
+        Self {
+            moves: SmallVec::new(),
+            truncated: true,
+        }
+    }
+
     pub fn add_front(&self, mov: RegularMove) -> Self {
-        let mut res = Self::new();
+        let mut res = Self::empty();
         res.moves.push(mov);
         for &mov in self.moves.iter() {
-            if res.moves.len() >= Self::MAX_LEN {
+            if res.moves.len() >= MAX_MOVES_IN_GAME {
                 res.truncated = true;
                 break;
             }

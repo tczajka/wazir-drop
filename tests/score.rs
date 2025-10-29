@@ -14,15 +14,15 @@ fn test_score() {
     assert_eq!(Score::loss(3).prev(), Score::loss(2));
     assert_eq!(Score::from_eval(17).prev(), Score::from_eval(16));
 
-    assert_eq!(Score::win(7).back(), Score::loss(8));
-    assert_eq!(Score::loss(3).back(), Score::win(4));
-    assert_eq!(Score::from_eval(17).back(), Score::from_eval(-17));
-    assert_eq!(Score::MIN_WIN.back(), -Score::MIN_WIN);
-    assert_eq!((-Score::MIN_WIN).back(), Score::MIN_WIN);
+    assert_eq!(Score::from_eval(17).to_relative(3), Score::from_eval(17));
+    assert_eq!(Score::win(0).to_relative(3), Score::win(0));
+    assert_eq!(Score::win(100).to_relative(3), Score::win(97));
+    assert_eq!(Score::loss(0).to_relative(3), Score::loss(0));
+    assert_eq!(Score::loss(100).to_relative(3), Score::loss(97));
 
-    assert_eq!(Score::win(7).forward(), Score::loss(6));
-    assert_eq!(Score::loss(3).forward(), Score::win(2));
-    assert_eq!(Score::from_eval(17).forward(), Score::from_eval(-17));
-    assert_eq!(Score::MIN_WIN.forward(), (-Score::MIN_WIN).prev());
-    assert_eq!((-Score::MIN_WIN).forward(), Score::MIN_WIN.next());
+    assert_eq!(Score::from_eval(17).to_absolute(3), Score::from_eval(17));
+    assert_eq!(Score::win(0).to_absolute(3), Score::win(3));
+    assert_eq!(Score::win(100).to_absolute(3), Score::win(103));
+    assert_eq!(Score::loss(0).to_absolute(3), Score::loss(3));
+    assert_eq!(Score::loss(100).to_absolute(3), Score::loss(103));
 }
