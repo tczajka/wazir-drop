@@ -112,25 +112,25 @@ impl WazirDropApp {
 
     fn square_color(square: Square) -> Color32 {
         if Self::is_dark_square(square) {
-            Color32::from_rgb(150, 75, 0)
+            Color32::from_rgb(185, 136, 102)
         } else {
-            Color32::from_rgb(200, 170, 100)
+            Color32::from_rgb(242, 217, 183)
         }
     }
 
     fn selected_square_color(square: Square) -> Color32 {
         if Self::is_dark_square(square) {
-            Color32::from_rgb(150, 75, 150)
+            Color32::from_rgb(99, 111, 67)
         } else {
-            Color32::from_rgb(200, 170, 250)
+            Color32::from_rgb(128, 151, 108)
         }
     }
 
     fn last_move_square_color(square: Square) -> Color32 {
         if Self::is_dark_square(square) {
-            Color32::from_rgb(150, 170, 0)
+            Color32::from_rgb(120, 120, 120)
         } else {
-            Color32::from_rgb(200, 250, 100)
+            Color32::from_rgb(155, 155, 155)
         }
     }
 
