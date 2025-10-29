@@ -4,7 +4,6 @@ use crate::{
 use std::{
     fmt::{self, Display, Formatter},
     ops::Deref,
-    rc::Rc,
     sync::Arc,
     time::Instant,
 };
