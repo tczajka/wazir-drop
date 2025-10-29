@@ -1,6 +1,8 @@
 use crate::{
-    clock::Timer, constants::SearchParams, log, Color, LinearEvaluator, Move, PieceSquareFeatures,
-    Player, PlayerFactory, Position, Search, SetupMove, Stage,
+    clock::Timer,
+    constants::{SearchParams, TIME_MARGIN},
+    log, Color, LinearEvaluator, Move, PieceSquareFeatures, Player, PlayerFactory, Position,
+    Search, SetupMove, Stage,
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
 
@@ -25,7 +27,10 @@ impl Player for MainPlayer {
             Stage::Regular => {
                 // TODO: Use more time when approaching 100 moves.
                 let fraction = 1.0 / self.search_params.time_alloc_decay_moves;
-                let deadline = timer.instant_at(timer.get().mul_f64(1.0 - fraction));
+                let time_left = timer.get();
+                let deadline = timer.instant_at(
+                    TIME_MARGIN + (time_left.saturating_sub(TIME_MARGIN)).mul_f64(1.0 - fraction),
+                );
 
                 let result = self.search.search_regular(position, None, Some(deadline));
                 log::info!(

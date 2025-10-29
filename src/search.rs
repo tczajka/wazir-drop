@@ -141,13 +141,13 @@ impl<E: Evaluator> Search<E> {
             return Ok(result);
         }
 
-        result.score = Score::loss(2);
-        result.pv.truncated = true;
+        if Score::loss(2) >= beta {
+            result.score = Score::loss(2);
+            result.pv.truncated = true;
+            return Ok(result);
+        }
 
         for mov in movegen::regular_pseudomoves(eposition.position()) {
-            if result.score >= beta {
-                break;
-            }
             let epos2 = eposition.make_regular_move(mov).unwrap();
             let alpha2 = alpha.max(result.score);
             let result2 =
@@ -156,6 +156,9 @@ impl<E: Evaluator> Search<E> {
             if score > result.score {
                 result.score = score;
                 result.pv = result2.pv.add_front(mov);
+                if result.score >= beta {
+                    break;
+                }
             }
         }
 
