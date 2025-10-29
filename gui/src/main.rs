@@ -128,9 +128,9 @@ impl WazirDropApp {
 
     fn last_move_square_color(square: Square) -> Color32 {
         if Self::is_dark_square(square) {
-            Color32::from_rgb(120, 120, 120)
+            Color32::from_rgb(100, 100, 100)
         } else {
-            Color32::from_rgb(155, 155, 155)
+            Color32::from_rgb(130, 130, 130)
         }
     }
 
