@@ -6,13 +6,15 @@ use std::{
     time::Duration,
 };
 use threadpool::ThreadPool;
-use wazir_drop::{Color, PlayerFactory, constants::DEFAULT_TIME_LIMIT, enums::EnumMap};
+use wazir_drop::{Color, Outcome, PlayerFactory, constants::DEFAULT_TIME_LIMIT, enums::EnumMap};
 
 #[derive(Debug, Clone)]
 pub struct MatchResult {
     pub match_id: String,
     pub num_games: usize,
+    pub num_draws: usize,
     pub player0_score: i32,
+    pub total_game_length: usize,
     pub min_time_left: [Duration; 2],
 }
 
@@ -25,7 +27,17 @@ impl Display for MatchResult {
         let score_per_game_2stddev = 2.0 / (self.num_games as f64).sqrt();
         writeln!(
             f,
-            "  Per game: {score_per_game:.3}  +- {score_per_game_2stddev:.3}",
+            "  Score per game: {score_per_game:.3}  +- {score_per_game_2stddev:.3}",
+        )?;
+        writeln!(
+            f,
+            "  Draws: {:.2}%",
+            self.num_draws as f64 / self.num_games as f64 * 100.0
+        )?;
+        writeln!(
+            f,
+            "  Average game length: {:.2}",
+            self.total_game_length as f64 / self.num_games as f64
         )?;
         // win_prob = 1 / (1 + 10^(-elo_diff / 400))
         // win_prob = (score_per_game + 1) / 2
@@ -58,7 +70,9 @@ pub fn run_match<RNG: Rng>(
     let match_result = Arc::new(Mutex::new(MatchResult {
         match_id: match_id.to_string(),
         num_games: 0,
+        num_draws: 0,
         player0_score: 0,
+        total_game_length: 0,
         min_time_left: time_limits.map(|limit| limit.unwrap_or(DEFAULT_TIME_LIMIT)),
     }));
     for round in 0..num_rounds {
@@ -85,6 +99,10 @@ pub fn run_match<RNG: Rng>(
 
                 let mut match_result = match_result.lock().unwrap();
                 match_result.num_games += 1;
+                if finished_game.outcome == Outcome::Draw {
+                    match_result.num_draws += 1;
+                }
+                match_result.total_game_length += finished_game.moves.len();
                 match_result.player0_score += player0_score;
                 for i in 0..2 {
                     match_result.min_time_left[i] = match_result.min_time_left[i]
