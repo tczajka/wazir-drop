@@ -1,4 +1,6 @@
 use std::{
+    error::Error,
+    process::ExitCode,
     sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant},
@@ -13,6 +15,7 @@ use eframe::{
 };
 use extra::moverand;
 use rand::{SeedableRng, rngs::StdRng};
+use simplelog::{ColorChoice, LevelFilter, TermLogger, TerminalMode};
 use wazir_drop::{
     Color, ColoredPiece, Coord, LinearEvaluator, Move, Piece, PieceSquareFeatures, Position,
     Search, SetupMove, ShortMove, ShortMoveFrom, Square, Stage, Symmetry,
@@ -20,7 +23,24 @@ use wazir_drop::{
     movegen,
 };
 
-fn main() {
+fn main() -> ExitCode {
+    if let Err(e) = run() {
+        log::error!("{e}");
+        eprintln!("Error: {e}");
+        return ExitCode::FAILURE;
+    }
+    ExitCode::SUCCESS
+}
+
+fn run() -> Result<(), Box<dyn Error>> {
+    wazir_drop::log::init(wazir_drop::log::Level::Info);
+    TermLogger::init(
+        LevelFilter::Info,
+        simplelog::Config::default(),
+        TerminalMode::Stderr,
+        ColorChoice::Auto,
+    )?;
+
     eframe::run_native(
         "Wazir Drop",
         eframe::NativeOptions {
@@ -28,8 +48,9 @@ fn main() {
             ..Default::default()
         },
         Box::new(|ctx| Ok(Box::new(WazirDropApp::new(ctx)))),
-    )
-    .unwrap();
+    )?;
+
+    Ok(())
 }
 
 struct WazirDropApp {
@@ -304,6 +325,17 @@ impl WazirDropApp {
                             .lock()
                             .unwrap()
                             .search_regular(&position, None, Some(deadline));
+                    log::info!(
+                        "depth {depth} score {score} \
+                            root {root_moves_considered}/{root_all_moves} \
+                            nodes {nodes} pv {pv}",
+                        depth = result.depth,
+                        score = result.score,
+                        root_moves_considered = result.root_moves_considered,
+                        root_all_moves = result.root_all_moves,
+                        nodes = result.nodes,
+                        pv = result.pv,
+                    );
                     result.pv.moves[0].into()
                 }
                 Stage::End => panic!("Game is over"),
