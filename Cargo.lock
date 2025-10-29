@@ -1475,6 +1475,8 @@ version = "0.0.0"
 dependencies = [
  "eframe",
  "egui_extras",
+ "extra",
+ "rand 0.9.2",
  "wazir-drop",
 ]
 

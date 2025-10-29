@@ -1,3 +1,8 @@
+use std::{
+    sync::{Arc, Mutex},
+    thread,
+};
+
 use eframe::{
     App,
     egui::{
@@ -5,6 +10,8 @@ use eframe::{
         SidePanel, Theme, Ui, Vec2, ViewportBuilder, include_image,
     },
 };
+use extra::moverand;
+use rand::{SeedableRng, rngs::StdRng};
 use wazir_drop::{
     Color, ColoredPiece, Coord, Move, Piece, Position, SetupMove, ShortMove, ShortMoveFrom, Square,
     Stage, Symmetry,
@@ -27,11 +34,14 @@ fn main() {
 #[derive(Debug)]
 struct WazirDropApp {
     reverse: bool,
+    is_computer_player: EnumMap<Color, bool>,
+    time_limit_str: String,
     piece_images: EnumMap<ColoredPiece, Image<'static>>,
     tile_size: f32,
     position: Position,
     next_move_state: NextMoveState,
     history: Vec<HistoryEntry>,
+    rng: Arc<Mutex<StdRng>>,
 }
 
 impl WazirDropApp {
@@ -39,13 +49,16 @@ impl WazirDropApp {
         egui_extras::install_image_loaders(&ctx.egui_ctx);
         let mut app = Self {
             reverse: false,
+            is_computer_player: EnumMap::from_fn(|_| false),
+            time_limit_str: "1000".to_string(),
             piece_images: Self::piece_images(),
             tile_size: 0.0,
             position: Position::initial(),
             next_move_state: NextMoveState::EndOfGame, // temporary
             history: Vec::new(),
+            rng: Arc::new(Mutex::new(StdRng::from_os_rng())),
         };
-        app.start_next_move();
+        app.start_next_move(&ctx.egui_ctx);
         app
     }
 
@@ -67,21 +80,32 @@ impl WazirDropApp {
         })
     }
 
-    fn square_color(square: Square) -> Color32 {
+    fn is_dark_square(square: Square) -> bool {
         let coord = Coord::from(square);
-        if (coord.x() + coord.y()).is_multiple_of(2) {
-            Color32::from_rgb(200, 170, 100)
-        } else {
+        !(coord.x() + coord.y()).is_multiple_of(2)
+    }
+
+    fn square_color(square: Square) -> Color32 {
+        if Self::is_dark_square(square) {
             Color32::from_rgb(150, 75, 0)
+        } else {
+            Color32::from_rgb(200, 170, 100)
         }
     }
 
     fn selected_square_color(square: Square) -> Color32 {
-        let coord = Coord::from(square);
-        if (coord.x() + coord.y()).is_multiple_of(2) {
-            Color32::from_rgb(200, 170, 250)
-        } else {
+        if Self::is_dark_square(square) {
             Color32::from_rgb(150, 75, 150)
+        } else {
+            Color32::from_rgb(200, 170, 250)
+        }
+    }
+
+    fn last_move_square_color(square: Square) -> Color32 {
+        if Self::is_dark_square(square) {
+            Color32::from_rgb(150, 170, 0)
+        } else {
+            Color32::from_rgb(200, 250, 100)
         }
     }
 
@@ -175,9 +199,9 @@ impl WazirDropApp {
         for square in Square::all() {
             let rect = self.square_rect(square);
             if ui.allocate_rect(rect, Sense::click()).clicked() {
-                self.click_square(square);
+                self.click_square(square, ui.ctx());
             }
-            let selected = match self.next_move_state {
+            let is_selected = match self.next_move_state {
                 NextMoveState::HumanRegular { from: Some(from) } => {
                     let short_move = ShortMove::Regular { from, to: square };
                     from == ShortMoveFrom::Square(square)
@@ -189,8 +213,17 @@ impl WazirDropApp {
                 } => swap_from == square,
                 _ => false,
             };
-            let color = if selected {
+            let is_last_move = match self.history.last() {
+                Some(HistoryEntry {
+                    mov: Move::Regular(mov),
+                    ..
+                }) => mov.from == Some(square) || mov.to == square,
+                _ => false,
+            };
+            let color = if is_selected {
                 Self::selected_square_color(square)
+            } else if is_last_move {
+                Self::last_move_square_color(square)
             } else {
                 Self::square_color(square)
             };
@@ -227,17 +260,36 @@ impl WazirDropApp {
         }
     }
 
-    fn start_next_move(&mut self) {
-        self.next_move_state = match self.position.stage() {
-            Stage::Setup => NextMoveState::HumanSetup {
+    fn start_next_move(&mut self, ctx: &egui::Context) {
+        self.next_move_state = match (
+            self.position.stage(),
+            self.is_computer_player[self.position.to_move()],
+        ) {
+            (Stage::End, _) => NextMoveState::EndOfGame,
+            (Stage::Setup, false) => NextMoveState::HumanSetup {
                 setup: movegen::setup_moves(self.position.to_move())
                     .next()
                     .unwrap(),
                 swap_from: None,
             },
-            Stage::Regular => NextMoveState::HumanRegular { from: None },
-            Stage::End => NextMoveState::EndOfGame,
+            (Stage::Regular, false) => NextMoveState::HumanRegular { from: None },
+            (_, true) => {
+                let result = Arc::new(Mutex::new(None));
+                self.launch_computer_thread(ctx, result.clone());
+                NextMoveState::Computer { result }
+            }
         };
+    }
+
+    fn launch_computer_thread(&mut self, ctx: &egui::Context, result: Arc<Mutex<Option<Move>>>) {
+        let position = self.position.clone();
+        let rng = self.rng.clone();
+        let ctx = ctx.clone();
+        _ = thread::spawn(move || {
+            let mov = moverand::random_move(&position, &mut rng.lock().unwrap());
+            *result.lock().unwrap() = Some(mov);
+            ctx.request_repaint();
+        });
     }
 
     fn draw_piece(&self, ui: &mut Ui, square: Square, piece: ColoredPiece) {
@@ -300,7 +352,7 @@ impl WazirDropApp {
         }
     }
 
-    fn click_square(&mut self, square: Square) {
+    fn click_square(&mut self, square: Square, ctx: &egui::Context) {
         match self.next_move_state {
             NextMoveState::HumanSetup {
                 ref mut setup,
@@ -338,7 +390,7 @@ impl WazirDropApp {
                         to: square,
                     };
                     if let Ok(mov) = movegen::move_from_short_move(&self.position, short_move) {
-                        self.make_move(mov);
+                        self.make_move(mov, ctx);
                     }
                 }
             }
@@ -359,48 +411,82 @@ impl WazirDropApp {
         }
     }
 
-    fn make_move(&mut self, mov: Move) {
+    fn make_move(&mut self, mov: Move, ctx: &egui::Context) {
         self.history.push(HistoryEntry {
             position: self.position.clone(),
             mov,
         });
         self.position = self.position.make_move(mov).expect("Invalid move");
-        self.start_next_move();
+        self.start_next_move(ctx);
     }
 
-    fn new_game(&mut self) {
-        self.position = Position::initial();
-        self.history.clear();
-        self.start_next_move();
+    fn new_game(&mut self, ctx: &egui::Context) {
+        if !matches!(self.next_move_state, NextMoveState::Computer { .. }) {
+            self.position = Position::initial();
+            self.history.clear();
+            self.start_next_move(ctx);
+        }
     }
 
-    fn undo(&mut self) {
-        if let Some(entry) = self.history.pop() {
+    fn undo(&mut self, ctx: &egui::Context) {
+        if !matches!(self.next_move_state, NextMoveState::Computer { .. })
+            && let Some(entry) = self.history.pop()
+        {
             self.position = entry.position;
-            self.start_next_move();
+            self.start_next_move(ctx);
         }
     }
 }
 
 impl App for WazirDropApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.set_zoom_factor(1.5);
         ctx.set_theme(Theme::Light);
+
+        let mut computer_move = None;
+        if let NextMoveState::Computer { result } = &self.next_move_state {
+            computer_move = result.lock().unwrap().take();
+        }
+        if let Some(mov) = computer_move {
+            self.make_move(mov, ctx);
+        }
 
         _ = SidePanel::right("side panel").show(ctx, |ui| {
             _ = ui.checkbox(&mut self.reverse, "Reverse view");
 
-            if ui.button("New Game").clicked() {
-                self.new_game();
+            for color in Color::all() {
+                if ui
+                    .checkbox(
+                        &mut self.is_computer_player[color],
+                        format!("Computer player {color}"),
+                    )
+                    .changed()
+                    && self.position.to_move() == color
+                    && !matches!(self.next_move_state, NextMoveState::Computer { .. })
+                {
+                    self.start_next_move(ctx);
+                }
+            }
+
+            _ = ui.label("Time limit (ms):");
+            _ = ui.text_edit_singleline(&mut self.time_limit_str);
+
+            if let NextMoveState::Computer { .. } = self.next_move_state {
+                _ = ui.label("Thinking...");
+            } else {
+                if ui.button("New Game").clicked() {
+                    self.new_game(ctx);
+                }
+
+                if !self.history.is_empty() && ui.button("Undo").clicked() {
+                    self.undo(ctx);
+                }
             }
 
             if let NextMoveState::HumanSetup { setup, .. } = &self.next_move_state
                 && ui.button("Make setup move").clicked()
             {
-                self.make_move(Move::Setup(*setup));
-            }
-
-            if !self.history.is_empty() && ui.button("Undo").clicked() {
-                self.undo();
+                self.make_move(Move::Setup(*setup), ctx);
             }
 
             self.draw_history(ui);
@@ -418,6 +504,9 @@ enum NextMoveState {
     },
     HumanRegular {
         from: Option<ShortMoveFrom>,
+    },
+    Computer {
+        result: Arc<Mutex<Option<Move>>>,
     },
     EndOfGame,
 }
