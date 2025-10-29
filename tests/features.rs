@@ -27,7 +27,7 @@ fn test_features_random_games<F: Features>(features: &F) {
         let mut position = Position::initial();
         let mut vs = gen_feature_vecs(features, &position);
 
-        while position.stage() != Stage::End {
+        while !matches!(position.stage(), Stage::End(_)) {
             let mov = moverand::random_move(&position, &mut rng);
             position = position.make_move(mov).unwrap();
             let new_vs = gen_feature_vecs(features, &position);

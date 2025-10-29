@@ -1,11 +1,23 @@
 use std::str::FromStr;
-use wazir_drop::{enums::SimpleEnumExt, Move, Position, Stage};
+use wazir_drop::{Move, Outcome, Position, Stage};
+
+#[test]
+fn test_outcome_display_round_trip() {
+    for o in [Outcome::RedWin, Outcome::Draw, Outcome::BlueWin] {
+        assert_eq!(Outcome::from_str(&o.to_string()).unwrap(), o);
+    }
+}
 
 #[test]
 fn test_stage_display_round_trip() {
-    for stage in Stage::all() {
-        let name = stage.to_string();
-        assert_eq!(Stage::from_str(&name).unwrap(), stage);
+    for s in [
+        Stage::Setup,
+        Stage::Regular,
+        Stage::End(Outcome::RedWin),
+        Stage::End(Outcome::Draw),
+        Stage::End(Outcome::BlueWin),
+    ] {
+        assert_eq!(Stage::from_str(&s.to_string()).unwrap(), s);
     }
 }
 
@@ -15,7 +27,7 @@ fn test_initial() {
         Position::initial().to_string(),
         "\
 setup
-red
+0
 
 ........
 ........
@@ -34,7 +46,7 @@ fn test_display_from_str() {
     // Opening.
     let s = "\
 setup
-red
+0
 
 ........
 ........
@@ -51,7 +63,7 @@ red
     // Red has placed something before setup.
     let s = "\
 setup
-red
+0
 
 W.......
 ........
@@ -66,7 +78,7 @@ W.......
 
     let s = "\
 setup
-blue
+1
 
 WNFFDDDD
 AAAAAAAA
@@ -83,7 +95,7 @@ AAAAAAAA
     // Invalid placement in setup.
     let s = "\
 setup
-blue
+1
 
 WNFFDDDD
 AAAAAAA.
@@ -98,7 +110,7 @@ AAAAAAA.
 
     let s = "\
 regular
-red
+4
 AFf
 .W.A.D.D
 AaFA.DDA
@@ -116,7 +128,7 @@ add.w..a
     // Too many ferzes.
     let s = "\
 regular
-red
+4
 AFFf
 .W.A.D.D
 AaFA.DDA
@@ -133,7 +145,7 @@ add.w..a
     // Too few ferzes.
     let s = "\
 regular
-red
+4
 Af
 .W.A.D.D
 AaFA.DDA
@@ -149,7 +161,7 @@ add.w..a
     // Too many lines.
     let s = "\
 regular
-red
+4
 Af
 .W.A.D.D
 AaFA.DDA
@@ -163,10 +175,10 @@ add.w..a
 ";
     assert!(Position::from_str(s).is_err());
 
-    // Ended, no red wazir.
+    // Ended, red wazir captured.
     let s = "\
-end
-red
+end blue_win
+4
 AFfw
 ...A.D.D
 AaFA.DDA
@@ -183,8 +195,8 @@ add.w..a
 
     // Ended, but red wazir still there.
     let s = "\
-end
-red
+end blue_win
+4
 AFf
 .W.A.D.D
 AaFA.DDA
@@ -203,7 +215,7 @@ fn test_make_move() {
     let position = Position::from_str(
         "\
 setup
-red
+0
 
 ........
 ........
@@ -224,7 +236,7 @@ red
         position2.to_string(),
         "\
 setup
-blue
+1
 
 AWNAADAD
 AFFAADDA
@@ -248,7 +260,7 @@ AFFAADDA
         position3.to_string(),
         "\
 regular
-red
+2
 
 AWNAADAD
 AFFAADDA
@@ -264,7 +276,7 @@ affaadda
     let position = Position::from_str(
         "\
 regular
-red
+4
 AFf
 .W.A.D.D
 AaFA.DDA
@@ -287,7 +299,7 @@ add.w..a
         position2.to_string(),
         "\
 regular
-blue
+5
 Ff
 AW.A.D.D
 AaFA.DDA
@@ -312,7 +324,7 @@ add.w..a
         position2.to_string(),
         "\
 regular
-blue
+5
 AFf
 ..WA.D.D
 AaFA.DDA
@@ -338,7 +350,7 @@ add.w..a
         position2.to_string(),
         "\
 regular
-blue
+5
 AAFf
 ...A.D.D
 AWFA.DDA
@@ -357,7 +369,7 @@ add.w..a
     let position = Position::from_str(
         "\
 regular
-blue
+5
 AFf
 .W.A.D.D
 AaFA.DDA
@@ -377,8 +389,8 @@ add.w..a
     assert_eq!(
         position2.to_string(),
         "\
-end
-red
+end blue_win
+6
 AFfw
 .n.A.D.D
 AaFA.DDA
@@ -389,5 +401,42 @@ AaFA.DDA
 a.a...f.
 add.w..a
 ",
+    );
+
+    let position = Position::from_str(
+        "\
+regular
+101
+AFf
+.W.A.D.D
+AaFA.DDA
+..A.A.A.
+......A.
+...a.a.d
+..d..nN.
+a.a...f.
+add.w..a
+",
+    )
+    .unwrap();
+
+    let position2 = position
+        .make_move(Move::from_str("fg7-h6").unwrap())
+        .unwrap();
+    assert_eq!(
+        position2.to_string(),
+        "\
+end draw
+102
+AFf
+.W.A.D.D
+AaFA.DDA
+..A.A.A.
+......A.
+...a.a.d
+..d..nN.
+a.a.....
+add.wf.a
+"
     );
 }

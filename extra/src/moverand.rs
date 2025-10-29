@@ -20,6 +20,6 @@ pub fn random_move<RNG: rand::Rng>(position: &Position, rng: &mut RNG) -> Move {
     match position.stage() {
         Stage::Setup => Move::Setup(random_setup(position.to_move(), rng)),
         Stage::Regular => Move::Regular(random_regular(position, rng)),
-        Stage::End => panic!("End of game"),
+        Stage::End(_) => panic!("End of game"),
     }
 }

@@ -26,7 +26,7 @@ fn test_linear_evaluator<F: Features>(features: F) {
 fn test_evaluator<E: Evaluator>(evaluator: &Arc<E>, rng: &mut StdRng) {
     for _ in 0..100 {
         let mut position = EvaluatedPosition::new(evaluator, Position::initial());
-        while position.position().stage() != Stage::End {
+        while !matches!(position.position().stage(), Stage::End(_)) {
             let mov = moverand::random_move(position.position(), rng);
             position = position.make_move(mov).unwrap();
             let value = position.evaluate();

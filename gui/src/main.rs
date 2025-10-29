@@ -290,7 +290,7 @@ impl WazirDropApp {
             self.position.stage(),
             self.is_computer_player[self.position.to_move()],
         ) {
-            (Stage::End, _) => NextMoveState::EndOfGame,
+            (Stage::End(_), _) => NextMoveState::EndOfGame,
             (Stage::Setup, false) => NextMoveState::HumanSetup {
                 setup: movegen::setup_moves(self.position.to_move())
                     .next()
@@ -338,7 +338,7 @@ impl WazirDropApp {
                     );
                     result.pv.moves[0].into()
                 }
-                Stage::End => panic!("Game is over"),
+                Stage::End(_) => panic!("Game is over"),
             };
             *result.lock().unwrap() = Some(mov);
             ctx.request_repaint();
@@ -369,7 +369,7 @@ impl WazirDropApp {
     }
 
     fn draw_to_move(&self, ui: &mut Ui) {
-        if self.position.stage() != Stage::End {
+        if !matches!(self.position.stage(), Stage::End(_)) {
             let x = 1.1 * self.tile_size;
             let y = if (self.position.to_move() == Color::Red) != self.reverse {
                 0.8 * self.tile_size
@@ -391,8 +391,8 @@ impl WazirDropApp {
     fn draw_history(&self, ui: &mut Ui) {
         _ = ui.heading("Moves");
         _ = ScrollArea::vertical().show(ui, |ui| {
-            for entry in self.history.iter() {
-                _ = ui.label(entry.mov.to_string());
+            for (index, entry) in self.history.iter().enumerate() {
+                _ = ui.label(format!("{}. {}", index + 1, entry.mov));
             }
         });
     }
@@ -540,6 +540,10 @@ impl App for WazirDropApp {
                 && ui.button("Make setup move").clicked()
             {
                 self.make_move(Move::Setup(*setup), ctx);
+            }
+
+            if let Stage::End(outcome) = self.position.stage() {
+                _ = ui.label(outcome.to_string());
             }
 
             self.draw_history(ui);

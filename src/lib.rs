@@ -41,7 +41,7 @@ pub use main_player::MainPlayerFactory;
 pub use moves::{InvalidMove, Move, RegularMove, SetupMove, ShortMove, ShortMoveFrom};
 pub use piece::{ColoredPiece, Piece};
 pub use player::{Player, PlayerFactory};
-pub use position::{Position, Stage};
+pub use position::{Outcome, Position, Stage};
 pub use score::Score;
 pub use search::{Search, Variation};
 pub use square::{Coord, Direction, Square};

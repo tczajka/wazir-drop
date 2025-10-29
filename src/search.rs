@@ -2,7 +2,7 @@ use crate::{
     constants::{CHECK_TIMEOUT_NODES, MAX_SEARCH_DEPTH},
     movegen,
     smallvec::SmallVec,
-    EvaluatedPosition, Evaluator, Position, RegularMove, Score, Stage,
+    EvaluatedPosition, Evaluator, Outcome, Position, RegularMove, Score, Stage,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -137,7 +137,10 @@ impl<E: Evaluator> Search<E> {
             pv: Variation::new(),
         };
 
-        if eposition.position().stage() == Stage::End {
+        if let Stage::End(outcome) = eposition.position().stage() {
+            if outcome == Outcome::Draw {
+                result.score = Score::from_eval(0);
+            }
             return Ok(result);
         }
 
@@ -179,7 +182,10 @@ impl<E: Evaluator> Search<E> {
             pv: Variation::new(),
         };
 
-        if eposition.position().stage() == Stage::End {
+        if let Stage::End(outcome) = eposition.position().stage() {
+            if outcome == Outcome::Draw {
+                result.score = Score::from_eval(0);
+            }
             return Ok(result);
         }
 

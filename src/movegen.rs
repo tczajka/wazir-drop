@@ -163,7 +163,7 @@ pub fn pseudomoves(position: &Position) -> impl Iterator<Item = Move> + '_ {
     match position.stage() {
         Stage::Setup => Either::Left(setup_moves(position.to_move()).map(Move::Setup)),
         Stage::Regular => Either::Right(regular_pseudomoves(position).map(Move::Regular)),
-        Stage::End => panic!("End of game"),
+        Stage::End(_) => panic!("End of game"),
     }
 }
 

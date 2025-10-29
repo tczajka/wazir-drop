@@ -1,15 +1,13 @@
 use std::time::Duration;
 use wazir_drop::{
-    Color, Move, PlayerFactory, Position, Stage,
-    clock::Timer,
-    constants::{DEFAULT_TIME_LIMIT, MAX_MOVES_IN_GAME},
-    enums::EnumMap,
+    Color, Move, Outcome, PlayerFactory, Position, Stage, clock::Timer,
+    constants::DEFAULT_TIME_LIMIT, enums::EnumMap,
 };
 
 #[derive(Debug, Clone)]
 pub struct FinishedGame {
     pub moves: Vec<Move>,
-    pub winner: Option<Color>,
+    pub outcome: Outcome,
     pub time_left: EnumMap<Color, Duration>,
 }
 
@@ -21,7 +19,6 @@ pub fn run_game(
 ) -> FinishedGame {
     let mut position = Position::initial();
     let mut moves = opening.to_vec();
-    let mut winner = None;
 
     let mut timers =
         EnumMap::from_fn(|color| Timer::new(time_limit[color].unwrap_or(DEFAULT_TIME_LIMIT)));
@@ -37,16 +34,12 @@ pub fn run_game(
         position = position.make_move(mov).expect("Invalid opening move");
     }
 
-    loop {
+    let outcome = loop {
         let color = position.to_move();
         let opp = color.opposite();
 
-        if position.stage() == Stage::End {
-            winner = Some(opp);
-            break;
-        }
-        if moves.len() >= MAX_MOVES_IN_GAME {
-            break;
+        if let Stage::End(outcome) = position.stage() {
+            break outcome;
         }
         timers[color].start();
         let mov = players[color].make_move(&position, &timers[color]);
@@ -55,18 +48,18 @@ pub fn run_game(
         moves.push(mov);
         let new_position = position.make_move(mov).expect("Invalid move");
 
-        if new_position.stage() != Stage::End {
+        if !matches!(new_position.stage(), Stage::End(_)) {
             timers[opp].start();
             players[opp].opponent_move(&position, mov, &timers[opp]);
             timers[opp].stop();
         }
 
         position = new_position;
-    }
+    };
 
     FinishedGame {
         moves,
-        winner,
+        outcome,
         time_left: EnumMap::from_fn(|color| timers[color].get()),
     }
 }

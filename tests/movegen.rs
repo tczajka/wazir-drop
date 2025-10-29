@@ -109,7 +109,7 @@ fn test_move_from_short_move() {
     let position = Position::from_str(
         "\
 setup
-red
+0
 
 ........
 ........
@@ -136,7 +136,7 @@ red
     let position = Position::from_str(
         "\
 regular
-red
+4
 AFf
 .W.A.D.D
 AaFA.DDA
@@ -182,7 +182,7 @@ fn test_captures() {
     let position = Position::from_str(
         "\
 regular
-red
+4
 AFf
 .W.A.D.D
 AfFA.DDA
@@ -205,7 +205,7 @@ fn test_pseudojumps() {
     let position = Position::from_str(
         "\
 regular
-red
+4
 AAAAAAAAddFf
 .W...DD.
 .fF.....
@@ -234,7 +234,7 @@ fn test_drops() {
     let position = Position::from_str(
         "\
 regular
-red
+4
 Af
 FW.A.D.D
 AfFA.DDA

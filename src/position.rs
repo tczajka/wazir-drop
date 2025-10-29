@@ -1,29 +1,72 @@
 use crate::{
+    constants::MAX_MOVES_IN_GAME,
     enums::SimpleEnumExt,
     error::Invalid,
     impl_from_str_for_parsable, movegen,
     parser::{self, ParseError, Parser, ParserExt},
-    unsafe_simple_enum, Bitboard, Board, Captured, Color, ColoredPiece, InvalidMove, Move, Piece,
-    RegularMove, SetupMove, Square, Symmetry,
+    Bitboard, Board, Captured, Color, ColoredPiece, InvalidMove, Move, Piece, RegularMove,
+    SetupMove, Square, Symmetry,
 };
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(u8)]
+pub enum Outcome {
+    RedWin,
+    Draw,
+    BlueWin,
+}
+
+impl Outcome {
+    pub fn parser() -> impl Parser<Output = Self> {
+        parser::exact(b"red_win")
+            .map(|_| Self::RedWin)
+            .or(parser::exact(b"draw").map(|_| Self::Draw))
+            .or(parser::exact(b"blue_win").map(|_| Self::BlueWin))
+    }
+
+    pub fn win(color: Color) -> Self {
+        match color {
+            Color::Red => Self::RedWin,
+            Color::Blue => Self::BlueWin,
+        }
+    }
+
+    pub fn red_score(self) -> i32 {
+        match self {
+            Self::RedWin => 1,
+            Self::Draw => 0,
+            Self::BlueWin => -1,
+        }
+    }
+}
+
+impl_from_str_for_parsable!(Outcome);
+
+impl Display for Outcome {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Outcome::RedWin => write!(f, "red_win"),
+            Outcome::Draw => write!(f, "draw"),
+            Outcome::BlueWin => write!(f, "blue_win"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Stage {
     Setup,
     Regular,
-    End,
+    End(Outcome),
 }
-
-unsafe_simple_enum!(Stage, 3);
 
 impl Stage {
     fn parser() -> impl Parser<Output = Self> {
         parser::exact(b"setup")
             .map(|_| Stage::Setup)
             .or(parser::exact(b"regular").map(|_| Stage::Regular))
-            .or(parser::exact(b"end").map(|_| Stage::End))
+            .or(parser::exact(b"end ")
+                .ignore_then(Outcome::parser())
+                .map(Stage::End))
     }
 }
 
@@ -34,7 +77,7 @@ impl Display for Stage {
         match self {
             Stage::Setup => write!(f, "setup"),
             Stage::Regular => write!(f, "regular"),
-            Stage::End => write!(f, "end"),
+            Stage::End(outcome) => write!(f, "end {outcome}"),
         }
     }
 }
@@ -42,7 +85,7 @@ impl Display for Stage {
 #[derive(Debug, Clone)]
 pub struct Position {
     stage: Stage,
-    to_move: Color,
+    move_number: u8,
     board: Board,
     captured: Captured,
 }
@@ -51,7 +94,7 @@ impl Position {
     pub fn initial() -> Self {
         Self {
             stage: Stage::Setup,
-            to_move: Color::Red,
+            move_number: 0,
             board: Board::empty(),
             captured: Captured::new(),
         }
@@ -61,8 +104,12 @@ impl Position {
         self.stage
     }
 
+    pub fn move_number(&self) -> usize {
+        self.move_number.into()
+    }
+
     pub fn to_move(&self) -> Color {
-        self.to_move
+        Color::from_index(self.move_number() % Color::COUNT)
     }
 
     pub fn square(&self, square: Square) -> Option<ColoredPiece> {
@@ -88,22 +135,24 @@ impl Position {
     pub fn parser() -> impl Parser<Output = Self> {
         Stage::parser()
             .then_ignore(parser::endl())
-            .and(Color::parser())
+            .and(parser::u32().try_map(|n| usize::try_from(n).map_err(|_| ParseError)))
             .then_ignore(parser::endl())
             .and(Captured::parser())
             .then_ignore(parser::endl())
             .and(Board::parser())
-            .try_map(|(((stage, to_move), captured), board)| {
-                Self::from_parts(stage, to_move, board, captured).map_err(|_| ParseError)
+            .try_map(|(((stage, move_number), captured), board)| {
+                Self::from_parts(stage, move_number, board, captured).map_err(|_| ParseError)
             })
     }
 
     fn from_parts(
         stage: Stage,
-        to_move: Color,
+        move_number: usize,
         board: Board,
         captured: Captured,
     ) -> Result<Position, Invalid> {
+        let to_move = Color::from_index(move_number % Color::COUNT);
+
         // Verify total piece count.
         if stage != Stage::Setup {
             for piece in Piece::all() {
@@ -114,6 +163,32 @@ impl Position {
                     count += captured.get(cpiece);
                 }
                 if count != Color::COUNT * piece.initial_count() {
+                    return Err(Invalid);
+                }
+            }
+        }
+
+        // Verify move number.
+        match stage {
+            Stage::Setup => {
+                if move_number >= Color::COUNT {
+                    return Err(Invalid);
+                }
+            }
+            Stage::Regular => {
+                if !(Color::COUNT..MAX_MOVES_IN_GAME).contains(&move_number) {
+                    return Err(Invalid);
+                }
+            }
+            Stage::End(Outcome::Draw) => {
+                if move_number != MAX_MOVES_IN_GAME {
+                    return Err(Invalid);
+                }
+            }
+            Stage::End(outcome) => {
+                if !(Color::COUNT..=MAX_MOVES_IN_GAME).contains(&move_number)
+                    || outcome != Outcome::win(to_move.opposite())
+                {
                     return Err(Invalid);
                 }
             }
@@ -137,7 +212,7 @@ impl Position {
                     }
                 }
             }
-            Stage::Regular => {
+            Stage::Regular | Stage::End(Outcome::Draw) => {
                 // Verify one wazir per color on the board.
                 for color in Color::all() {
                     if board
@@ -149,7 +224,7 @@ impl Position {
                     }
                 }
             }
-            Stage::End => {
+            Stage::End(_) => {
                 // Verify opposite wazir on the board and one captured.
                 let wazir_opp = Piece::Wazir.with_color(to_move.opposite());
                 if board.occupied_by_piece(wazir_opp).count() != 1 || captured.get(wazir_opp) != 1 {
@@ -159,7 +234,7 @@ impl Position {
         }
         Ok(Position {
             stage,
-            to_move,
+            move_number: move_number.try_into().unwrap(),
             board,
             captured,
         })
@@ -174,7 +249,6 @@ impl Position {
 
     pub fn make_setup_move(&self, mov: SetupMove) -> Result<Position, InvalidMove> {
         let me = self.to_move();
-        let opp = me.opposite();
         if self.stage != Stage::Setup || mov.color != me {
             return Err(InvalidMove);
         }
@@ -188,15 +262,15 @@ impl Position {
                 .place_piece(square, piece.with_color(me))
                 .unwrap();
         }
-        new_position.to_move = opp;
-        if opp == Color::Red {
+        new_position.move_number += 1;
+        if new_position.move_number() == Color::COUNT {
             new_position.stage = Stage::Regular;
         }
         Ok(new_position)
     }
 
     pub fn make_regular_move(&self, mov: RegularMove) -> Result<Position, InvalidMove> {
-        let me = self.to_move;
+        let me = self.to_move();
         let opp = me.opposite();
         if self.stage != Stage::Regular || mov.colored_piece.color() != me {
             return Err(InvalidMove);
@@ -227,14 +301,17 @@ impl Position {
                 .add(captured.with_color(me))
                 .map_err(|_| InvalidMove)?;
             if captured == Piece::Wazir {
-                new_position.stage = Stage::End;
+                new_position.stage = Stage::End(Outcome::win(me));
             }
         }
         new_position
             .board
             .place_piece(mov.to, mov.colored_piece)
             .map_err(|_| InvalidMove)?;
-        new_position.to_move = opp;
+        new_position.move_number += 1;
+        if new_position.move_number() == MAX_MOVES_IN_GAME && new_position.stage == Stage::Regular {
+            new_position.stage = Stage::End(Outcome::Draw);
+        }
         Ok(new_position)
     }
 }
@@ -244,7 +321,7 @@ impl_from_str_for_parsable!(Position);
 impl Display for Position {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "{}", self.stage)?;
-        writeln!(f, "{}", self.to_move)?;
+        writeln!(f, "{}", self.move_number())?;
         writeln!(f, "{}", self.captured)?;
         write!(f, "{}", self.board)?;
         Ok(())

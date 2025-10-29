@@ -46,7 +46,7 @@ impl Player for MainPlayer {
                 );
                 result.pv.moves[0].into()
             }
-            Stage::End => panic!("Game is over"),
+            Stage::End(_) => panic!("Game is over"),
         }
     }
 }

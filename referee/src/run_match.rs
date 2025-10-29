@@ -12,7 +12,7 @@ use wazir_drop::{Color, PlayerFactory, constants::DEFAULT_TIME_LIMIT, enums::Enu
 pub struct MatchResult {
     pub match_id: String,
     pub num_games: usize,
-    pub player0_score: isize,
+    pub player0_score: i32,
     pub min_time_left: [Duration; 2],
 }
 
@@ -76,11 +76,7 @@ pub fn run_match<RNG: Rng>(
                     EnumMap::from_fn(|color: Color| time_limits[red_player_idx ^ color.index()]);
                 let finished_game = run_game(&game_id, pf, &opening, tl);
 
-                let red_score = match finished_game.winner {
-                    None => 0,
-                    Some(Color::Red) => 1,
-                    Some(Color::Blue) => -1,
-                };
+                let red_score = finished_game.outcome.red_score();
                 let player0_score = if red_player_idx == 0 {
                     red_score
                 } else {
@@ -95,7 +91,7 @@ pub fn run_match<RNG: Rng>(
                         .min(finished_game.time_left[Color::from_index(i ^ red_player_idx)]);
                 }
                 log::info!(
-                    "{game_id} score {running_score}",
+                    "{game_id} score {player0_score} total {running_score}",
                     running_score = match_result.player0_score
                 );
             });
