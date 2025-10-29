@@ -1,11 +1,12 @@
 use crate::{
+    Color, Move, PlayerFactory, Position, ShortMove,
     clock::{Stopwatch, Timer},
     constants::DEFAULT_TIME_LIMIT,
     impl_from_str_for_parsable,
     log::{self, Level},
     movegen,
     parser::{self, Parser, ParserExt},
-    platform, Color, Move, PlayerFactory, Position, ShortMove,
+    platform,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -135,7 +136,7 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
                 if player.is_some() || time_limit.is_some() {
                     return Err(CliError::TimeCommandTooLate);
                 }
-                log::info!("time limit {}", duration.as_millis());
+                log::info!("time limit {t}", t = duration.as_millis());
                 time_limit = Some(duration);
                 timer = Timer::new(duration);
             }
@@ -164,15 +165,20 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
                 let mov = movegen::move_from_short_move(&position, short_move)
                     .map_err(|_| CliError::InvalidOpponentMove(short_move))?;
 
+                let mut opp_time = Duration::ZERO;
                 if let Some(opp_stopwatch) = opp_stopwatch.as_mut() {
                     opp_stopwatch.stop();
-                    log::info!("opp {} ms", opp_stopwatch.get().as_millis());
+                    opp_time = opp_stopwatch.get();
                 }
-                log::info!("opp {mov}");
+                log::info!(
+                    "{move_number}. opp {mov} {t} ms",
+                    move_number = position.move_number() + 1,
+                    t = opp_time.as_millis()
+                );
 
                 if player.is_none() {
                     player = Some(player_factory.create("", Color::Blue, &opening, time_limit));
-                    log::info!("init {} ms", timer.get().as_millis());
+                    log::info!("init {t} ms", t = timer.get().as_millis());
                 }
 
                 player
@@ -197,7 +203,11 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
             .make_move(mov)
             .map_err(|_| CliError::InvalidPlayerMove(mov))?;
         timer.stop();
-        log::info!("move {mov} {} ms", timer.get().as_millis());
+        log::info!(
+            "{move_number}. move {mov} {t} ms",
+            move_number = position.move_number(),
+            t = timer.get().as_millis()
+        );
 
         if opp_stopwatch.is_none() {
             opp_stopwatch = Some(Stopwatch::new());

@@ -1,8 +1,9 @@
 use crate::{
+    Color, LinearEvaluator, Move, PieceSquareFeatures, Player, PlayerFactory, Position, Search,
+    SetupMove, Stage,
     clock::Timer,
     constants::{SearchParams, TIME_MARGIN},
-    log, Color, LinearEvaluator, Move, PieceSquareFeatures, Player, PlayerFactory, Position,
-    Search, SetupMove, Stage,
+    log,
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
 
@@ -38,7 +39,10 @@ impl Player for MainPlayer {
                     "depth {depth} score {score} \
                         root {root_moves_considered}/{root_all_moves} \
                         nodes {nodes} knps {knps:.0} pv {pv}",
-                    depth = result.depth,
+                    depth = result
+                        .depth
+                        .map(|d| d.to_string())
+                        .unwrap_or("inf".to_string()),
                     score = result.score.to_relative(position.move_number()),
                     root_moves_considered = result.root_moves_considered,
                     root_all_moves = result.root_all_moves,

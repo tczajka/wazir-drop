@@ -1,8 +1,8 @@
 use crate::{
+    EvaluatedPosition, Evaluator, Outcome, Position, RegularMove, Score, Stage,
     constants::{CHECK_TIMEOUT_NODES, MAX_MOVES_IN_GAME, MAX_SEARCH_DEPTH},
     movegen,
     smallvec::SmallVec,
-    EvaluatedPosition, Evaluator, Outcome, Position, RegularMove, Score, Stage,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -39,6 +39,7 @@ impl<E: Evaluator> Search<E> {
         let mut moves: Vec<(RegularMove, Score)> = Vec::new();
         let mut pv = Variation::empty();
         let mut best_score = Score::loss(0);
+        let mut inf_depth = true;
 
         for mov in movegen::regular_pseudomoves(eposition.position()) {
             let epos2 = eposition.make_regular_move(mov).unwrap();
@@ -51,6 +52,7 @@ impl<E: Evaluator> Search<E> {
                     &mut stats,
                 )
                 .unwrap();
+            inf_depth &= result.inf_depth;
             let score = -result.score;
             moves.push((mov, score));
             if score > best_score {
@@ -68,10 +70,8 @@ impl<E: Evaluator> Search<E> {
 
         stats.deadline = deadline;
 
-        'iterative_deepening: while depth < max_depth
-            && best_score > -Score::WIN_TOO_LONG
-            && best_score < Score::WIN_TOO_LONG
-        {
+        'iterative_deepening: while depth < max_depth && !inf_depth {
+            inf_depth = true;
             let epos2 = eposition.make_regular_move(moves[0]).unwrap();
             let Ok(result) = self.search(
                 &epos2,
@@ -80,12 +80,14 @@ impl<E: Evaluator> Search<E> {
                 depth,
                 &mut stats,
             ) else {
+                inf_depth = false;
                 break;
             };
             depth += 1;
             root_moves_considered = 1;
             pv = result.pv.add_front(moves[0]);
             best_score = -result.score;
+            inf_depth &= result.inf_depth;
 
             while root_moves_considered < moves.len() {
                 let mov = moves[root_moves_considered];
@@ -97,10 +99,12 @@ impl<E: Evaluator> Search<E> {
                     depth - 1,
                     &mut stats,
                 ) else {
+                    inf_depth = false;
                     break 'iterative_deepening;
                 };
                 root_moves_considered += 1;
                 let score = -result.score;
+                inf_depth &= result.inf_depth;
                 if score > best_score {
                     best_score = score;
                     pv = result.pv.add_front(mov);
@@ -112,7 +116,7 @@ impl<E: Evaluator> Search<E> {
         SearchRegularResult {
             score: best_score,
             pv,
-            depth,
+            depth: if inf_depth { None } else { Some(depth) },
             root_moves_considered,
             root_all_moves: moves.len(),
             nodes: stats.nodes,
@@ -126,16 +130,8 @@ impl<E: Evaluator> Search<E> {
         beta: Score,
         depth: usize,
         stats: &mut SearchStats,
-    ) -> Result<PVResult, Timeout> {
+    ) -> Result<SearchResult, Timeout> {
         stats.new_node()?;
-
-        // Leaf node.
-        if depth == 0 {
-            return Ok(PVResult {
-                score: Score::from_eval(eposition.evaluate()),
-                pv: Variation::empty(),
-            });
-        }
 
         let move_number = eposition.position().move_number();
 
@@ -145,8 +141,9 @@ impl<E: Evaluator> Search<E> {
                 Outcome::Draw => Score::from_eval(0),
                 _ => Score::loss(move_number),
             };
-            return Ok(PVResult {
+            return Ok(SearchResult {
                 score,
+                inf_depth: true,
                 pv: Variation::empty(),
             });
         }
@@ -155,23 +152,35 @@ impl<E: Evaluator> Search<E> {
         {
             let best_win = Score::win(move_number + 1);
             if best_win <= alpha {
-                return Ok(PVResult {
+                return Ok(SearchResult {
                     score: best_win,
+                    inf_depth: true,
                     pv: Variation::empty_truncated(),
                 });
             }
             let worst_loss = Score::loss(move_number + 2);
             if worst_loss >= beta {
-                return Ok(PVResult {
+                return Ok(SearchResult {
                     score: worst_loss,
+                    inf_depth: true,
                     pv: Variation::empty_truncated(),
                 });
             }
         }
 
+        // Leaf node.
+        if depth == 0 {
+            return Ok(SearchResult {
+                score: Score::from_eval(eposition.evaluate()),
+                inf_depth: false,
+                pv: Variation::empty(),
+            });
+        }
+
         // Try all moves.
-        let mut result = PVResult {
+        let mut result = SearchResult {
             score: -Score::IMMEDIATE_WIN,
+            inf_depth: true,
             pv: Variation::empty(),
         };
 
@@ -179,6 +188,7 @@ impl<E: Evaluator> Search<E> {
             let epos2 = eposition.make_regular_move(mov).unwrap();
             let result2 = self.search(&epos2, -beta, -alpha.max(result.score), depth - 1, stats)?;
             let score = -result2.score;
+            result.inf_depth &= result2.inf_depth;
             if score > result.score {
                 result.score = score;
                 result.pv = result2.pv.add_front(mov);
@@ -195,14 +205,15 @@ impl<E: Evaluator> Search<E> {
 pub struct SearchRegularResult {
     pub score: Score,
     pub pv: Variation,
-    pub depth: usize,
+    pub depth: Option<usize>, // None if full depth.
     pub root_moves_considered: usize,
     pub root_all_moves: usize,
     pub nodes: u64,
 }
 
-struct PVResult {
+struct SearchResult {
     score: Score,
+    inf_depth: bool,
     pv: Variation,
 }
 

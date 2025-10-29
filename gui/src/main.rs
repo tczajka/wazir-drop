@@ -329,7 +329,10 @@ impl WazirDropApp {
                         "depth {depth} score {score} \
                             root {root_moves_considered}/{root_all_moves} \
                             nodes {nodes} pv {pv}",
-                        depth = result.depth,
+                        depth = result
+                            .depth
+                            .map(|d| d.to_string())
+                            .unwrap_or("inf".to_string()),
                         score = result.score.to_relative(position.move_number()),
                         root_moves_considered = result.root_moves_considered,
                         root_all_moves = result.root_all_moves,
