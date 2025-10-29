@@ -79,6 +79,7 @@ impl<E: Evaluator> Search<E> {
             };
             depth += 1;
             root_moves_considered = 1;
+            pv = result.pv.add_front(moves[0]);
             best_score = result.score.back();
 
             while root_moves_considered < moves.len() {
