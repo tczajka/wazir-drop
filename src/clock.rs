@@ -31,6 +31,11 @@ impl Stopwatch {
             None => self.snapshot,
         }
     }
+
+    pub fn instant_at(&self, t: Duration) -> Instant {
+        let start_instant = self.start_instant.expect("Stopwatch not running");
+        start_instant + t.saturating_sub(self.snapshot)
+    }
 }
 
 #[derive(Debug)]
@@ -57,5 +62,9 @@ impl Timer {
 
     pub fn get(&self) -> Duration {
         self.initial.saturating_sub(self.stopwatch.get())
+    }
+
+    pub fn instant_at(&self, t: Duration) -> Instant {
+        self.stopwatch.instant_at(self.initial.saturating_sub(t))
     }
 }

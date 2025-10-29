@@ -1,10 +1,11 @@
 use crate::{
     clock::{Stopwatch, Timer},
+    constants::DEFAULT_TIME_LIMIT,
     impl_from_str_for_parsable,
     log::{self, Level},
     movegen,
     parser::{self, Parser, ParserExt},
-    platform, Color, Move, PlayerFactory, Position, ShortMove, DEFAULT_TIME_LIMIT,
+    platform, Color, Move, PlayerFactory, Position, ShortMove,
 };
 use std::{
     fmt::{self, Display, Formatter},

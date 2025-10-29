@@ -88,7 +88,7 @@ fn run_matches(config: &Config, config_dir: &Path, log_dir: &Path) -> Result<(),
         .iter()
         .map(|(name, player_config)| {
             let player_factory: Arc<dyn PlayerFactory> = match player_config {
-                PlayerConfig::Main => Arc::new(MainPlayerFactory::new()),
+                PlayerConfig::Main => Arc::new(MainPlayerFactory::default()),
                 PlayerConfig::Random => Arc::new(RandomPlayerFactory::new()),
                 PlayerConfig::External { path } => Arc::new(ExternalPlayerFactory::new(
                     name,

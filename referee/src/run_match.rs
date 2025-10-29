@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 use threadpool::ThreadPool;
-use wazir_drop::{Color, DEFAULT_TIME_LIMIT, PlayerFactory, enums::EnumMap};
+use wazir_drop::{Color, PlayerFactory, constants::DEFAULT_TIME_LIMIT, enums::EnumMap};
 
 #[derive(Debug, Clone)]
 pub struct MatchResult {

@@ -1,7 +1,9 @@
 use std::time::Duration;
 use wazir_drop::{
-    Color, DEFAULT_TIME_LIMIT, MAX_MOVES_IN_GAME, Move, PlayerFactory, Position, Stage,
-    clock::Timer, enums::EnumMap,
+    Color, Move, PlayerFactory, Position, Stage,
+    clock::Timer,
+    constants::{DEFAULT_TIME_LIMIT, MAX_MOVES_IN_GAME},
+    enums::EnumMap,
 };
 
 #[derive(Debug, Clone)]

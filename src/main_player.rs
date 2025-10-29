@@ -1,24 +1,18 @@
 use crate::{
-    clock::Timer, log, Color, LinearEvaluator, Move, PieceSquareFeatures, Player, PlayerFactory,
-    Position, Search, SetupMove, Stage,
+    clock::Timer, constants::SearchParams, log, Color, LinearEvaluator, Move, PieceSquareFeatures,
+    Player, PlayerFactory, Position, Search, SetupMove, Stage,
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
 
-pub struct MainPlayer {
-    search: Search<LinearEvaluator<PieceSquareFeatures>>,
-}
+type MainPlayerEvaluator = LinearEvaluator<PieceSquareFeatures>;
 
-impl MainPlayer {
-    #[allow(clippy::new_without_default)]
-    pub fn new(evaluator: &Arc<LinearEvaluator<PieceSquareFeatures>>) -> Self {
-        Self {
-            search: Search::new(evaluator),
-        }
-    }
+struct MainPlayer {
+    search_params: SearchParams,
+    search: Search<MainPlayerEvaluator>,
 }
 
 impl Player for MainPlayer {
-    fn make_move(&mut self, position: &Position, _timer: &Timer) -> Move {
+    fn make_move(&mut self, position: &Position, timer: &Timer) -> Move {
         match position.stage() {
             Stage::Setup => {
                 let mov = SetupMove::from_str("AAAAAAWANDDDDFFA").unwrap();
@@ -29,11 +23,15 @@ impl Player for MainPlayer {
                 .into()
             }
             Stage::Regular => {
-                let result = self.search.search_regular(position, None, None);
+                // TODO: Use more time when approaching 100 moves.
+                let fraction = 1.0 / self.search_params.time_alloc_decay_moves;
+                let deadline = timer.instant_at(timer.get().mul_f64(1.0 - fraction));
+
+                let result = self.search.search_regular(position, None, Some(deadline));
                 log::info!(
                     "depth {depth} score {score} \
                         root {root_moves_considered}/{root_all_moves} \
-                        nodes {nodes} pv {pv}\n",
+                        nodes {nodes} pv {pv}",
                     depth = result.depth,
                     score = result.score,
                     root_moves_considered = result.root_moves_considered,
@@ -50,15 +48,25 @@ impl Player for MainPlayer {
 
 #[derive(Debug)]
 pub struct MainPlayerFactory {
-    evaluator: Arc<LinearEvaluator<PieceSquareFeatures>>,
+    search_params: SearchParams,
+    evaluator: Arc<MainPlayerEvaluator>,
 }
 
 impl MainPlayerFactory {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    pub fn new(search_params: SearchParams, evaluator: &Arc<MainPlayerEvaluator>) -> Self {
         Self {
-            evaluator: Arc::new(LinearEvaluator::default()),
+            search_params,
+            evaluator: evaluator.clone(),
         }
+    }
+}
+
+impl Default for MainPlayerFactory {
+    fn default() -> Self {
+        Self::new(
+            SearchParams::default(),
+            &Arc::new(MainPlayerEvaluator::default()),
+        )
     }
 }
 
@@ -70,6 +78,9 @@ impl PlayerFactory for MainPlayerFactory {
         _opening: &[Move],
         _time_limit: Option<Duration>,
     ) -> Box<dyn crate::Player> {
-        Box::new(MainPlayer::new(&self.evaluator))
+        Box::new(MainPlayer {
+            search_params: self.search_params.clone(),
+            search: Search::new(&self.evaluator),
+        })
     }
 }

@@ -7,12 +7,12 @@ use std::{
 pub struct Score(i32);
 
 impl Score {
-    pub const IMMEDIATE_WIN: Score = Score(1000000000);
-    const MAX_PLY: usize = 1000000;
-    pub const MIN_WIN: Score = Self::win_in(Self::MAX_PLY);
+    const IMMEDIATE_WIN: Score = Score(1000000000);
+    const MAX_PLY: usize = 100_000_000;
+    pub const MIN_WIN: Score = Self::win(Self::MAX_PLY);
     const MAX_EVAL: i32 = Self::MIN_WIN.prev().0;
 
-    pub const fn win_in(ply: usize) -> Self {
+    pub const fn win(ply: usize) -> Self {
         let ply = if ply > Self::MAX_PLY {
             Self::MAX_PLY
         } else {
@@ -21,8 +21,8 @@ impl Score {
         Self(Self::IMMEDIATE_WIN.0 - ply as i32)
     }
 
-    pub fn lose_in(ply: usize) -> Self {
-        -Self::win_in(ply)
+    pub fn loss(ply: usize) -> Self {
+        -Self::win(ply)
     }
 
     pub const fn next(self) -> Self {
