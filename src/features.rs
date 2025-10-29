@@ -1,10 +1,9 @@
 use std::iter;
 
 use crate::{
-    either::Either,
-    enums::{EnumMap, SimpleEnumExt},
-    smallvec::SmallVec,
-    Color, Move, NormalizedSquare, Piece, Position, RegularMove, SetupMove, Square, Symmetry,
+    captured_index, either::Either, enums::SimpleEnumExt, smallvec::SmallVec, Color, Move,
+    NormalizedSquare, Piece, Position, RegularMove, SetupMove, Square, Symmetry,
+    NUM_CAPTURED_INDEXES,
 };
 
 pub trait Features {
@@ -64,7 +63,7 @@ impl PieceSquareFeatures {
 
 impl Features for PieceSquareFeatures {
     fn count(&self) -> usize {
-        Piece::COUNT * NormalizedSquare::COUNT + NUM_CAPTURED_INDEXES
+        Piece::COUNT * NormalizedSquare::COUNT + NUM_CAPTURED_INDEXES - 2
     }
 
     fn all(&self, position: &Position, color: Color) -> impl Iterator<Item = usize> {
@@ -137,24 +136,3 @@ impl Features for PieceSquareFeatures {
         Some((added.into_iter(), removed.into_iter()))
     }
 }
-
-/// Not counting Wazirs.
-const NUM_CAPTURED_INDEXES: usize = Color::COUNT * (SetupMove::SIZE - 1);
-
-fn captured_index(piece: Piece, index: usize) -> usize {
-    assert!(piece != Piece::Wazir);
-    CAPTURED_OFFSET_TABLE[piece] + index
-}
-
-static CAPTURED_OFFSET_TABLE: EnumMap<Piece, usize> = {
-    let mut table = [0; Piece::COUNT];
-    let mut sum = 0;
-    let mut piece_idx = 0;
-    while piece_idx != Piece::COUNT {
-        table[piece_idx] = sum;
-        sum += Color::COUNT * Piece::from_index(piece_idx).initial_count();
-        piece_idx += 1;
-    }
-    assert!(table[Piece::Wazir.index()] == NUM_CAPTURED_INDEXES);
-    EnumMap::from_array(table)
-};

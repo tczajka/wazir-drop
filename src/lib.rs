@@ -31,7 +31,7 @@ mod symmetry;
 
 pub use bitboard::{Bitboard, BitboardIterator};
 pub use board::Board;
-pub use captured::Captured;
+pub use captured::{captured_index, Captured, NUM_CAPTURED_INDEXES};
 pub use cli::{run_cli, CliCommand};
 pub use color::Color;
 pub use eval::{EvaluatedPosition, Evaluator};

@@ -28,6 +28,10 @@ impl Piece {
         }
     }
 
+    pub const fn total_count(self) -> usize {
+        Color::COUNT * self.initial_count()
+    }
+
     pub fn all_non_wazir() -> impl Iterator<Item = Self> {
         (0..Piece::Wazir.index()).map(Self::from_index)
     }

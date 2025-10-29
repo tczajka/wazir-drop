@@ -162,7 +162,7 @@ impl Position {
                     count += board.occupied_by_piece(cpiece).count();
                     count += captured.get(cpiece);
                 }
-                if count != Color::COUNT * piece.initial_count() {
+                if count != piece.total_count() {
                     return Err(Invalid);
                 }
             }

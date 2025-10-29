@@ -3,11 +3,11 @@ use crate::{
     error::Invalid,
     impl_from_str_for_parsable,
     parser::{ParseError, Parser, ParserExt},
-    Color, ColoredPiece, SetupMove,
+    Color, ColoredPiece, Piece, SetupMove,
 };
 use std::fmt::{self, Display, Formatter};
 
-/// Allows capturing up to `Color::COUNT * piece::initial_count()` of each ColoredPiece.
+/// Allows capturing up to `piece::total_count()` of each ColoredPiece.
 #[derive(Debug, Clone, Copy)]
 pub struct Captured {
     counts: EnumMap<ColoredPiece, u8>,
@@ -26,7 +26,7 @@ impl Captured {
 
     pub fn add(&mut self, cpiece: ColoredPiece) -> Result<(), Invalid> {
         let c = &mut self.counts[cpiece];
-        if usize::from(*c) >= Color::COUNT * cpiece.piece().initial_count() {
+        if usize::from(*c) >= cpiece.piece().total_count() {
             return Err(Invalid);
         }
         *c += 1;
@@ -73,3 +73,23 @@ impl Display for Captured {
         Ok(())
     }
 }
+
+/// Not counting Wazirs.
+pub const NUM_CAPTURED_INDEXES: usize = Color::COUNT * SetupMove::SIZE;
+
+pub fn captured_index(piece: Piece, index: usize) -> usize {
+    CAPTURED_OFFSET_TABLE[piece] + index
+}
+
+static CAPTURED_OFFSET_TABLE: EnumMap<Piece, usize> = {
+    let mut table = [0; Piece::COUNT];
+    let mut sum = 0;
+    let mut piece_idx = 0;
+    while piece_idx != Piece::COUNT {
+        table[piece_idx] = sum;
+        sum += Piece::from_index(piece_idx).total_count();
+        piece_idx += 1;
+    }
+    assert!(sum == NUM_CAPTURED_INDEXES);
+    EnumMap::from_array(table)
+};
