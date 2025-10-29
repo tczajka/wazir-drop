@@ -1,7 +1,6 @@
-use std::rc::Rc;
-
 use extra::moverand;
 use rand::{rngs::StdRng, Rng, SeedableRng};
+use std::rc::Rc;
 use wazir_drop::{
     EvaluatedPosition, Evaluator, Features, LinearEvaluator, PieceSquareFeatures, Position, Stage,
 };

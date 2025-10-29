@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::{enums::EnumMap, Color, Features, InvalidMove, Move, Position, RegularMove, SetupMove};
 
@@ -15,16 +15,16 @@ pub trait Evaluator {
 
 #[derive(Debug, Clone)]
 pub struct EvaluatedPosition<E: Evaluator> {
-    evaluator: Rc<E>,
+    evaluator: Arc<E>,
     position: Position,
     accumulators: EnumMap<Color, E::Accumulator>,
 }
 
 impl<E: Evaluator> EvaluatedPosition<E> {
-    pub fn new(evaluator: &Rc<E>, position: Position) -> Self {
+    pub fn new(evaluator: &Arc<E>, position: Position) -> Self {
         let accumulators = EnumMap::from_fn(|color| Self::refresh(evaluator, &position, color));
         Self {
-            evaluator: Rc::clone(evaluator),
+            evaluator: evaluator.clone(),
             position,
             accumulators,
         }

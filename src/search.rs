@@ -5,19 +5,20 @@ use std::{
     fmt::{self, Display, Formatter},
     ops::Deref,
     rc::Rc,
+    sync::Arc,
     time::Instant,
 };
 
 pub struct Search<E> {
-    evaluator: Rc<E>,
+    evaluator: Arc<E>,
 }
 
 impl<E: Evaluator> Search<E> {
     const MAX_DEPTH: usize = 100;
 
-    pub fn new(evaluator: &Rc<E>) -> Self {
+    pub fn new(evaluator: &Arc<E>) -> Self {
         Self {
-            evaluator: Rc::clone(evaluator),
+            evaluator: Arc::clone(evaluator),
         }
     }
 

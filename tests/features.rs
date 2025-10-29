@@ -7,6 +7,7 @@ use wazir_drop::{
 
 #[test]
 fn test_piece_square_features() {
+    assert_eq!(PieceSquareFeatures.count(), 80);
     test_features_random_games(&PieceSquareFeatures);
 }
 

@@ -1,6 +1,7 @@
 use std::{
     sync::{Arc, Mutex},
     thread,
+    time::{Duration, Instant},
 };
 
 use eframe::{
@@ -13,8 +14,8 @@ use eframe::{
 use extra::moverand;
 use rand::{SeedableRng, rngs::StdRng};
 use wazir_drop::{
-    Color, ColoredPiece, Coord, Move, Piece, Position, SetupMove, ShortMove, ShortMoveFrom, Square,
-    Stage, Symmetry,
+    Color, ColoredPiece, Coord, LinearEvaluator, Move, Piece, PieceSquareFeatures, Position,
+    Search, SetupMove, ShortMove, ShortMoveFrom, Square, Stage, Symmetry,
     enums::{EnumMap, SimpleEnumExt},
     movegen,
 };
@@ -31,7 +32,6 @@ fn main() {
     .unwrap();
 }
 
-#[derive(Debug)]
 struct WazirDropApp {
     reverse: bool,
     is_computer_player: EnumMap<Color, bool>,
@@ -42,6 +42,7 @@ struct WazirDropApp {
     next_move_state: NextMoveState,
     history: Vec<HistoryEntry>,
     rng: Arc<Mutex<StdRng>>,
+    search: Arc<Mutex<Search<LinearEvaluator<PieceSquareFeatures>>>>,
 }
 
 impl WazirDropApp {
@@ -57,6 +58,9 @@ impl WazirDropApp {
             next_move_state: NextMoveState::EndOfGame, // temporary
             history: Vec::new(),
             rng: Arc::new(Mutex::new(StdRng::from_os_rng())),
+            search: Arc::new(Mutex::new(Search::new(&Arc::new(
+                LinearEvaluator::default(),
+            )))),
         };
         app.start_next_move(&ctx.egui_ctx);
         app
@@ -284,9 +288,26 @@ impl WazirDropApp {
     fn launch_computer_thread(&mut self, ctx: &egui::Context, result: Arc<Mutex<Option<Move>>>) {
         let position = self.position.clone();
         let rng = self.rng.clone();
+        let search = self.search.clone();
         let ctx = ctx.clone();
+        let time_limit_ms = self.time_limit_str.parse::<u32>().unwrap_or(1000);
+
         _ = thread::spawn(move || {
-            let mov = moverand::random_move(&position, &mut rng.lock().unwrap());
+            let deadline = Instant::now() + Duration::from_millis(time_limit_ms.into());
+            let mov = match position.stage() {
+                Stage::Setup => {
+                    moverand::random_setup(position.to_move(), &mut rng.lock().unwrap()).into()
+                }
+                Stage::Regular => {
+                    let result =
+                        search
+                            .lock()
+                            .unwrap()
+                            .search_regular(&position, None, Some(deadline));
+                    result.pv.moves[0].into()
+                }
+                Stage::End => panic!("Game is over"),
+            };
             *result.lock().unwrap() = Some(mov);
             ctx.request_repaint();
         });
