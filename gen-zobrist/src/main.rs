@@ -23,9 +23,15 @@ fn main() {
     println!();
 
     println!("#[rustfmt::skip]");
-    println!("static CAPTURED: [u64; NUM_CAPTURED_INDEXES] = [");
-    generate("    ", NUM_CAPTURED_INDEXES, &mut rng);
-    println!("];");
+    println!(
+        "static CAPTURED: EnumMap<Color, [u64; NUM_CAPTURED_INDEXES]> = EnumMap::from_array(["
+    );
+    for _ in 0..Color::COUNT {
+        println!("    [");
+        generate("        ", NUM_CAPTURED_INDEXES, &mut rng);
+        println!("    ],");
+    }
+    println!("]);");
 }
 
 fn generate(indent: &str, count: usize, rng: &mut StdRng) {

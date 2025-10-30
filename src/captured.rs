@@ -1,44 +1,85 @@
 use crate::{
-    enums::EnumMap,
+    Color, ColoredPiece, Piece, SetupMove,
+    enums::{EnumMap, SimpleEnumExt},
     error::Invalid,
     impl_from_str_for_parsable,
     parser::{ParseError, Parser, ParserExt},
-    Color, ColoredPiece, Piece, SetupMove,
+    zobrist,
 };
 use std::fmt::{self, Display, Formatter};
 
-/// Allows capturing up to `piece::total_count()` of each ColoredPiece.
 #[derive(Debug, Clone, Copy)]
-pub struct Captured {
-    counts: EnumMap<ColoredPiece, u8>,
+pub struct CapturedOneSide {
+    counts: EnumMap<Piece, u8>,
 }
 
-impl Captured {
+impl CapturedOneSide {
     pub fn new() -> Self {
         Self {
             counts: EnumMap::from_fn(|_| 0),
         }
     }
 
-    pub fn get(&self, cpiece: ColoredPiece) -> usize {
-        self.counts[cpiece].into()
+    pub fn get(&self, piece: Piece) -> usize {
+        self.counts[piece].into()
     }
 
-    pub fn add(&mut self, cpiece: ColoredPiece) -> Result<(), Invalid> {
-        let c = &mut self.counts[cpiece];
-        if usize::from(*c) >= cpiece.piece().total_count() {
+    pub fn add(&mut self, piece: Piece) -> Result<(), Invalid> {
+        let c = &mut self.counts[piece];
+        let count = usize::from(*c);
+        if count >= piece.total_count() {
             return Err(Invalid);
         }
         *c += 1;
         Ok(())
     }
 
-    pub fn remove(&mut self, cpiece: ColoredPiece) -> Result<(), Invalid> {
-        let c = &mut self.counts[cpiece];
+    pub fn remove(&mut self, piece: Piece) -> Result<(), Invalid> {
+        let c = &mut self.counts[piece];
         if *c == 0 {
             return Err(Invalid);
         }
         *c -= 1;
+        Ok(())
+    }
+}
+
+/// Allows capturing up to `piece::total_count()` of each ColoredPiece.
+#[derive(Debug, Clone, Copy)]
+pub struct Captured {
+    sides: EnumMap<Color, CapturedOneSide>,
+    hash: u64,
+}
+
+impl Captured {
+    pub fn new() -> Self {
+        Self {
+            sides: EnumMap::from_fn(|_| CapturedOneSide::new()),
+            hash: 0,
+        }
+    }
+
+    pub fn get(&self, cpiece: ColoredPiece) -> usize {
+        self.sides[cpiece.color()].get(cpiece.piece())
+    }
+
+    pub fn hash(&self) -> u64 {
+        self.hash
+    }
+
+    pub fn add(&mut self, cpiece: ColoredPiece) -> Result<(), Invalid> {
+        let color = cpiece.color();
+        let piece = cpiece.piece();
+        self.sides[color].add(piece)?;
+        self.hash ^= zobrist::captured(cpiece, self.sides[color].get(piece) - 1);
+        Ok(())
+    }
+
+    pub fn remove(&mut self, cpiece: ColoredPiece) -> Result<(), Invalid> {
+        let color = cpiece.color();
+        let piece = cpiece.piece();
+        self.sides[color].remove(piece)?;
+        self.hash ^= zobrist::captured(cpiece, self.sides[color].get(piece));
         Ok(())
     }
 
@@ -65,9 +106,12 @@ impl Default for Captured {
 
 impl Display for Captured {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        for (cpiece, &count) in self.counts.iter() {
-            for _ in 0..count {
-                write!(f, "{cpiece}")?;
+        for (color, captured_by_color) in self.sides.iter() {
+            for piece in Piece::all() {
+                let count = captured_by_color.get(piece);
+                for _ in 0..count {
+                    write!(f, "{}", piece.with_color(color))?;
+                }
             }
         }
         Ok(())

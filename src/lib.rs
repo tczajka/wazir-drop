@@ -32,8 +32,8 @@ mod zobrist;
 
 pub use bitboard::{Bitboard, BitboardIterator};
 pub use board::Board;
-pub use captured::{captured_index, Captured, NUM_CAPTURED_INDEXES};
-pub use cli::{run_cli, CliCommand};
+pub use captured::{Captured, CapturedOneSide, NUM_CAPTURED_INDEXES, captured_index};
+pub use cli::{CliCommand, run_cli};
 pub use color::Color;
 pub use eval::{EvaluatedPosition, Evaluator};
 pub use features::{Features, PieceSquareFeatures};
