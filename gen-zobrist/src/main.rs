@@ -1,5 +1,5 @@
 use rand::{Rng, SeedableRng, rngs::StdRng};
-use wazir_drop::{Color, NUM_CAPTURED_INDEXES, Piece, Square};
+use wazir_drop::{Color, ColoredPiece, NUM_CAPTURED_INDEXES, Square};
 
 fn main() {
     let mut rng = StdRng::from_os_rng();
@@ -12,9 +12,9 @@ fn main() {
 
     println!("#[rustfmt::skip]");
     println!(
-        "pub static PIECE_SQUARE: EnumMap<Piece, EnumMap<Square, u64>> = EnumMap::from_array(["
+        "pub static COLORED_PIECE_SQUARE: EnumMap<ColoredPiece, EnumMap<Square, u64>> = EnumMap::from_array(["
     );
-    for _ in 0..Piece::COUNT {
+    for _ in 0..ColoredPiece::COUNT {
         println!("    EnumMap::from_array([");
         generate("        ", Square::COUNT, &mut rng);
         println!("    ]),");

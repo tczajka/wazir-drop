@@ -1,9 +1,10 @@
 use crate::{
+    Bitboard, Color, ColoredPiece, Coord, Square,
     enums::{EnumMap, SimpleEnumExt},
     error::Invalid,
     impl_from_str_for_parsable,
     parser::{self, Parser, ParserExt},
-    Bitboard, Color, ColoredPiece, Coord, Square,
+    zobrist,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -12,7 +13,8 @@ pub struct Board {
     squares: EnumMap<Square, Option<ColoredPiece>>,
     occupied_by: EnumMap<Color, Bitboard>,
     empty_squares: Bitboard,
-    piece_map: EnumMap<ColoredPiece, Bitboard>,
+    occupied_by_piece: EnumMap<ColoredPiece, Bitboard>,
+    hash: u64,
 }
 
 impl Board {
@@ -21,7 +23,8 @@ impl Board {
             squares: EnumMap::from_fn(|_| None),
             occupied_by: EnumMap::from_fn(|_| Bitboard::EMPTY),
             empty_squares: !Bitboard::EMPTY,
-            piece_map: EnumMap::from_fn(|_| Bitboard::EMPTY),
+            occupied_by_piece: EnumMap::from_fn(|_| Bitboard::EMPTY),
+            hash: 0,
         }
     }
 
@@ -38,7 +41,11 @@ impl Board {
     }
 
     pub fn occupied_by_piece(&self, cpiece: ColoredPiece) -> Bitboard {
-        self.piece_map[cpiece]
+        self.occupied_by_piece[cpiece]
+    }
+
+    pub fn hash(&self) -> u64 {
+        self.hash
     }
 
     pub fn place_piece(&mut self, square: Square, cpiece: ColoredPiece) -> Result<(), Invalid> {
@@ -49,7 +56,8 @@ impl Board {
         *s = Some(cpiece);
         self.occupied_by[cpiece.color()].add(square);
         self.empty_squares.remove(square);
-        self.piece_map[cpiece].add(square);
+        self.occupied_by_piece[cpiece].add(square);
+        self.hash ^= zobrist::COLORED_PIECE_SQUARE[cpiece][square];
         Ok(())
     }
 
@@ -61,7 +69,8 @@ impl Board {
         *s = None;
         self.occupied_by[cpiece.color()].remove(square);
         self.empty_squares.add(square);
-        self.piece_map[cpiece].remove(square);
+        self.occupied_by_piece[cpiece].remove(square);
+        self.hash ^= zobrist::COLORED_PIECE_SQUARE[cpiece][square];
         Ok(())
     }
 

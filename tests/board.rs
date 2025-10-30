@@ -55,15 +55,21 @@ add.w..a
 "
     );
 
-    assert!(board
-        .place_piece(Square::A1, ColoredPiece::RedWazir)
-        .is_err());
-    assert!(board
-        .remove_piece(Square::A1, ColoredPiece::RedWazir)
-        .is_err());
-    assert!(board
-        .remove_piece(Square::B1, ColoredPiece::RedWazir)
-        .is_err());
+    assert!(
+        board
+            .place_piece(Square::A1, ColoredPiece::RedWazir)
+            .is_err()
+    );
+    assert!(
+        board
+            .remove_piece(Square::A1, ColoredPiece::RedWazir)
+            .is_err()
+    );
+    assert!(
+        board
+            .remove_piece(Square::B1, ColoredPiece::RedWazir)
+            .is_err()
+    );
 }
 
 #[test]
@@ -176,4 +182,21 @@ add.w..a
 ........
 "
     );
+}
+
+#[test]
+fn test_hash() {
+    let mut board = Board::empty();
+    board
+        .place_piece(Square::A1, ColoredPiece::RedWazir)
+        .unwrap();
+    let hash = board.hash();
+    board
+        .remove_piece(Square::A1, ColoredPiece::RedWazir)
+        .unwrap();
+    assert_ne!(board.hash(), hash);
+    board
+        .place_piece(Square::A1, ColoredPiece::RedWazir)
+        .unwrap();
+    assert_eq!(board.hash(), hash);
 }
