@@ -1,8 +1,8 @@
 use crate::{
-    EvaluatedPosition, Evaluator, Outcome, Position, RegularMove, Score, Stage,
     constants::{CHECK_TIMEOUT_NODES, MAX_MOVES_IN_GAME, MAX_SEARCH_DEPTH},
     movegen,
     smallvec::SmallVec,
+    EvaluatedPosition, Evaluator, Outcome, Position, RegularMove, Score, Stage,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -25,7 +25,7 @@ impl<E: Evaluator> Search<E> {
     pub fn search_regular(
         &mut self,
         position: &Position,
-        max_depth: Option<usize>,
+        max_depth: Option<u16>,
         deadline: Option<Instant>,
     ) -> SearchRegularResult {
         assert_eq!(position.stage(), Stage::Regular);
@@ -65,7 +65,7 @@ impl<E: Evaluator> Search<E> {
         assert!(!moves.is_empty(), "Stalemate");
         moves[1..].sort_by_key(|&(_, score)| -score);
         let mut moves: Vec<RegularMove> = moves.into_iter().map(|(mov, _)| mov).collect();
-        let mut depth: usize = 1;
+        let mut depth: u16 = 1;
         let mut root_moves_considered = moves.len();
 
         stats.deadline = deadline;
@@ -116,7 +116,7 @@ impl<E: Evaluator> Search<E> {
         SearchRegularResult {
             score: best_score,
             pv,
-            depth: if inf_depth { None } else { Some(depth) },
+            depth: if inf_depth { u16::MAX } else { depth },
             root_moves_considered,
             root_all_moves: moves.len(),
             nodes: stats.nodes,
@@ -128,7 +128,7 @@ impl<E: Evaluator> Search<E> {
         eposition: &EvaluatedPosition<E>,
         alpha: Score,
         beta: Score,
-        depth: usize,
+        depth: u16,
         stats: &mut SearchStats,
     ) -> Result<SearchResult, Timeout> {
         stats.new_node()?;
@@ -205,7 +205,7 @@ impl<E: Evaluator> Search<E> {
 pub struct SearchRegularResult {
     pub score: Score,
     pub pv: Variation,
-    pub depth: Option<usize>, // None if full depth.
+    pub depth: u16,
     pub root_moves_considered: usize,
     pub root_all_moves: usize,
     pub nodes: u64,
