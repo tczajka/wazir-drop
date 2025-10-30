@@ -44,6 +44,12 @@ impl CapturedOneSide {
     }
 }
 
+impl Default for CapturedOneSide {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Allows capturing up to `piece::total_count()` of each ColoredPiece.
 #[derive(Debug, Clone, Copy)]
 pub struct Captured {

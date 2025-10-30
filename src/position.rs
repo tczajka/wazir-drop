@@ -1,11 +1,12 @@
 use crate::{
+    Bitboard, Board, Captured, Color, ColoredPiece, InvalidMove, Move, Piece, RegularMove,
+    SetupMove, Square, Symmetry,
     constants::MAX_MOVES_IN_GAME,
     enums::SimpleEnumExt,
     error::Invalid,
     impl_from_str_for_parsable, movegen,
     parser::{self, ParseError, Parser, ParserExt},
-    Bitboard, Board, Captured, Color, ColoredPiece, InvalidMove, Move, Piece, RegularMove,
-    SetupMove, Square, Symmetry,
+    zobrist,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -130,6 +131,17 @@ impl Position {
 
     pub fn num_captured(&self, cpiece: ColoredPiece) -> usize {
         self.captured.get(cpiece)
+    }
+
+    pub fn hash(&self) -> u64 {
+        // stage is implied by board and captured
+        zobrist::TO_MOVE[self.to_move()] ^ self.board.hash() ^ self.captured.hash()
+    }
+
+    pub fn hash_ignoring_captured(&self) -> u64 {
+        // There is a collision because we ignore `stage`. Setup with blue on move may look identical as a red win.
+        // We ignore it, it's rare and harmless.
+        zobrist::TO_MOVE[self.to_move()] ^ self.board.hash()
     }
 
     pub fn parser() -> impl Parser<Output = Self> {
