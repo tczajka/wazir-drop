@@ -8,11 +8,11 @@ pub const MAX_SEARCH_DEPTH: usize = 100;
 pub const CHECK_TIMEOUT_NODES: u64 = 256;
 
 #[derive(Debug, Clone)]
-pub struct SearchParams {
+pub struct Hyperparameters {
     pub time_alloc_decay_moves: f64,
 }
 
-impl Default for SearchParams {
+impl Default for Hyperparameters {
     fn default() -> Self {
         Self {
             time_alloc_decay_moves: 20.0,

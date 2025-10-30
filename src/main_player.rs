@@ -2,7 +2,7 @@ use crate::{
     Color, LinearEvaluator, Move, PieceSquareFeatures, Player, PlayerFactory, Position, Search,
     SetupMove, Stage,
     clock::Timer,
-    constants::{SearchParams, TIME_MARGIN},
+    constants::{Hyperparameters, TIME_MARGIN},
     log,
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
@@ -10,7 +10,7 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 type MainPlayerEvaluator = LinearEvaluator<PieceSquareFeatures>;
 
 struct MainPlayer {
-    search_params: SearchParams,
+    hyperparameters: Hyperparameters,
     search: Search<MainPlayerEvaluator>,
 }
 
@@ -28,7 +28,7 @@ impl Player for MainPlayer {
             Stage::Regular => {
                 // TODO: Use more time when approaching 100 moves.
                 let time_left = timer.get();
-                let fraction = 1.0 / self.search_params.time_alloc_decay_moves;
+                let fraction = 1.0 / self.hyperparameters.time_alloc_decay_moves;
                 let deadline = timer.instant_at(
                     TIME_MARGIN + (time_left.saturating_sub(TIME_MARGIN)).mul_f64(1.0 - fraction),
                 );
@@ -59,14 +59,14 @@ impl Player for MainPlayer {
 
 #[derive(Debug)]
 pub struct MainPlayerFactory {
-    search_params: SearchParams,
+    hyperparameters: Hyperparameters,
     evaluator: Arc<MainPlayerEvaluator>,
 }
 
 impl MainPlayerFactory {
-    pub fn new(search_params: SearchParams, evaluator: &Arc<MainPlayerEvaluator>) -> Self {
+    pub fn new(hyperparameters: Hyperparameters, evaluator: &Arc<MainPlayerEvaluator>) -> Self {
         Self {
-            search_params,
+            hyperparameters,
             evaluator: evaluator.clone(),
         }
     }
@@ -75,7 +75,7 @@ impl MainPlayerFactory {
 impl Default for MainPlayerFactory {
     fn default() -> Self {
         Self::new(
-            SearchParams::default(),
+            Hyperparameters::default(),
             &Arc::new(MainPlayerEvaluator::default()),
         )
     }
@@ -90,7 +90,7 @@ impl PlayerFactory for MainPlayerFactory {
         _time_limit: Option<Duration>,
     ) -> Box<dyn crate::Player> {
         Box::new(MainPlayer {
-            search_params: self.search_params.clone(),
+            hyperparameters: self.hyperparameters.clone(),
             search: Search::new(&self.evaluator),
         })
     }
