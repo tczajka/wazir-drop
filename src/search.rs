@@ -3,7 +3,7 @@ use crate::{
     movegen,
     smallvec::SmallVec,
     ttable::{TTable, TTableEntry, TTableScoreType},
-    EvaluatedPosition, Evaluator, Outcome, Position, RegularMove, Score, Stage,
+    EvaluatedPosition, Evaluator, Outcome, Position, RegularMove, Score, ScoreExpanded, Stage,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -162,9 +162,10 @@ impl<E: Evaluator> Search<E> {
         // Check whether game ended.
         if let Stage::End(outcome) = eposition.position().stage() {
             let score = match outcome {
-                Outcome::Draw => Score::from_eval(0),
-                _ => Score::loss(move_number),
-            };
+                Outcome::Draw => ScoreExpanded::Eval(0),
+                _ => ScoreExpanded::Loss(move_number),
+            }
+            .into();
             return Ok(SearchResultInternal {
                 score,
                 inf_depth: true,
@@ -174,7 +175,7 @@ impl<E: Evaluator> Search<E> {
 
         // Endgame distance pruning.
         {
-            let best_win = Score::win(move_number + 1);
+            let best_win = ScoreExpanded::Win(move_number + 1).into();
             if best_win <= alpha {
                 return Ok(SearchResultInternal {
                     score: best_win,
@@ -182,7 +183,7 @@ impl<E: Evaluator> Search<E> {
                     pv: Variation::empty_truncated(),
                 });
             }
-            let worst_loss = Score::loss(move_number + 2);
+            let worst_loss = ScoreExpanded::Loss(move_number + 2).into();
             if worst_loss >= beta {
                 return Ok(SearchResultInternal {
                     score: worst_loss,
@@ -257,7 +258,7 @@ impl<E: Evaluator> Search<E> {
         // Leaf node.
         if depth == 0 {
             return Ok(SearchResultInternal {
-                score: Score::from_eval(eposition.evaluate()),
+                score: ScoreExpanded::Eval(eposition.evaluate()).into(),
                 inf_depth: false,
                 pv: Variation::empty(),
             });

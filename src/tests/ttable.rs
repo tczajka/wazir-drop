@@ -1,6 +1,6 @@
 use crate::{
     ttable::{TTable, TTableEntry, TTableScoreType},
-    RegularMove, Score,
+    RegularMove, ScoreExpanded,
 };
 use std::str::FromStr;
 
@@ -12,7 +12,7 @@ fn test_ttable() {
         depth: 10,
         mov: Some(RegularMove::from_str("A@a1").unwrap()),
         score_type: TTableScoreType::Exact,
-        score: Score::from_eval(100),
+        score: ScoreExpanded::Eval(100).into(),
     };
     ttable.set(hash, entry);
     assert_eq!(ttable.get(hash), Some(entry));
