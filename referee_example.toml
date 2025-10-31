@@ -27,3 +27,5 @@ path = "target/release/wazir-drop"
 players = ["wazir-drop", "caia3"]
 opening_length = 0
 num_rounds = 10000
+time_limit_0 = 3000
+time_limit_1 = 3000
