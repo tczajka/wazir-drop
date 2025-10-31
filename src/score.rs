@@ -68,6 +68,10 @@ impl Score {
     pub fn to_absolute(self, move_number: usize) -> Self {
         ScoreExpanded::from(self).to_absolute(move_number).into()
     }
+
+    pub fn offset(self, offset: i32) -> Self {
+        ScoreExpanded::from(self).offset(offset).into()
+    }
 }
 
 impl Neg for Score {
