@@ -2,13 +2,13 @@ use extra::moverand;
 use rand::{rngs::StdRng, SeedableRng};
 use wazir_drop::{
     enums::{EnumMap, SimpleEnumExt},
-    Color, Features, PieceSquareFeatures, Position, Stage,
+    Color, Features, PSFeatures, Position, Stage,
 };
 
 #[test]
 fn test_piece_square_features() {
-    assert_eq!(PieceSquareFeatures.count(), 80);
-    test_features_random_games(&PieceSquareFeatures);
+    assert_eq!(PSFeatures.count(), 80);
+    test_features_random_games(&PSFeatures);
 }
 
 fn gen_feature_vecs<F: Features>(features: &F, position: &Position) -> EnumMap<Color, Vec<i32>> {

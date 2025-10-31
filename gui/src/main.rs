@@ -1,11 +1,3 @@
-use std::{
-    error::Error,
-    process::ExitCode,
-    sync::{Arc, Mutex},
-    thread,
-    time::{Duration, Instant},
-};
-
 use eframe::{
     App,
     egui::{
@@ -16,9 +8,16 @@ use eframe::{
 use extra::moverand;
 use rand::{SeedableRng, rngs::StdRng};
 use simplelog::{ColorChoice, LevelFilter, TermLogger, TerminalMode};
+use std::{
+    error::Error,
+    process::ExitCode,
+    sync::{Arc, Mutex},
+    thread,
+    time::{Duration, Instant},
+};
 use wazir_drop::{
-    Color, ColoredPiece, Coord, LinearEvaluator, Move, Piece, PieceSquareFeatures, Position,
-    Search, SetupMove, ShortMove, ShortMoveFrom, Square, Stage, Symmetry,
+    Color, ColoredPiece, Coord, DefaultEvaluator, Move, Piece, Position, Search, SetupMove,
+    ShortMove, ShortMoveFrom, Square, Stage, Symmetry,
     constants::Hyperparameters,
     enums::{EnumMap, SimpleEnumExt},
     movegen,
@@ -64,7 +63,7 @@ struct WazirDropApp {
     next_move_state: NextMoveState,
     history: Vec<HistoryEntry>,
     rng: Arc<Mutex<StdRng>>,
-    search: Arc<Mutex<Search<LinearEvaluator<PieceSquareFeatures>>>>,
+    search: Arc<Mutex<Search<DefaultEvaluator>>>,
 }
 
 impl WazirDropApp {
@@ -82,7 +81,7 @@ impl WazirDropApp {
             rng: Arc::new(Mutex::new(StdRng::from_os_rng())),
             search: Arc::new(Mutex::new(Search::new(
                 &Hyperparameters::default(),
-                &Arc::new(LinearEvaluator::default()),
+                &Arc::new(DefaultEvaluator::default()),
             ))),
         };
         app.start_next_move(&ctx.egui_ctx);

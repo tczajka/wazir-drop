@@ -1,16 +1,13 @@
 use crate::{
     clock::Timer,
     constants::{Hyperparameters, TIME_MARGIN},
-    log, Color, LinearEvaluator, Move, PieceSquareFeatures, Player, PlayerFactory, Position,
-    Search, SetupMove, Stage,
+    log, Color, DefaultEvaluator, Move, Player, PlayerFactory, Position, Search, SetupMove, Stage,
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
 
-type MainPlayerEvaluator = LinearEvaluator<PieceSquareFeatures>;
-
 struct MainPlayer {
     hyperparameters: Hyperparameters,
-    search: Search<MainPlayerEvaluator>,
+    search: Search<DefaultEvaluator>,
 }
 
 impl Player for MainPlayer {
@@ -56,11 +53,11 @@ impl Player for MainPlayer {
 #[derive(Debug)]
 pub struct MainPlayerFactory {
     hyperparameters: Hyperparameters,
-    evaluator: Arc<MainPlayerEvaluator>,
+    evaluator: Arc<DefaultEvaluator>,
 }
 
 impl MainPlayerFactory {
-    pub fn new(hyperparameters: &Hyperparameters, evaluator: &Arc<MainPlayerEvaluator>) -> Self {
+    pub fn new(hyperparameters: &Hyperparameters, evaluator: &Arc<DefaultEvaluator>) -> Self {
         Self {
             hyperparameters: hyperparameters.clone(),
             evaluator: evaluator.clone(),
@@ -72,7 +69,7 @@ impl Default for MainPlayerFactory {
     fn default() -> Self {
         Self::new(
             &Hyperparameters::default(),
-            &Arc::new(MainPlayerEvaluator::default()),
+            &Arc::new(DefaultEvaluator::default()),
         )
     }
 }

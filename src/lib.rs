@@ -17,7 +17,7 @@ pub mod constants;
 mod eval;
 mod features;
 mod linear_eval;
-pub mod linear_eval_piece_square_weights;
+pub mod linear_ps_weights;
 mod main_player;
 pub mod movegen;
 mod moves;
@@ -40,7 +40,7 @@ pub use captured::{captured_index, Captured, CapturedOneSide, NUM_CAPTURED_INDEX
 pub use cli::{run_cli, CliCommand};
 pub use color::Color;
 pub use eval::{EvaluatedPosition, Evaluator};
-pub use features::{Features, PieceSquareFeatures};
+pub use features::{Features, PSFeatures};
 pub use linear_eval::LinearEvaluator;
 pub use main_player::MainPlayerFactory;
 pub use moves::{InvalidMove, Move, RegularMove, SetupMove, ShortMove, ShortMoveFrom};
@@ -51,3 +51,5 @@ pub use score::{Score, ScoreExpanded};
 pub use search::{Search, Variation};
 pub use square::{Coord, Direction, Square};
 pub use symmetry::{NormalizedSquare, Symmetry};
+
+pub type DefaultEvaluator = LinearEvaluator<PSFeatures>;

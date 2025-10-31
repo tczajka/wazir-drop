@@ -46,9 +46,9 @@ pub trait Features {
 }
 
 #[derive(Debug)]
-pub struct PieceSquareFeatures;
+pub struct PSFeatures;
 
-impl PieceSquareFeatures {
+impl PSFeatures {
     const CAPTURED_OFFSET: usize = Piece::COUNT * NormalizedSquare::COUNT;
 
     fn board_feature(piece: Piece, square: Square) -> usize {
@@ -61,7 +61,7 @@ impl PieceSquareFeatures {
     }
 }
 
-impl Features for PieceSquareFeatures {
+impl Features for PSFeatures {
     fn count(&self) -> usize {
         Piece::COUNT * NormalizedSquare::COUNT + NUM_CAPTURED_INDEXES - 2
     }

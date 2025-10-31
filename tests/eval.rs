@@ -3,12 +3,12 @@ use std::sync::Arc;
 use extra::moverand;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use wazir_drop::{
-    EvaluatedPosition, Evaluator, Features, LinearEvaluator, PieceSquareFeatures, Position, Stage,
+    EvaluatedPosition, Evaluator, Features, LinearEvaluator, PSFeatures, Position, Stage,
 };
 
 #[test]
 fn test_linear_piece_square_evaluator() {
-    test_linear_evaluator(PieceSquareFeatures);
+    test_linear_evaluator(PSFeatures);
 }
 
 fn test_linear_evaluator<F: Features>(features: F) {
