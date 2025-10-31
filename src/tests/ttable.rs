@@ -1,5 +1,5 @@
 use crate::{
-    ttable::{TTable, TTableEntry, TTableScore},
+    ttable::{TTable, TTableEntry, TTableScoreType},
     RegularMove, Score,
 };
 use std::str::FromStr;
@@ -11,7 +11,8 @@ fn test_ttable() {
     let entry = TTableEntry {
         depth: 10,
         mov: Some(RegularMove::from_str("A@a1").unwrap()),
-        score: TTableScore::Exact(Score::from_eval(100)),
+        score_type: TTableScoreType::Exact,
+        score: Score::from_eval(100),
     };
     ttable.set(hash, entry);
     assert_eq!(ttable.get(hash), Some(entry));

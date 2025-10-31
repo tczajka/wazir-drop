@@ -23,15 +23,15 @@ impl TTable {
         };
     }
 
-    pub fn get(&self, hash: u64) -> Option<TTableEntry> {
+    pub fn get(&mut self, hash: u64) -> Option<TTableEntry> {
         let (hash, bucket_idx) = self.split_hash(hash);
-        let bucket = &self.buckets[bucket_idx];
-        let entry = bucket.entries.iter().find(|bucket| bucket.hash == hash)?;
-        Some(TTableEntry {
-            depth: entry.depth,
-            mov: entry.mov,
-            score: TTableScore::combine(entry.score_type, entry.score),
-        })
+        let bucket = &mut self.buckets[bucket_idx];
+        let entry = bucket
+            .entries
+            .iter_mut()
+            .find(|bucket| bucket.hash == hash)?;
+        entry.epoch = self.epoch;
+        Some((&*entry).into())
     }
 
     pub fn set(&mut self, hash: u64, entry: TTableEntry) {
@@ -40,18 +40,14 @@ impl TTable {
         let best_entry = bucket
             .entries
             .iter_mut()
-            .max_by_key(|entry| {
-                (
-                    entry.hash == hash,
-                    entry.epoch != self.epoch,
-                    Reverse(entry.depth),
-                )
-            })
+            .max_by_key(|e| (e.hash == hash, e.epoch != self.epoch, Reverse(e.depth)))
             .unwrap();
         best_entry.hash = hash;
+        best_entry.epoch = self.epoch;
         best_entry.depth = entry.depth;
         best_entry.mov = entry.mov;
-        (best_entry.score_type, best_entry.score) = entry.score.split();
+        best_entry.score_type = entry.score_type;
+        best_entry.score = entry.score;
     }
 
     fn split_hash(&self, hash: u64) -> (u32, usize) {
@@ -66,52 +62,30 @@ impl TTable {
 pub struct TTableEntry {
     pub depth: u16,
     pub mov: Option<RegularMove>,
-    pub score: TTableScore,
+    pub score_type: TTableScoreType,
+    pub score: Score,
+}
+
+impl From<&PhysicalEntry> for TTableEntry {
+    fn from(entry: &PhysicalEntry) -> Self {
+        Self {
+            depth: entry.depth,
+            mov: entry.mov,
+            score_type: entry.score_type,
+            score: entry.score,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum TTableScore {
-    None,
-    Exact(Score),
-    LowerBound(Score),
-    UpperBound(Score),
-}
-
-impl TTableScore {
-    fn combine(score_type: ScoreType, score: Score) -> Self {
-        match score_type {
-            ScoreType::None => Self::None,
-            ScoreType::Exact => Self::Exact(score),
-            ScoreType::LowerBound => Self::LowerBound(score),
-            ScoreType::UpperBound => Self::UpperBound(score),
-        }
-    }
-
-    fn split(self) -> (ScoreType, Score) {
-        match self {
-            Self::None => (ScoreType::None, Score::default()),
-            Self::Exact(score) => (ScoreType::Exact, score),
-            Self::LowerBound(score) => (ScoreType::LowerBound, score),
-            Self::UpperBound(score) => (ScoreType::UpperBound, score),
-        }
-    }
-}
-
-impl Default for TTableScore {
-    fn default() -> Self {
-        Self::None
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-enum ScoreType {
+pub enum TTableScoreType {
     None,
     Exact,
     LowerBound,
     UpperBound,
 }
 
-impl Default for ScoreType {
+impl Default for TTableScoreType {
     fn default() -> Self {
         Self::None
     }
@@ -120,11 +94,11 @@ impl Default for ScoreType {
 #[derive(Debug, Copy, Clone, Default)]
 struct PhysicalEntry {
     hash: u32,
+    epoch: u8,
     depth: u16,
     mov: Option<RegularMove>,
-    score_type: ScoreType,
+    score_type: TTableScoreType,
     score: Score,
-    epoch: u8,
 }
 
 const _: () = assert!(mem::size_of::<PhysicalEntry>() == 16);

@@ -11,6 +11,7 @@ pub const CHECK_TIMEOUT_NODES: u64 = 256;
 pub struct Hyperparameters {
     pub ttable_size: usize,
     pub time_alloc_decay_moves: f64,
+    pub min_ttable_depth: u16,
 }
 
 impl Default for Hyperparameters {
@@ -18,6 +19,7 @@ impl Default for Hyperparameters {
         Self {
             ttable_size: 1 << 30,
             time_alloc_decay_moves: 20.0,
+            min_ttable_depth: 2,
         }
     }
 }

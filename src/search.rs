@@ -2,7 +2,7 @@ use crate::{
     constants::{Hyperparameters, CHECK_TIMEOUT_NODES, MAX_MOVES_IN_GAME, MAX_SEARCH_DEPTH},
     movegen,
     smallvec::SmallVec,
-    ttable::TTable,
+    ttable::{TTable, TTableEntry, TTableScoreType},
     EvaluatedPosition, Evaluator, Outcome, Position, RegularMove, Score, Stage,
 };
 use std::{
@@ -13,6 +13,7 @@ use std::{
 };
 
 pub struct Search<E> {
+    hyperparameters: Hyperparameters,
     evaluator: Arc<E>,
     ttable: TTable,
 }
@@ -20,6 +21,7 @@ pub struct Search<E> {
 impl<E: Evaluator> Search<E> {
     pub fn new(hyperparameters: &Hyperparameters, evaluator: &Arc<E>) -> Self {
         Self {
+            hyperparameters: hyperparameters.clone(),
             evaluator: Arc::clone(evaluator),
             ttable: TTable::new(hyperparameters.ttable_size),
         }
@@ -32,6 +34,8 @@ impl<E: Evaluator> Search<E> {
         deadline: Option<Instant>,
     ) -> SearchRegularResult {
         assert_eq!(position.stage(), Stage::Regular);
+
+        self.ttable.new_epoch();
         let mut stats = SearchStats {
             deadline: None,
             nodes: 0,
@@ -126,6 +130,7 @@ impl<E: Evaluator> Search<E> {
         }
     }
 
+    /// Recursive search function.
     fn search(
         &mut self,
         eposition: &EvaluatedPosition<E>,
@@ -135,7 +140,6 @@ impl<E: Evaluator> Search<E> {
         stats: &mut SearchStats,
     ) -> Result<SearchResult, Timeout> {
         stats.new_node()?;
-
         let move_number = eposition.position().move_number();
 
         // Check whether game ended.
@@ -171,6 +175,67 @@ impl<E: Evaluator> Search<E> {
             }
         }
 
+        let mut tt_move = None;
+
+        // Transposition table lookup.
+        if depth >= self.hyperparameters.min_ttable_depth {
+            if let Some(ttentry) = self.ttable.get(eposition.position().hash()) {
+                // Transposition table cutoff.
+                if ttentry.depth >= depth {
+                    let score = ttentry.score.to_absolute(move_number);
+                    let cutoff = match ttentry.score_type {
+                        TTableScoreType::None => false,
+                        TTableScoreType::Exact => true,
+                        TTableScoreType::LowerBound => score >= beta,
+                        TTableScoreType::UpperBound => score <= alpha,
+                    };
+                    if cutoff {
+                        return Ok(SearchResult {
+                            score,
+                            inf_depth: ttentry.depth == u16::MAX,
+                            pv: Variation::empty_truncated(),
+                        });
+                    }
+                }
+                tt_move = ttentry.mov;
+            }
+        }
+
+        let result = self.search_real_work(eposition, alpha, beta, depth, tt_move, stats)?;
+
+        if depth >= self.hyperparameters.min_ttable_depth {
+            let score_type = if result.score >= beta {
+                TTableScoreType::LowerBound
+            } else if result.score <= alpha {
+                TTableScoreType::UpperBound
+            } else {
+                TTableScoreType::Exact
+            };
+
+            self.ttable.set(
+                eposition.position().hash(),
+                TTableEntry {
+                    depth: if result.inf_depth { u16::MAX } else { depth },
+                    mov: result.pv.moves.first().copied(),
+                    score_type,
+                    score: result.score.to_relative(move_number),
+                },
+            );
+        }
+
+        Ok(result)
+    }
+
+    // No early cutoff, we have to do real work.
+    fn search_real_work(
+        &mut self,
+        eposition: &EvaluatedPosition<E>,
+        alpha: Score,
+        beta: Score,
+        depth: u16,
+        tt_move: Option<RegularMove>,
+        stats: &mut SearchStats,
+    ) -> Result<SearchResult, Timeout> {
         // Leaf node.
         if depth == 0 {
             return Ok(SearchResult {
@@ -180,21 +245,31 @@ impl<E: Evaluator> Search<E> {
             });
         }
 
-        // Try all moves.
+        // Transposition table move first, then all other moves.
+        let moves = tt_move.into_iter().chain(
+            movegen::regular_pseudomoves(eposition.position()).filter(|&mov| Some(mov) != tt_move),
+        );
+
         let mut result = SearchResult {
             score: -Score::IMMEDIATE_WIN,
             inf_depth: true,
             pv: Variation::empty(),
         };
 
-        for mov in movegen::regular_pseudomoves(eposition.position()) {
-            let epos2 = eposition.make_regular_move(mov).unwrap();
+        for mov in moves {
+            let Ok(epos2) = eposition.make_regular_move(mov) else {
+                // Illegal move. Could be a hash collision in the transposition table
+                // or invalid killer move.
+                continue;
+            };
             let result2 = self.search(&epos2, -beta, -alpha.max(result.score), depth - 1, stats)?;
             let score = -result2.score;
             result.inf_depth &= result2.inf_depth;
             if score > result.score {
                 result.score = score;
-                result.pv = result2.pv.add_front(mov);
+                if result.score > alpha {
+                    result.pv = result2.pv.add_front(mov);
+                }
                 if result.score >= beta {
                     break;
                 }
