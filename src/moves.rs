@@ -7,6 +7,7 @@ use crate::{
 use std::{
     array,
     fmt::{self, Display, Formatter},
+    mem,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -76,12 +77,15 @@ impl Display for SetupMove {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(align(4))]
 pub struct RegularMove {
     pub colored_piece: ColoredPiece,
     pub from: Option<Square>,
     pub captured: Option<Piece>,
     pub to: Square,
 }
+
+const _: () = assert!(mem::size_of::<RegularMove>() == 4);
 
 impl RegularMove {
     pub fn parser() -> impl Parser<Output = Self> {
