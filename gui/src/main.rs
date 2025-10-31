@@ -322,11 +322,10 @@ impl WazirDropApp {
                     moverand::random_setup(position.to_move(), &mut rng.lock().unwrap()).into()
                 }
                 Stage::Regular => {
-                    let result =
-                        search
-                            .lock()
-                            .unwrap()
-                            .search_regular(&position, None, Some(deadline));
+                    let result = search
+                        .lock()
+                        .unwrap()
+                        .search(&position, None, Some(deadline));
                     log::info!(
                         "depth {depth} score {score} \
                             root {root_moves_considered}/{root_all_moves} \

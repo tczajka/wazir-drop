@@ -27,12 +27,12 @@ impl<E: Evaluator> Search<E> {
         }
     }
 
-    pub fn search_regular(
+    pub fn search(
         &mut self,
         position: &Position,
         max_depth: Option<u16>,
         deadline: Option<Instant>,
-    ) -> SearchRegularResult {
+    ) -> SearchResult {
         assert_eq!(position.stage(), Stage::Regular);
 
         self.ttable.new_epoch();
@@ -43,102 +43,119 @@ impl<E: Evaluator> Search<E> {
         let max_depth = max_depth.unwrap_or(MAX_SEARCH_DEPTH);
         let eposition = EvaluatedPosition::new(&self.evaluator, position.clone());
 
-        let mut moves: Vec<(RegularMove, Score)> = Vec::new();
-        let mut pv = Variation::empty();
-        let mut best_score = Score::loss(0);
-        let mut inf_depth = true;
-
-        for mov in movegen::regular_pseudomoves(eposition.position()) {
-            let epos2 = eposition.make_regular_move(mov).unwrap();
-            let result = self
-                .search(
-                    &epos2,
-                    -Score::IMMEDIATE_WIN,
-                    Score::IMMEDIATE_WIN,
-                    0,
-                    &mut stats,
-                )
-                .unwrap();
-            inf_depth &= result.inf_depth;
-            let score = -result.score;
-            moves.push((mov, score));
-            if score > best_score {
-                best_score = score;
-                pv = result.pv.add_front(mov);
-                let last = moves.len() - 1;
-                moves.swap(0, last);
-            }
-        }
-        assert!(!moves.is_empty(), "Stalemate");
-        moves[1..].sort_by_key(|&(_, score)| -score);
+        let (mut search_result, moves) = self.search_one_ply(&eposition, &mut stats);
         let mut moves: Vec<RegularMove> = moves.into_iter().map(|(mov, _)| mov).collect();
         let mut depth: u16 = 1;
         let mut root_moves_considered = moves.len();
 
         stats.deadline = deadline;
 
-        'iterative_deepening: while depth < max_depth && !inf_depth {
-            inf_depth = true;
+        'iterative_deepening: while depth < max_depth && !search_result.inf_depth {
+            search_result.inf_depth = true;
             let epos2 = eposition.make_regular_move(moves[0]).unwrap();
-            let Ok(result) = self.search(
+            let Ok(result) = self.search_alpha_beta(
                 &epos2,
                 -Score::IMMEDIATE_WIN,
                 Score::IMMEDIATE_WIN,
                 depth,
                 &mut stats,
             ) else {
-                inf_depth = false;
+                search_result.inf_depth = false;
                 break;
             };
             depth += 1;
             root_moves_considered = 1;
-            pv = result.pv.add_front(moves[0]);
-            best_score = -result.score;
-            inf_depth &= result.inf_depth;
+            search_result.pv = result.pv.add_front(moves[0]);
+            search_result.score = -result.score;
+            search_result.inf_depth &= result.inf_depth;
 
             while root_moves_considered < moves.len() {
                 let mov = moves[root_moves_considered];
                 let epos2 = eposition.make_regular_move(mov).unwrap();
-                let Ok(result) = self.search(
+                let Ok(result) = self.search_alpha_beta(
                     &epos2,
                     -Score::IMMEDIATE_WIN,
-                    -best_score,
+                    -search_result.score,
                     depth - 1,
                     &mut stats,
                 ) else {
-                    inf_depth = false;
+                    search_result.inf_depth = false;
                     break 'iterative_deepening;
                 };
                 root_moves_considered += 1;
                 let score = -result.score;
-                inf_depth &= result.inf_depth;
-                if score > best_score {
-                    best_score = score;
-                    pv = result.pv.add_front(mov);
+                search_result.inf_depth &= result.inf_depth;
+                if score > search_result.score {
+                    search_result.score = score;
+                    search_result.pv = result.pv.add_front(mov);
                     moves[0..root_moves_considered].rotate_right(1);
                 }
             }
         }
 
-        SearchRegularResult {
-            score: best_score,
-            pv,
-            depth: if inf_depth { u16::MAX } else { depth },
+        SearchResult {
+            score: search_result.score,
+            pv: search_result.pv,
+            depth: if search_result.inf_depth {
+                u16::MAX
+            } else {
+                depth
+            },
             root_moves_considered,
             root_all_moves: moves.len(),
             nodes: stats.nodes,
         }
     }
 
+    // Returns moves sorted by score.
+    fn search_one_ply(
+        &mut self,
+        eposition: &EvaluatedPosition<E>,
+        stats: &mut SearchStats,
+    ) -> (SearchResultInternal, Vec<(RegularMove, Score)>) {
+        let mut moves: Vec<(RegularMove, Score)> = Vec::new();
+        let mut search_result = SearchResultInternal {
+            score: -Score::IMMEDIATE_WIN,
+            inf_depth: true,
+            pv: Variation::empty(),
+        };
+
+        for mov in movegen::regular_pseudomoves(eposition.position()) {
+            let epos2 = eposition.make_regular_move(mov).unwrap();
+            let result = self
+                .search_alpha_beta(
+                    &epos2,
+                    -Score::IMMEDIATE_WIN,
+                    Score::IMMEDIATE_WIN,
+                    0,
+                    stats,
+                )
+                .unwrap();
+            search_result.inf_depth &= result.inf_depth;
+            let score = -result.score;
+            moves.push((mov, score));
+            if score > search_result.score {
+                search_result.score = score;
+                search_result.pv = result.pv.add_front(mov);
+                let last = moves.len() - 1;
+                moves.swap(0, last);
+            }
+        }
+        assert!(!moves.is_empty(), "Stalemate");
+        moves[1..].sort_by_key(|&(_, score)| -score);
+
+        (search_result, moves)
+    }
+
     /// Recursive search function.
-    fn search(
+    fn search_alpha_beta(
         &mut self,
         eposition: &EvaluatedPosition<E>,
         alpha: Score,
         beta: Score,
         depth: u16,
         stats: &mut SearchStats,
-    ) -> Result<SearchResult, Timeout> {
+    ) -> Result<SearchResultInternal, Timeout> {
         stats.new_node()?;
         let move_number = eposition.position().move_number();
 
@@ -148,7 +165,7 @@ impl<E: Evaluator> Search<E> {
                 Outcome::Draw => Score::from_eval(0),
                 _ => Score::loss(move_number),
             };
-            return Ok(SearchResult {
+            return Ok(SearchResultInternal {
                 score,
                 inf_depth: true,
                 pv: Variation::empty(),
@@ -159,7 +176,7 @@ impl<E: Evaluator> Search<E> {
         {
             let best_win = Score::win(move_number + 1);
             if best_win <= alpha {
-                return Ok(SearchResult {
+                return Ok(SearchResultInternal {
                     score: best_win,
                     inf_depth: true,
                     pv: Variation::empty_truncated(),
@@ -167,7 +184,7 @@ impl<E: Evaluator> Search<E> {
             }
             let worst_loss = Score::loss(move_number + 2);
             if worst_loss >= beta {
-                return Ok(SearchResult {
+                return Ok(SearchResultInternal {
                     score: worst_loss,
                     inf_depth: true,
                     pv: Variation::empty_truncated(),
@@ -190,7 +207,7 @@ impl<E: Evaluator> Search<E> {
                         TTableScoreType::UpperBound => score <= alpha,
                     };
                     if cutoff {
-                        return Ok(SearchResult {
+                        return Ok(SearchResultInternal {
                             score,
                             inf_depth: ttentry.depth == u16::MAX,
                             pv: Variation::empty_truncated(),
@@ -201,7 +218,8 @@ impl<E: Evaluator> Search<E> {
             }
         }
 
-        let result = self.search_real_work(eposition, alpha, beta, depth, tt_move, stats)?;
+        let result =
+            self.search_alpha_beta_real_work(eposition, alpha, beta, depth, tt_move, stats)?;
 
         if depth >= self.hyperparameters.min_ttable_depth {
             let score_type = if result.score >= beta {
@@ -227,7 +245,7 @@ impl<E: Evaluator> Search<E> {
     }
 
     // No early cutoff, we have to do real work.
-    fn search_real_work(
+    fn search_alpha_beta_real_work(
         &mut self,
         eposition: &EvaluatedPosition<E>,
         alpha: Score,
@@ -235,10 +253,10 @@ impl<E: Evaluator> Search<E> {
         depth: u16,
         tt_move: Option<RegularMove>,
         stats: &mut SearchStats,
-    ) -> Result<SearchResult, Timeout> {
+    ) -> Result<SearchResultInternal, Timeout> {
         // Leaf node.
         if depth == 0 {
-            return Ok(SearchResult {
+            return Ok(SearchResultInternal {
                 score: Score::from_eval(eposition.evaluate()),
                 inf_depth: false,
                 pv: Variation::empty(),
@@ -250,7 +268,7 @@ impl<E: Evaluator> Search<E> {
             movegen::regular_pseudomoves(eposition.position()).filter(|&mov| Some(mov) != tt_move),
         );
 
-        let mut result = SearchResult {
+        let mut result = SearchResultInternal {
             score: -Score::IMMEDIATE_WIN,
             inf_depth: true,
             pv: Variation::empty(),
@@ -262,7 +280,8 @@ impl<E: Evaluator> Search<E> {
                 // or invalid killer move.
                 continue;
             };
-            let result2 = self.search(&epos2, -beta, -alpha.max(result.score), depth - 1, stats)?;
+            let result2 =
+                self.search_alpha_beta(&epos2, -beta, -alpha.max(result.score), depth - 1, stats)?;
             let score = -result2.score;
             result.inf_depth &= result2.inf_depth;
             if score > result.score {
@@ -280,7 +299,7 @@ impl<E: Evaluator> Search<E> {
     }
 }
 
-pub struct SearchRegularResult {
+pub struct SearchResult {
     pub score: Score,
     pub pv: Variation,
     pub depth: u16,
@@ -289,7 +308,7 @@ pub struct SearchRegularResult {
     pub nodes: u64,
 }
 
-struct SearchResult {
+struct SearchResultInternal {
     score: Score,
     inf_depth: bool,
     pv: Variation,

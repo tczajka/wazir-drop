@@ -32,7 +32,7 @@ impl Player for MainPlayer {
                     TIME_MARGIN + (time_left.saturating_sub(TIME_MARGIN)).mul_f64(1.0 - fraction),
                 );
 
-                let result = self.search.search_regular(position, None, Some(deadline));
+                let result = self.search.search(position, None, Some(deadline));
                 let elapsed = time_left.saturating_sub(timer.get());
                 log::info!(
                     "depth {depth} score {score} \
