@@ -1,8 +1,8 @@
 use crate::{
-    constants::{CHECK_TIMEOUT_NODES, MAX_MOVES_IN_GAME, MAX_SEARCH_DEPTH},
+    constants::{Hyperparameters, CHECK_TIMEOUT_NODES, MAX_MOVES_IN_GAME, MAX_SEARCH_DEPTH},
     movegen,
     smallvec::SmallVec,
-    EvaluatedPosition, Evaluator, Outcome, Position, RegularMove, Score, Stage,
+    EvaluatedPosition, Evaluator, Outcome, Position, RegularMove, Score, Stage, TTable,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -13,12 +13,14 @@ use std::{
 
 pub struct Search<E> {
     evaluator: Arc<E>,
+    ttable: TTable,
 }
 
 impl<E: Evaluator> Search<E> {
-    pub fn new(evaluator: &Arc<E>) -> Self {
+    pub fn new(hyperparameters: &Hyperparameters, evaluator: &Arc<E>) -> Self {
         Self {
             evaluator: Arc::clone(evaluator),
+            ttable: TTable::new(hyperparameters.ttable_size),
         }
     }
 

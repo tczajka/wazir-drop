@@ -60,9 +60,9 @@ pub struct MainPlayerFactory {
 }
 
 impl MainPlayerFactory {
-    pub fn new(hyperparameters: Hyperparameters, evaluator: &Arc<MainPlayerEvaluator>) -> Self {
+    pub fn new(hyperparameters: &Hyperparameters, evaluator: &Arc<MainPlayerEvaluator>) -> Self {
         Self {
-            hyperparameters,
+            hyperparameters: hyperparameters.clone(),
             evaluator: evaluator.clone(),
         }
     }
@@ -71,7 +71,7 @@ impl MainPlayerFactory {
 impl Default for MainPlayerFactory {
     fn default() -> Self {
         Self::new(
-            Hyperparameters::default(),
+            &Hyperparameters::default(),
             &Arc::new(MainPlayerEvaluator::default()),
         )
     }
@@ -87,7 +87,7 @@ impl PlayerFactory for MainPlayerFactory {
     ) -> Box<dyn crate::Player> {
         Box::new(MainPlayer {
             hyperparameters: self.hyperparameters.clone(),
-            search: Search::new(&self.evaluator),
+            search: Search::new(&self.hyperparameters, &self.evaluator),
         })
     }
 }

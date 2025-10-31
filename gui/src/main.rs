@@ -19,6 +19,7 @@ use simplelog::{ColorChoice, LevelFilter, TermLogger, TerminalMode};
 use wazir_drop::{
     Color, ColoredPiece, Coord, LinearEvaluator, Move, Piece, PieceSquareFeatures, Position,
     Search, SetupMove, ShortMove, ShortMoveFrom, Square, Stage, Symmetry,
+    constants::Hyperparameters,
     enums::{EnumMap, SimpleEnumExt},
     movegen,
 };
@@ -79,9 +80,10 @@ impl WazirDropApp {
             next_move_state: NextMoveState::EndOfGame, // temporary
             history: Vec::new(),
             rng: Arc::new(Mutex::new(StdRng::from_os_rng())),
-            search: Arc::new(Mutex::new(Search::new(&Arc::new(
-                LinearEvaluator::default(),
-            )))),
+            search: Arc::new(Mutex::new(Search::new(
+                &Hyperparameters::default(),
+                &Arc::new(LinearEvaluator::default()),
+            ))),
         };
         app.start_next_move(&ctx.egui_ctx);
         app
