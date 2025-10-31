@@ -1,6 +1,8 @@
+use crate::{
+    ttable::{TTable, TTableEntry, TTableScore},
+    RegularMove, Score,
+};
 use std::str::FromStr;
-
-use wazir_drop::{RegularMove, Score, TTable, TTableEntry, TTableScore};
 
 #[test]
 fn test_ttable() {

@@ -2,7 +2,8 @@ use crate::{
     constants::{Hyperparameters, CHECK_TIMEOUT_NODES, MAX_MOVES_IN_GAME, MAX_SEARCH_DEPTH},
     movegen,
     smallvec::SmallVec,
-    EvaluatedPosition, Evaluator, Outcome, Position, RegularMove, Score, Stage, TTable,
+    ttable::TTable,
+    EvaluatedPosition, Evaluator, Outcome, Position, RegularMove, Score, Stage,
 };
 use std::{
     fmt::{self, Display, Formatter},

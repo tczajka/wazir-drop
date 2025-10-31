@@ -31,6 +31,9 @@ mod symmetry;
 mod ttable;
 mod zobrist;
 
+#[cfg(test)]
+mod tests;
+
 pub use bitboard::{Bitboard, BitboardIterator};
 pub use board::Board;
 pub use captured::{captured_index, Captured, CapturedOneSide, NUM_CAPTURED_INDEXES};
@@ -48,4 +51,3 @@ pub use score::Score;
 pub use search::{Search, Variation};
 pub use square::{Coord, Direction, Square};
 pub use symmetry::{NormalizedSquare, Symmetry};
-pub use ttable::{TTable, TTableEntry, TTableScore};
