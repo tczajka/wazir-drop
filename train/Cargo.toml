@@ -10,6 +10,7 @@ clap = { version = "4.5.50", features = ["derive"] }
 log = "0.4.28"
 rand = "0.9.2"
 serde = { version = "1.0.228", features = ["derive"] }
+serde_cbor = "0.10"
 simplelog = "0.12.2"
 threadpool = "1.8.1"
 toml = "0.9.8"

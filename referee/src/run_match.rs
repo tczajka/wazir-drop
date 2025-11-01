@@ -90,12 +90,9 @@ pub fn run_match<RNG: Rng>(
                     EnumMap::from_fn(|color: Color| time_limits[red_player_idx ^ color.index()]);
                 let finished_game = run_game(&game_id, pf, &opening, tl);
 
-                let red_points = finished_game.outcome.red_points();
-                let player0_points = if red_player_idx == 0 {
-                    red_points
-                } else {
-                    -red_points
-                };
+                let player0_points = finished_game
+                    .outcome
+                    .points(Color::from_index(red_player_idx));
 
                 let mut match_result = match_result.lock().unwrap();
                 match_result.num_games += 1;

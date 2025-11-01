@@ -6,7 +6,7 @@ use crate::{
     NUM_CAPTURED_INDEXES,
 };
 
-pub trait Features {
+pub trait Features: Clone + Send + 'static {
     fn count(&self) -> usize;
 
     fn all(&self, position: &Position, color: Color) -> impl Iterator<Item = usize>;
@@ -45,7 +45,7 @@ pub trait Features {
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PSFeatures;
 
 impl PSFeatures {

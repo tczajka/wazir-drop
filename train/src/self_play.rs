@@ -1,7 +1,8 @@
 use clap::Parser;
 use extra::moverand;
 use rand::{SeedableRng, rngs::StdRng, seq::IndexedRandom};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use serde_cbor::ser::{IoWrite, Serializer};
 use std::{
     error::Error,
     fs::{self, File},
@@ -12,8 +13,8 @@ use std::{
 };
 use threadpool::ThreadPool;
 use wazir_drop::{
-    DefaultEvaluator, Position, Score, ScoreExpanded, Search, Stage, TopVariation,
-    constants::Hyperparameters,
+    DefaultEvaluator, Features, PSFeatures, Position, Score, ScoreExpanded, Search, Stage,
+    TopVariation, constants::Hyperparameters,
 };
 
 #[derive(Debug, Parser)]
@@ -28,12 +29,14 @@ struct Config {
     num_cpus: usize,
     num_games: u64,
     batch_size: u64,
+    ttable_size_mb: usize,
     depth: u16,
     extra_depth: u16,
     temperature: i32,
     temperature_cutoff: i32,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Sample {
     /// [to move, other]
     features: [Vec<u32>; 2],
@@ -50,12 +53,21 @@ pub fn run(args: Args) -> Result<(), Box<dyn Error>> {
     let config_dir = args.config.parent().unwrap();
     let log_dir = config_dir.join(&config.log_dir);
     super::init_log(&log_dir, "self-play.log")?;
-    run_games(&config)?;
+
+    let output = BufWriter::new(File::create(&config.output)?);
+    let output = IoWrite::new(output);
+    let output = Serializer::new(output).packed_format();
+    let output = Arc::new(Mutex::new(output));
+
+    run_games(&config, PSFeatures, &output)?;
     Ok(())
 }
 
-fn run_games(config: &Arc<Config>) -> Result<(), Box<dyn Error>> {
-    let output = Arc::new(Mutex::new(BufWriter::new(File::create(&config.output)?)));
+fn run_games<F: Features, W: serde_cbor::ser::Write + Send + 'static>(
+    config: &Arc<Config>,
+    features: F,
+    output: &Arc<Mutex<serde_cbor::Serializer<W>>>,
+) -> Result<(), Box<dyn Error>> {
     let evaluator = Arc::new(DefaultEvaluator::default());
     let thread_pool = ThreadPool::new(config.num_cpus);
     let stats = Arc::new(Mutex::new(Stats::new()));
@@ -82,30 +94,40 @@ fn run_games(config: &Arc<Config>) -> Result<(), Box<dyn Error>> {
             let output = output.clone();
             let evaluator = evaluator.clone();
             let stats = stats.clone();
-            thread_pool.execute(move || match play_game(&config, &output, &evaluator) {
-                Ok(s) => {
-                    let mut stats = stats.lock().unwrap();
-                    stats.add(&s);
-                }
-                Err(e) => {
-                    log::error!("Error playing game: {e}");
-                    panic!("Error playing game: {e}");
-                }
-            });
+            let features = features.clone();
+            thread_pool.execute(
+                move || match play_game(&config, &output, &evaluator, features) {
+                    Ok(s) => {
+                        let mut stats = stats.lock().unwrap();
+                        stats.add(&s);
+                    }
+                    Err(e) => {
+                        log::error!("Error playing game: {e}");
+                        panic!("Error playing game: {e}");
+                    }
+                },
+            );
         }
         thread_pool.join();
     }
     Ok(())
 }
 
-fn play_game(
+fn play_game<F: Features, W: serde_cbor::ser::Write>(
     config: &Config,
-    output: &Mutex<BufWriter<File>>,
+    output: &Mutex<serde_cbor::Serializer<W>>,
     evaluator: &Arc<DefaultEvaluator>,
+    features: F,
 ) -> Result<Stats, Box<dyn Error>> {
     let mut rng = StdRng::from_os_rng();
     let mut position = Position::initial();
-    let mut search = Search::new(&Hyperparameters::default(), evaluator);
+
+    let hyperparameters = Hyperparameters {
+        ttable_size: config.ttable_size_mb << 20,
+        ..Hyperparameters::default()
+    };
+
+    let mut search = Search::new(&hyperparameters, evaluator);
     let mut stats = Stats::new();
 
     struct Entry {
@@ -136,9 +158,9 @@ fn play_game(
                     config.extra_depth,
                     &mut prev_pv_position_hash,
                 ) {
-                    Ok(deep_score) => {
+                    Ok((pv_position, deep_score)) => {
                         entries.push(Entry {
-                            pv_position: position.clone(),
+                            pv_position,
                             deep_score,
                         });
                         stats.samples += 1;
@@ -161,6 +183,29 @@ fn play_game(
         }
     };
     stats.games += 1;
+    let mut output = output.lock().unwrap();
+    for entry in entries {
+        let to_move = entry.pv_position.to_move();
+        let f = [to_move, to_move.opposite()].map(|color| {
+            features
+                .all(&entry.pv_position, color)
+                .map(|x| x as u32)
+                .collect()
+        });
+        let deep_value = match entry.deep_score.into() {
+            ScoreExpanded::Win(_) => i32::MAX,
+            ScoreExpanded::Eval(eval) => eval,
+            ScoreExpanded::Loss(_) => -i32::MAX,
+        };
+        let game_points = outcome.points(to_move);
+        let sample = Sample {
+            features: f,
+            deep_value,
+            game_points,
+        };
+        sample.serialize(&mut *output)?;
+    }
+
     Ok(stats)
 }
 
@@ -171,13 +216,14 @@ enum DeepScoreImpossible {
     RepeatedPVPosition,
 }
 
+/// Returns the PV position and the deep score.
 fn calc_deep_score(
     position: &Position,
     pv: &TopVariation,
     search: &mut Search<DefaultEvaluator>,
     extra_depth: u16,
     prev_pv_position_hash: &mut u64,
-) -> Result<Score, DeepScoreImpossible> {
+) -> Result<(Position, Score), DeepScoreImpossible> {
     if !matches!(pv.score.into(), ScoreExpanded::Eval(_)) {
         return Err(DeepScoreImpossible::GameDecided);
     }
@@ -201,7 +247,7 @@ fn calc_deep_score(
     if pv_position.to_move() != position.to_move() {
         deep_score = -deep_score;
     }
-    Ok(deep_score)
+    Ok((pv_position, deep_score))
 }
 
 fn select_variation<'a>(

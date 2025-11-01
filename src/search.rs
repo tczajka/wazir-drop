@@ -12,6 +12,8 @@ use std::{
     time::Instant,
 };
 
+/// Align to 64 bytes to avoid false sharing.
+#[repr(align(64))]
 pub struct Search<E> {
     hyperparameters: Hyperparameters,
     evaluator: Arc<E>,

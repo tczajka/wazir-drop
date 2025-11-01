@@ -31,11 +31,15 @@ impl Outcome {
         }
     }
 
-    pub fn red_points(self) -> i32 {
-        match self {
+    pub fn points(self, color: Color) -> i32 {
+        let red_points = match self {
             Self::RedWin => 1,
             Self::Draw => 0,
             Self::BlueWin => -1,
+        };
+        match color {
+            Color::Red => red_points,
+            Color::Blue => -red_points,
         }
     }
 
