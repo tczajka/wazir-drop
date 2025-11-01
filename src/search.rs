@@ -112,7 +112,7 @@ impl<E: Evaluator> Search<E> {
                 if score > search_result.score {
                     search_result.score = score;
                     search_result.pv = result.pv.add_front(mov);
-                    moves[0..move_idx].rotate_right(1);
+                    moves[0..=move_idx].rotate_right(1);
                 }
             }
         }
