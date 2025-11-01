@@ -1,5 +1,5 @@
 use crate::{
-    constants::{Hyperparameters, CHECK_TIMEOUT_NODES, MAX_MOVES_IN_GAME, MAX_SEARCH_DEPTH},
+    constants::{Hyperparameters, CHECK_TIMEOUT_NODES, MAX_SEARCH_DEPTH},
     movegen,
     smallvec::SmallVec,
     ttable::{TTable, TTableEntry, TTableScoreType},
@@ -442,11 +442,13 @@ impl SearchStats {
 }
 
 pub struct Variation {
-    pub moves: SmallVec<RegularMove, MAX_MOVES_IN_GAME>,
+    pub moves: SmallVec<RegularMove, { Self::MAX_LENGTH }>,
     pub truncated: bool,
 }
 
 impl Variation {
+    pub const MAX_LENGTH: usize = 100;
+
     pub fn empty() -> Self {
         Self {
             moves: SmallVec::new(),
@@ -465,7 +467,7 @@ impl Variation {
         let mut res = Self::empty();
         res.moves.push(mov);
         for &mov in self.moves.iter() {
-            if res.moves.len() >= MAX_MOVES_IN_GAME {
+            if res.moves.len() >= Self::MAX_LENGTH {
                 res.truncated = true;
                 break;
             }

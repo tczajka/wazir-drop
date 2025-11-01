@@ -14,5 +14,5 @@ fn test_variation() {
         variation = variation.add_front(RegularMove::from_str("A@a1").unwrap());
     }
     assert!(variation.truncated);
-    assert_eq!(variation.len(), 102);
+    assert_eq!(variation.len(), Variation::MAX_LENGTH);
 }

@@ -1,6 +1,5 @@
-use std::sync::Arc;
-
 use crate::{enums::EnumMap, Color, Features, InvalidMove, Move, Position, RegularMove, SetupMove};
+use std::sync::Arc;
 
 pub trait Evaluator {
     type Accumulator: Clone;

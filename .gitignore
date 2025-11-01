@@ -3,3 +3,4 @@
 /logs
 /players
 /referee.toml
+/perf.data*

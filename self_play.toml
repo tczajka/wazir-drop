@@ -1,9 +1,9 @@
 log_dir = "logs"
 output = "data/self_play.cbor"
-num_cpus = 2
+num_cpus = 10
 num_games = 1000
 batch_size = 500
-ttable_size_mb = 16
+ttable_size_mb = 8
 depth = 3
 extra_depth = 3
 temperature = 10
