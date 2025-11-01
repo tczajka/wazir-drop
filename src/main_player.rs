@@ -5,6 +5,7 @@ use crate::{
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
 
+#[repr(align(64))]
 struct MainPlayer {
     hyperparameters: Hyperparameters,
     search: Search<DefaultEvaluator>,
