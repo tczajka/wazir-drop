@@ -1,12 +1,11 @@
 use crate::{
-    Bitboard, Board, Captured, Color, ColoredPiece, InvalidMove, Move, Piece, RegularMove,
-    SetupMove, Square, Symmetry,
     constants::MAX_MOVES_IN_GAME,
     enums::SimpleEnumExt,
     error::Invalid,
     impl_from_str_for_parsable, movegen,
     parser::{self, ParseError, Parser, ParserExt},
-    zobrist,
+    zobrist, Bitboard, Board, Captured, Color, ColoredPiece, InvalidMove, Move, Piece, RegularMove,
+    Score, ScoreExpanded, SetupMove, Square, Symmetry,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -32,12 +31,20 @@ impl Outcome {
         }
     }
 
-    pub fn red_score(self) -> i32 {
+    pub fn red_points(self) -> i32 {
         match self {
             Self::RedWin => 1,
             Self::Draw => 0,
             Self::BlueWin => -1,
         }
+    }
+
+    pub fn to_score(self, move_number: usize) -> Score {
+        match self {
+            Self::Draw => ScoreExpanded::Eval(0),
+            _ => ScoreExpanded::Loss(move_number),
+        }
+        .into()
     }
 }
 

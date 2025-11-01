@@ -3,7 +3,7 @@ use crate::{
     movegen,
     smallvec::SmallVec,
     ttable::{TTable, TTableEntry, TTableScoreType},
-    EvaluatedPosition, Evaluator, Outcome, Position, RegularMove, Score, ScoreExpanded, Stage,
+    EvaluatedPosition, Evaluator, Position, RegularMove, Score, ScoreExpanded, Stage,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -33,7 +33,21 @@ impl<E: Evaluator> Search<E> {
         max_depth: Option<u16>,
         deadline: Option<Instant>,
     ) -> SearchResult {
-        assert_eq!(position.stage(), Stage::Regular);
+        match position.stage() {
+            Stage::Setup => panic!("search does not support setup"),
+            Stage::Regular => {}
+            Stage::End(outcome) => {
+                return SearchResult {
+                    score: outcome.to_score(position.move_number()),
+                    pv: Variation::empty(),
+                    depth: u16::MAX,
+                    root_moves_considered: 0,
+                    root_all_moves: 0,
+                    nodes: 0,
+                };
+            }
+        }
+
         self.ttable.new_epoch();
         let mut stats = SearchStats::new();
         let max_depth = max_depth.unwrap_or(MAX_SEARCH_DEPTH);
@@ -111,72 +125,6 @@ impl<E: Evaluator> Search<E> {
         }
     }
 
-    /// No deadline. Returns moves sorted by score.
-    pub fn search_top_moves(
-        &mut self,
-        position: &Position,
-        max_depth: u16,
-        max_eval_diff: i32,
-    ) -> Vec<(RegularMove, Score)> {
-        assert_eq!(position.stage(), Stage::Regular);
-        assert!(max_eval_diff >= 0);
-        self.ttable.new_epoch();
-        let mut stats = SearchStats::new();
-        let eposition = EvaluatedPosition::new(&self.evaluator, position.clone());
-
-        let (mut search_result, mut moves) = self.search_one_ply(&eposition, &mut stats);
-
-        for depth in 2..=max_depth {
-            if search_result.inf_depth {
-                break;
-            }
-            let epos2 = eposition.make_regular_move(moves[0].0).unwrap();
-            let result = self
-                .search_alpha_beta(
-                    &epos2,
-                    -Score::IMMEDIATE_WIN,
-                    Score::IMMEDIATE_WIN,
-                    depth - 1,
-                    &mut stats,
-                )
-                .unwrap();
-            let score = -result.score;
-            moves[0].1 = score;
-            search_result.pv = result.pv.add_front(moves[0].0);
-            search_result.score = score;
-            search_result.inf_depth = result.inf_depth;
-
-            for move_idx in 1..moves.len() {
-                let mov = moves[move_idx].0;
-                let epos2 = eposition.make_regular_move(mov).unwrap();
-                let result = self
-                    .search_alpha_beta(
-                        &epos2,
-                        -Score::IMMEDIATE_WIN,
-                        -search_result.score.offset(-max_eval_diff).prev(),
-                        depth - 1,
-                        &mut stats,
-                    )
-                    .unwrap();
-                let score = -result.score;
-                moves[move_idx].1 = score;
-                search_result.inf_depth &= result.inf_depth;
-                if score > search_result.score {
-                    search_result.score = score;
-                    search_result.pv = result.pv.add_front(mov);
-                    moves[0..=move_idx].rotate_right(1);
-                }
-            }
-        }
-
-        moves.sort_by_key(|&(_, score)| -score);
-        let threshold = search_result.score.offset(-max_eval_diff);
-        moves
-            .into_iter()
-            .take_while(|&(_, score)| score >= threshold)
-            .collect()
-    }
-
     // Returns moves sorted by score.
     fn search_one_ply(
         &mut self,
@@ -231,13 +179,8 @@ impl<E: Evaluator> Search<E> {
 
         // Check whether game ended.
         if let Stage::End(outcome) = eposition.position().stage() {
-            let score = match outcome {
-                Outcome::Draw => ScoreExpanded::Eval(0),
-                _ => ScoreExpanded::Loss(move_number),
-            }
-            .into();
             return Ok(SearchResultInternal {
-                score,
+                score: outcome.to_score(move_number),
                 inf_depth: true,
                 pv: Variation::empty(),
             });
@@ -368,6 +311,88 @@ impl<E: Evaluator> Search<E> {
 
         Ok(result)
     }
+
+    /// No deadline. Returns moves sorted by score.
+    pub fn search_top_variations(
+        &mut self,
+        position: &Position,
+        max_depth: u16,
+        max_eval_diff: i32,
+    ) -> Vec<TopVariation> {
+        assert_eq!(position.stage(), Stage::Regular);
+        assert!(max_eval_diff >= 0);
+        self.ttable.new_epoch();
+        let mut stats = SearchStats::new();
+        let eposition = EvaluatedPosition::new(&self.evaluator, position.clone());
+
+        let mut variations: Vec<TopVariation> = Vec::new();
+
+        for mov in movegen::regular_pseudomoves(eposition.position()) {
+            let epos2 = eposition.make_regular_move(mov).unwrap();
+            let result = self
+                .search_alpha_beta(
+                    &epos2,
+                    -Score::IMMEDIATE_WIN,
+                    Score::IMMEDIATE_WIN,
+                    0,
+                    &mut stats,
+                )
+                .unwrap();
+            let score = -result.score;
+            variations.push(TopVariation {
+                variation: result.pv.add_front(mov),
+                score,
+            });
+        }
+
+        variations.sort_by_key(|v| -v.score);
+
+        for depth in 2..=max_depth {
+            let mov = variations[0].variation.moves[0];
+            let epos2 = eposition.make_regular_move(mov).unwrap();
+            let result = self
+                .search_alpha_beta(
+                    &epos2,
+                    -Score::IMMEDIATE_WIN,
+                    Score::IMMEDIATE_WIN,
+                    depth - 1,
+                    &mut stats,
+                )
+                .unwrap();
+            variations[0] = TopVariation {
+                variation: result.pv.add_front(mov),
+                score: -result.score,
+            };
+
+            for move_idx in 1..variations.len() {
+                let mov = variations[move_idx].variation.moves[0];
+                let epos2 = eposition.make_regular_move(mov).unwrap();
+                let result = self
+                    .search_alpha_beta(
+                        &epos2,
+                        -Score::IMMEDIATE_WIN,
+                        -variations[0].score.offset(-max_eval_diff).prev(),
+                        depth - 1,
+                        &mut stats,
+                    )
+                    .unwrap();
+                let score = -result.score;
+                variations[move_idx] = TopVariation {
+                    variation: result.pv.add_front(mov),
+                    score,
+                };
+                if score > variations[0].score {
+                    variations.swap(0, move_idx);
+                }
+            }
+        }
+
+        let threshold = variations[0].score.offset(-max_eval_diff);
+        variations
+            .into_iter()
+            .take_while(|v| v.score >= threshold)
+            .collect()
+    }
 }
 
 pub struct SearchResult {
@@ -377,6 +402,11 @@ pub struct SearchResult {
     pub root_moves_considered: usize,
     pub root_all_moves: usize,
     pub nodes: u64,
+}
+
+pub struct TopVariation {
+    pub score: Score,
+    pub variation: Variation,
 }
 
 struct SearchResultInternal {

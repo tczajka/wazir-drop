@@ -13,7 +13,7 @@ pub struct MatchResult {
     pub match_id: String,
     pub num_games: usize,
     pub num_draws: usize,
-    pub player0_score: i32,
+    pub player0_points: i32,
     pub total_game_length: usize,
     pub min_time_left: [Duration; 2],
 }
@@ -22,8 +22,8 @@ impl Display for MatchResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "Match {}: ", self.match_id)?;
         writeln!(f, "  Games: {}", self.num_games)?;
-        writeln!(f, "  Score: {}", self.player0_score)?;
-        let score_per_game = self.player0_score as f64 / self.num_games as f64;
+        writeln!(f, "  Score: {}", self.player0_points)?;
+        let score_per_game = self.player0_points as f64 / self.num_games as f64;
         let score_per_game_2stddev = 2.0 / (self.num_games as f64).sqrt();
         writeln!(
             f,
@@ -71,7 +71,7 @@ pub fn run_match<RNG: Rng>(
         match_id: match_id.to_string(),
         num_games: 0,
         num_draws: 0,
-        player0_score: 0,
+        player0_points: 0,
         total_game_length: 0,
         min_time_left: time_limits.map(|limit| limit.unwrap_or(DEFAULT_TIME_LIMIT)),
     }));
@@ -90,11 +90,11 @@ pub fn run_match<RNG: Rng>(
                     EnumMap::from_fn(|color: Color| time_limits[red_player_idx ^ color.index()]);
                 let finished_game = run_game(&game_id, pf, &opening, tl);
 
-                let red_score = finished_game.outcome.red_score();
-                let player0_score = if red_player_idx == 0 {
-                    red_score
+                let red_points = finished_game.outcome.red_points();
+                let player0_points = if red_player_idx == 0 {
+                    red_points
                 } else {
-                    -red_score
+                    -red_points
                 };
 
                 let mut match_result = match_result.lock().unwrap();
@@ -103,14 +103,14 @@ pub fn run_match<RNG: Rng>(
                     match_result.num_draws += 1;
                 }
                 match_result.total_game_length += finished_game.moves.len();
-                match_result.player0_score += player0_score;
+                match_result.player0_points += player0_points;
                 for i in 0..2 {
                     match_result.min_time_left[i] = match_result.min_time_left[i]
                         .min(finished_game.time_left[Color::from_index(i ^ red_player_idx)]);
                 }
                 log::info!(
-                    "{game_id} score {player0_score} total {running_score}",
-                    running_score = match_result.player0_score
+                    "{game_id} points {player0_points} total {running_points}",
+                    running_points = match_result.player0_points
                 );
             });
         }

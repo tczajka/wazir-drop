@@ -11,7 +11,18 @@ workspace = true
 
 [workspace]
 resolver = "3"
-members = ["external-player", "extra", "gen-zobrist", "gui", "random-player", "referee"]
+members = [
+    "external-player",
+    "extra",
+    "gen-zobrist",
+    "gui",
+    "random-player",
+    "referee",
+    "train",
+]
+
+[profile.release]
+panic = "abort"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

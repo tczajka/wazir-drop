@@ -4,7 +4,7 @@ use log::LevelFilter;
 use rand::{SeedableRng, rngs::StdRng};
 use random_player::RandomPlayerFactory;
 use referee::run_match;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode, WriteLogger};
 use std::{
     collections::HashMap,
@@ -22,7 +22,7 @@ struct Args {
     config: PathBuf,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 struct Config {
     log_dir: PathBuf,
     num_cpus: usize,
@@ -30,7 +30,7 @@ struct Config {
     r#match: Vec<MatchConfig>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
 enum PlayerConfig {
     Main,
@@ -38,7 +38,7 @@ enum PlayerConfig {
     External { path: PathBuf },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 struct MatchConfig {
     players: [String; 2],
     opening_length: usize,
@@ -63,7 +63,6 @@ fn run() -> Result<(), Box<dyn Error>> {
     let config_text = fs::read_to_string(&args.config)?;
     let config: Config = toml::from_str(&config_text)?;
     let config_dir = args.config.parent().unwrap();
-
     let log_dir = config_dir.join(&config.log_dir);
     fs::create_dir_all(&log_dir)?;
     let log_file = File::create(log_dir.join("referee.log"))?;

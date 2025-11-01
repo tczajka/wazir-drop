@@ -1,5 +1,5 @@
-num_cpus = 31
 log_dir = "logs"
+num_cpus = 31
 
 [player.caia1]
 type = "External"

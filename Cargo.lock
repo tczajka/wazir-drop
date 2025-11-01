@@ -3361,6 +3361,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "train"
+version = "0.0.0"
+dependencies = [
+ "clap",
+ "extra",
+ "log",
+ "rand 0.9.2",
+ "serde",
+ "simplelog",
+ "threadpool",
+ "toml",
+ "wazir-drop",
+]
+
+[[package]]
 name = "ttf-parser"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,0 +1,9 @@
+log_dir = "logs"
+output = "data/self_play.data"
+num_cpus = 30
+num_games = 1000
+batch_size = 100
+depth = 3
+extra_depth = 3
+temperature = 20
+temperature_cutoff = 60
