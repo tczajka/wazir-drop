@@ -51,7 +51,7 @@ pub struct Score(i32);
 impl Score {
     pub const IMMEDIATE_WIN: Score = Score(1000000000);
     const MAX_DISTANCE: usize = 1000000;
-    pub const WIN_TOO_LONG: Score = Score(Self::IMMEDIATE_WIN.0 - Self::MAX_DISTANCE as i32);
+    const WIN_MAX_DISTANCE: Score = Score(Self::IMMEDIATE_WIN.0 - Self::MAX_DISTANCE as i32);
 
     pub fn next(self) -> Self {
         Self((self.0 + 1).min(Self::IMMEDIATE_WIN.0))
@@ -84,9 +84,9 @@ impl Neg for Score {
 
 impl From<Score> for ScoreExpanded {
     fn from(score: Score) -> Self {
-        if score >= Score::WIN_TOO_LONG {
+        if score >= Score::WIN_MAX_DISTANCE {
             Self::Win((Score::IMMEDIATE_WIN.0 as usize).saturating_sub(score.0 as usize))
-        } else if score <= -Score::WIN_TOO_LONG {
+        } else if score <= -Score::WIN_MAX_DISTANCE {
             Self::Loss((Score::IMMEDIATE_WIN.0 as usize).saturating_sub((-score.0) as usize))
         } else {
             Self::Eval(score.0)
@@ -103,9 +103,10 @@ impl From<ScoreExpanded> for Score {
             ScoreExpanded::Loss(distance) => {
                 Score(-Score::IMMEDIATE_WIN.0 + distance.min(Score::MAX_DISTANCE) as i32)
             }
-            ScoreExpanded::Eval(eval) => {
-                Score(eval.clamp(-Score::WIN_TOO_LONG.0 + 1, Score::WIN_TOO_LONG.0 - 1))
-            }
+            ScoreExpanded::Eval(eval) => Score(eval.clamp(
+                -Score::WIN_MAX_DISTANCE.0 + 1,
+                Score::WIN_MAX_DISTANCE.0 - 1,
+            )),
         }
     }
 }
