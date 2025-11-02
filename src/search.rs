@@ -12,8 +12,6 @@ use std::{
     time::Instant,
 };
 
-/// Align to 64 bytes to avoid false sharing.
-#[repr(align(64))]
 pub struct Search<E> {
     hyperparameters: Hyperparameters,
     evaluator: Arc<E>,
@@ -35,6 +33,46 @@ impl<E: Evaluator> Search<E> {
         max_depth: Option<u16>,
         deadline: Option<Instant>,
     ) -> SearchResult {
+        let mut instance = self.instance();
+        instance.search(position, max_depth, deadline)
+    }
+
+    pub fn search_top_variations(
+        &mut self,
+        position: &Position,
+        max_depth: u16,
+        max_eval_diff: i32,
+    ) -> Vec<TopVariation> {
+        let mut instance = self.instance();
+        instance.search_top_variations(position, max_depth, max_eval_diff)
+    }
+
+    fn instance(&mut self) -> SearchInstance<'_, E> {
+        SearchInstance {
+            hyperparameters: self.hyperparameters.clone(),
+            evaluator: &self.evaluator,
+            ttable: &mut self.ttable,
+            deadline: None,
+            nodes: 0,
+        }
+    }
+}
+
+struct SearchInstance<'a, E: Evaluator> {
+    hyperparameters: Hyperparameters,
+    evaluator: &'a E,
+    ttable: &'a mut TTable,
+    deadline: Option<Instant>,
+    nodes: u64,
+}
+
+impl<E: Evaluator> SearchInstance<'_, E> {
+    fn search(
+        &mut self,
+        position: &Position,
+        max_depth: Option<u16>,
+        deadline: Option<Instant>,
+    ) -> SearchResult {
         match position.stage() {
             Stage::Setup => panic!("search does not support setup"),
             Stage::Regular => {}
@@ -51,14 +89,13 @@ impl<E: Evaluator> Search<E> {
         }
 
         self.ttable.new_epoch();
-        let mut stats = SearchStats::new();
         let max_depth = max_depth.unwrap_or(MAX_SEARCH_DEPTH);
-        let eposition = EvaluatedPosition::new(&self.evaluator, position.clone());
+        let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
 
-        let (mut search_result, moves) = self.search_one_ply(&eposition, &mut stats);
+        let (mut search_result, moves) = self.search_one_ply(&eposition);
         let mut moves: Vec<RegularMove> = moves.into_iter().map(|(mov, _)| mov).collect();
 
-        stats.deadline = deadline;
+        self.deadline = deadline;
 
         let final_depth;
         let root_moves_considered;
@@ -82,7 +119,6 @@ impl<E: Evaluator> Search<E> {
                 -Score::IMMEDIATE_WIN,
                 Score::IMMEDIATE_WIN,
                 depth - 1,
-                &mut stats,
             ) else {
                 final_depth = depth - 1;
                 root_moves_considered = moves.len();
@@ -100,7 +136,6 @@ impl<E: Evaluator> Search<E> {
                     -Score::IMMEDIATE_WIN,
                     -search_result.score,
                     depth - 1,
-                    &mut stats,
                 ) else {
                     search_result.inf_depth = false;
                     final_depth = depth;
@@ -123,7 +158,7 @@ impl<E: Evaluator> Search<E> {
             depth: final_depth,
             root_moves_considered,
             root_all_moves: moves.len(),
-            nodes: stats.nodes,
+            nodes: self.nodes,
         }
     }
 
@@ -131,7 +166,6 @@ impl<E: Evaluator> Search<E> {
     fn search_one_ply(
         &mut self,
         eposition: &EvaluatedPosition<E>,
-        stats: &mut SearchStats,
     ) -> (SearchResultInternal, Vec<(RegularMove, Score)>) {
         let mut moves: Vec<(RegularMove, Score)> = Vec::new();
         let mut search_result = SearchResultInternal {
@@ -143,13 +177,7 @@ impl<E: Evaluator> Search<E> {
         for mov in movegen::regular_pseudomoves(eposition.position()) {
             let epos2 = eposition.make_regular_move(mov).unwrap();
             let result = self
-                .search_alpha_beta(
-                    &epos2,
-                    -Score::IMMEDIATE_WIN,
-                    Score::IMMEDIATE_WIN,
-                    0,
-                    stats,
-                )
+                .search_alpha_beta(&epos2, -Score::IMMEDIATE_WIN, Score::IMMEDIATE_WIN, 0)
                 .unwrap();
             search_result.inf_depth &= result.inf_depth;
             let score = -result.score;
@@ -174,9 +202,8 @@ impl<E: Evaluator> Search<E> {
         alpha: Score,
         beta: Score,
         depth: u16,
-        stats: &mut SearchStats,
     ) -> Result<SearchResultInternal, Timeout> {
-        stats.new_node()?;
+        self.new_node()?;
         let move_number = eposition.position().move_number();
 
         // Check whether game ended.
@@ -234,8 +261,7 @@ impl<E: Evaluator> Search<E> {
             }
         }
 
-        let result =
-            self.search_alpha_beta_real_work(eposition, alpha, beta, depth, tt_move, stats)?;
+        let result = self.search_alpha_beta_real_work(eposition, alpha, beta, depth, tt_move)?;
 
         if depth >= self.hyperparameters.min_ttable_depth {
             let score_type = if result.score >= beta {
@@ -268,7 +294,6 @@ impl<E: Evaluator> Search<E> {
         beta: Score,
         depth: u16,
         tt_move: Option<RegularMove>,
-        stats: &mut SearchStats,
     ) -> Result<SearchResultInternal, Timeout> {
         // Leaf node.
         if depth == 0 {
@@ -297,7 +322,7 @@ impl<E: Evaluator> Search<E> {
                 continue;
             };
             let result2 =
-                self.search_alpha_beta(&epos2, -beta, -alpha.max(result.score), depth - 1, stats)?;
+                self.search_alpha_beta(&epos2, -beta, -alpha.max(result.score), depth - 1)?;
             let score = -result2.score;
             result.inf_depth &= result2.inf_depth;
             if score > result.score {
@@ -324,21 +349,14 @@ impl<E: Evaluator> Search<E> {
         assert_eq!(position.stage(), Stage::Regular);
         assert!(max_eval_diff >= 0);
         self.ttable.new_epoch();
-        let mut stats = SearchStats::new();
-        let eposition = EvaluatedPosition::new(&self.evaluator, position.clone());
+        let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
 
         let mut variations: Vec<TopVariation> = Vec::new();
 
         for mov in movegen::regular_pseudomoves(eposition.position()) {
             let epos2 = eposition.make_regular_move(mov).unwrap();
             let result = self
-                .search_alpha_beta(
-                    &epos2,
-                    -Score::IMMEDIATE_WIN,
-                    Score::IMMEDIATE_WIN,
-                    0,
-                    &mut stats,
-                )
+                .search_alpha_beta(&epos2, -Score::IMMEDIATE_WIN, Score::IMMEDIATE_WIN, 0)
                 .unwrap();
             let score = -result.score;
             variations.push(TopVariation {
@@ -358,7 +376,6 @@ impl<E: Evaluator> Search<E> {
                     -Score::IMMEDIATE_WIN,
                     Score::IMMEDIATE_WIN,
                     depth - 1,
-                    &mut stats,
                 )
                 .unwrap();
             variations[0] = TopVariation {
@@ -375,7 +392,6 @@ impl<E: Evaluator> Search<E> {
                         -Score::IMMEDIATE_WIN,
                         -variations[0].score.offset(-max_eval_diff).prev(),
                         depth - 1,
-                        &mut stats,
                     )
                     .unwrap();
                 let score = -result.score;
@@ -394,6 +410,16 @@ impl<E: Evaluator> Search<E> {
             .into_iter()
             .take_while(|v| v.score >= threshold)
             .collect()
+    }
+
+    fn new_node(&mut self) -> Result<(), Timeout> {
+        self.nodes += 1;
+        if let Some(deadline) = self.deadline {
+            if self.nodes % CHECK_TIMEOUT_NODES == 0 && Instant::now() >= deadline {
+                return Err(Timeout);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -415,30 +441,6 @@ struct SearchResultInternal {
     score: Score,
     inf_depth: bool,
     pv: Variation,
-}
-
-struct SearchStats {
-    deadline: Option<Instant>,
-    nodes: u64,
-}
-
-impl SearchStats {
-    pub fn new() -> Self {
-        Self {
-            deadline: None,
-            nodes: 0,
-        }
-    }
-
-    pub fn new_node(&mut self) -> Result<(), Timeout> {
-        self.nodes += 1;
-        if let Some(deadline) = self.deadline {
-            if self.nodes % CHECK_TIMEOUT_NODES == 0 && Instant::now() >= deadline {
-                return Err(Timeout);
-            }
-        }
-        Ok(())
-    }
 }
 
 pub struct Variation {

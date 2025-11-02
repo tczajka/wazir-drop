@@ -1,5 +1,4 @@
 use crate::{enums::EnumMap, Color, Features, InvalidMove, Move, Position, RegularMove, SetupMove};
-use std::sync::Arc;
 
 pub trait Evaluator {
     type Accumulator: Clone;
@@ -13,17 +12,17 @@ pub trait Evaluator {
 }
 
 #[derive(Debug, Clone)]
-pub struct EvaluatedPosition<E: Evaluator> {
-    evaluator: Arc<E>,
+pub struct EvaluatedPosition<'a, E: Evaluator> {
+    evaluator: &'a E,
     position: Position,
     accumulators: EnumMap<Color, E::Accumulator>,
 }
 
-impl<E: Evaluator> EvaluatedPosition<E> {
-    pub fn new(evaluator: &Arc<E>, position: Position) -> Self {
-        let accumulators = EnumMap::from_fn(|color| Self::refresh(evaluator, &position, color));
+impl<'a, E: Evaluator> EvaluatedPosition<'a, E> {
+    pub fn new(evaluator: &'a E, position: Position) -> Self {
+        let accumulators = EnumMap::from_fn(|color| refresh(evaluator, &position, color));
         Self {
-            evaluator: evaluator.clone(),
+            evaluator,
             position,
             accumulators,
         }
@@ -31,40 +30,6 @@ impl<E: Evaluator> EvaluatedPosition<E> {
 
     pub fn position(&self) -> &Position {
         &self.position
-    }
-
-    fn refresh(evaluator: &E, position: &Position, color: Color) -> E::Accumulator {
-        let mut acc = evaluator.new_accumulator();
-        for feature in evaluator.features().all(position, color) {
-            evaluator.add_feature(&mut acc, feature);
-        }
-        acc
-    }
-
-    fn update<Added, Removed>(
-        evaluator: &E,
-        accumulator: &E::Accumulator,
-        new_position: &Position,
-        color: Color,
-        diff: Option<(Added, Removed)>,
-    ) -> E::Accumulator
-    where
-        Added: Iterator<Item = usize>,
-        Removed: Iterator<Item = usize>,
-    {
-        match diff {
-            Some((added, removed)) => {
-                let mut accumulator = accumulator.clone();
-                for feature in added {
-                    evaluator.add_feature(&mut accumulator, feature);
-                }
-                for feature in removed {
-                    evaluator.remove_feature(&mut accumulator, feature);
-                }
-                accumulator
-            }
-            None => Self::refresh(evaluator, new_position, color),
-        }
     }
 
     pub fn make_move(&self, mov: Move) -> Result<Self, InvalidMove> {
@@ -77,8 +42,8 @@ impl<E: Evaluator> EvaluatedPosition<E> {
     pub fn make_setup_move(&self, mov: SetupMove) -> Result<Self, InvalidMove> {
         let position = self.position.make_setup_move(mov)?;
         let accumulators = EnumMap::from_fn(|color| {
-            Self::update(
-                &self.evaluator,
+            update(
+                self.evaluator,
                 &self.accumulators[color],
                 &position,
                 color,
@@ -86,7 +51,7 @@ impl<E: Evaluator> EvaluatedPosition<E> {
             )
         });
         Ok(Self {
-            evaluator: self.evaluator.clone(),
+            evaluator: self.evaluator,
             position,
             accumulators,
         })
@@ -95,8 +60,8 @@ impl<E: Evaluator> EvaluatedPosition<E> {
     pub fn make_regular_move(&self, mov: RegularMove) -> Result<Self, InvalidMove> {
         let position = self.position.make_regular_move(mov)?;
         let accumulators = EnumMap::from_fn(|color| {
-            Self::update(
-                &self.evaluator,
+            update(
+                self.evaluator,
                 &self.accumulators[color],
                 &position,
                 color,
@@ -106,7 +71,7 @@ impl<E: Evaluator> EvaluatedPosition<E> {
             )
         });
         Ok(Self {
-            evaluator: self.evaluator.clone(),
+            evaluator: self.evaluator,
             position,
             accumulators,
         })
@@ -115,5 +80,39 @@ impl<E: Evaluator> EvaluatedPosition<E> {
     pub fn evaluate(&self) -> i32 {
         self.evaluator
             .evaluate(&self.accumulators, self.position.to_move())
+    }
+}
+
+fn refresh<E: Evaluator>(evaluator: &E, position: &Position, color: Color) -> E::Accumulator {
+    let mut acc = evaluator.new_accumulator();
+    for feature in evaluator.features().all(position, color) {
+        evaluator.add_feature(&mut acc, feature);
+    }
+    acc
+}
+
+fn update<E: Evaluator, Added, Removed>(
+    evaluator: &E,
+    accumulator: &E::Accumulator,
+    new_position: &Position,
+    color: Color,
+    diff: Option<(Added, Removed)>,
+) -> E::Accumulator
+where
+    Added: Iterator<Item = usize>,
+    Removed: Iterator<Item = usize>,
+{
+    match diff {
+        Some((added, removed)) => {
+            let mut accumulator = accumulator.clone();
+            for feature in added {
+                evaluator.add_feature(&mut accumulator, feature);
+            }
+            for feature in removed {
+                evaluator.remove_feature(&mut accumulator, feature);
+            }
+            accumulator
+        }
+        None => refresh(evaluator, new_position, color),
     }
 }
