@@ -1,0 +1,4 @@
+log = "logs/learn.log"
+
+[command.learn]
+self_play_data = "data/self_play.cbor"

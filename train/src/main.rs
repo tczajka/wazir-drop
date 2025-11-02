@@ -1,3 +1,4 @@
+mod learn;
 mod self_play;
 
 use clap::Parser;
@@ -27,6 +28,7 @@ struct Config {
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 enum Command {
     SelfPlay(self_play::Config),
+    Learn(learn::Config),
 }
 
 fn main() -> ExitCode {
@@ -59,6 +61,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     match &config.command {
         Command::SelfPlay(config) => self_play::run(config)?,
+        Command::Learn(config) => learn::run(config)?,
     }
 
     Ok(())
