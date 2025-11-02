@@ -176,6 +176,23 @@ pub fn endl() -> impl Parser<Output = ()> {
     exact(b"\n")
 }
 
+pub fn u8() -> impl Parser<Output = u8> {
+    byte()
+        .try_map(|b| match b {
+            b'0'..=b'9' => Ok(b - b'0'),
+            _ => Err(ParseError),
+        })
+        .repeat(1..)
+        .try_map(|digits| {
+            let mut res = 0u8;
+            for digit in digits {
+                res = res.checked_mul(10).ok_or(ParseError)?;
+                res = res.checked_add(digit).ok_or(ParseError)?;
+            }
+            Ok(res)
+        })
+}
+
 pub fn u32() -> impl Parser<Output = u32> {
     byte()
         .try_map(|b| match b {

@@ -43,7 +43,7 @@ impl Outcome {
         }
     }
 
-    pub fn to_score(self, move_number: usize) -> Score {
+    pub fn to_score(self, move_number: u8) -> Score {
         match self {
             Self::Draw => ScoreExpanded::Eval(0),
             _ => ScoreExpanded::Loss(move_number),
@@ -116,12 +116,12 @@ impl Position {
         self.stage
     }
 
-    pub fn move_number(&self) -> usize {
-        self.move_number.into()
+    pub fn move_number(&self) -> u8 {
+        self.move_number
     }
 
     pub fn to_move(&self) -> Color {
-        Color::from_index(self.move_number() % Color::COUNT)
+        Color::from_index(usize::from(self.move_number()) % Color::COUNT)
     }
 
     pub fn square(&self, square: Square) -> Option<ColoredPiece> {
@@ -158,7 +158,7 @@ impl Position {
     pub fn parser() -> impl Parser<Output = Self> {
         Stage::parser()
             .then_ignore(parser::endl())
-            .and(parser::u32().try_map(|n| usize::try_from(n).map_err(|_| ParseError)))
+            .and(parser::u8())
             .then_ignore(parser::endl())
             .and(Captured::parser())
             .then_ignore(parser::endl())
@@ -170,11 +170,11 @@ impl Position {
 
     fn from_parts(
         stage: Stage,
-        move_number: usize,
+        move_number: u8,
         board: Board,
         captured: Captured,
     ) -> Result<Position, Invalid> {
-        let to_move = Color::from_index(move_number % Color::COUNT);
+        let to_move = Color::from_index(usize::from(move_number) % Color::COUNT);
 
         // Verify total piece count.
         if stage != Stage::Setup {
@@ -194,12 +194,12 @@ impl Position {
         // Verify move number.
         match stage {
             Stage::Setup => {
-                if move_number >= Color::COUNT {
+                if usize::from(move_number) >= Color::COUNT {
                     return Err(Invalid);
                 }
             }
             Stage::Regular => {
-                if !(Color::COUNT..MAX_MOVES_IN_GAME).contains(&move_number) {
+                if !(Color::COUNT as u8..MAX_MOVES_IN_GAME).contains(&move_number) {
                     return Err(Invalid);
                 }
             }
@@ -209,7 +209,7 @@ impl Position {
                 }
             }
             Stage::End(outcome) => {
-                if !(Color::COUNT..=MAX_MOVES_IN_GAME).contains(&move_number)
+                if !(Color::COUNT as u8..=MAX_MOVES_IN_GAME).contains(&move_number)
                     || outcome != Outcome::win(to_move.opposite())
                 {
                     return Err(Invalid);
@@ -257,7 +257,7 @@ impl Position {
         }
         Ok(Position {
             stage,
-            move_number: move_number.try_into().unwrap(),
+            move_number,
             board,
             captured,
         })
@@ -286,7 +286,7 @@ impl Position {
                 .unwrap();
         }
         new_position.move_number += 1;
-        if new_position.move_number() == Color::COUNT {
+        if usize::from(new_position.move_number) == Color::COUNT {
             new_position.stage = Stage::Regular;
         }
         Ok(new_position)

@@ -53,6 +53,19 @@ fn test_endl() {
 }
 
 #[test]
+fn test_u8() {
+    let p = parser::u8();
+    let result = p.parse(b"123abc").unwrap();
+    assert_eq!(result.value, 123);
+    assert_eq!(result.remaining, b"abc");
+
+    assert!(p.parse(b"abc").is_err());
+    assert!(p
+        .parse(b"1234567890123456789012345678901234567890")
+        .is_err());
+}
+
+#[test]
 fn test_u32() {
     let p = parser::u32();
     let result = p.parse(b"123abc").unwrap();
