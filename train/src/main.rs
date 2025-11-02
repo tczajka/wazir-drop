@@ -1,24 +1,32 @@
 mod self_play;
 
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use log::LevelFilter;
+use serde::Deserialize;
 use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode, WriteLogger};
 use std::{
     error::Error,
     fs::{self, File},
-    path::Path,
+    path::PathBuf,
     process::ExitCode,
 };
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[command(subcommand)]
+    config_file: PathBuf,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Config {
+    log: PathBuf,
     command: Command,
 }
 
-#[derive(Debug, Subcommand)]
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
 enum Command {
-    SelfPlay(self_play::Args),
+    SelfPlay(self_play::Config),
 }
 
 fn main() -> ExitCode {
@@ -33,15 +41,12 @@ fn main() -> ExitCode {
 fn run() -> Result<(), Box<dyn Error>> {
     wazir_drop::log::init(wazir_drop::log::Level::Always);
     let args = Args::parse();
-    match args.command {
-        Command::SelfPlay(args) => self_play::run(args)?,
-    }
-    Ok(())
-}
 
-fn init_log(log_dir: impl AsRef<Path>, log_name: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
-    fs::create_dir_all(log_dir.as_ref())?;
-    let log_file = File::create(log_dir.as_ref().join(log_name.as_ref()))?;
+    let config_text = fs::read_to_string(&args.config_file)?;
+    let config: Config = toml::from_str(&config_text)?;
+    let config_dir = args.config_file.parent().unwrap();
+
+    let log_file = File::create(config_dir.join(&config.log))?;
     CombinedLogger::init(vec![
         WriteLogger::new(LevelFilter::Info, simplelog::Config::default(), log_file),
         TermLogger::new(
@@ -51,5 +56,10 @@ fn init_log(log_dir: impl AsRef<Path>, log_name: impl AsRef<Path>) -> Result<(),
             ColorChoice::Auto,
         ),
     ])?;
+
+    match &config.command {
+        Command::SelfPlay(config) => self_play::run(config)?,
+    }
+
     Ok(())
 }

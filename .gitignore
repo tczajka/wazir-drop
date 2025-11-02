@@ -4,3 +4,4 @@
 /players
 /referee.toml
 /perf.data*
+/flamegraph.svg

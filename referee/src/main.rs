@@ -23,6 +23,7 @@ struct Args {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Config {
     log_dir: PathBuf,
     num_cpus: usize,
@@ -31,7 +32,7 @@ struct Config {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 enum PlayerConfig {
     Main,
     Random,
@@ -39,6 +40,7 @@ enum PlayerConfig {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct MatchConfig {
     players: [String; 2],
     opening_length: usize,

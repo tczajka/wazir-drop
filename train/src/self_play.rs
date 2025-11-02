@@ -1,11 +1,10 @@
-use clap::Parser;
 use extra::moverand;
 use rand::{SeedableRng, rngs::StdRng, seq::IndexedRandom};
 use serde::{Deserialize, Serialize};
 use serde_cbor::ser::{IoWrite, Serializer};
 use std::{
     error::Error,
-    fs::{self, File},
+    fs::File,
     io::BufWriter,
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -17,14 +16,8 @@ use wazir_drop::{
     TopVariation, constants::Hyperparameters,
 };
 
-#[derive(Debug, Parser)]
-pub struct Args {
-    pub config: PathBuf,
-}
-
-#[derive(Debug, Deserialize)]
-struct Config {
-    log_dir: PathBuf,
+#[derive(Clone, Debug, Deserialize)]
+pub struct Config {
     output: PathBuf,
     num_cpus: usize,
     num_games: u64,
@@ -47,24 +40,18 @@ pub struct Sample {
     game_points: i32,
 }
 
-pub fn run(args: Args) -> Result<(), Box<dyn Error>> {
-    let config_text = fs::read_to_string(&args.config)?;
-    let config: Arc<Config> = Arc::new(toml::from_str(&config_text)?);
-    let config_dir = args.config.parent().unwrap();
-    let log_dir = config_dir.join(&config.log_dir);
-    super::init_log(&log_dir, "self-play.log")?;
-
+pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
     let output = BufWriter::new(File::create(&config.output)?);
     let output = IoWrite::new(output);
     let output = Serializer::new(output).packed_format();
     let output = Arc::new(Mutex::new(output));
 
-    run_games(&config, PSFeatures, &output)?;
+    run_games(config, PSFeatures, &output)?;
     Ok(())
 }
 
 fn run_games<F: Features, W: serde_cbor::ser::Write + Send + 'static>(
-    config: &Arc<Config>,
+    config: &Config,
     features: F,
     output: &Arc<Mutex<serde_cbor::Serializer<W>>>,
 ) -> Result<(), Box<dyn Error>> {
