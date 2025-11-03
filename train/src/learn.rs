@@ -1,3 +1,4 @@
+use crate::self_play::Sample;
 use serde::Deserialize;
 use serde_cbor::Deserializer;
 use std::{
@@ -6,8 +7,7 @@ use std::{
     io::BufReader,
     path::{Path, PathBuf},
 };
-
-use crate::self_play::Sample;
+use tch::Device;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Config {
@@ -16,6 +16,8 @@ pub struct Config {
 
 pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
     let dataset = Dataset::from_file(&config.self_play_data)?;
+    let device = Device::cuda_if_available();
+    log::info!("Using device: {device:?}");
     Ok(())
 }
 

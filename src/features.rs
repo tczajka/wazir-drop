@@ -1,12 +1,11 @@
-use std::iter;
-
 use crate::{
     captured_index, either::Either, enums::SimpleEnumExt, smallvec::SmallVec, Color, Move,
     NormalizedSquare, Piece, Position, RegularMove, SetupMove, Square, Symmetry,
     NUM_CAPTURED_INDEXES,
 };
+use std::{fmt::Debug, iter};
 
-pub trait Features: Clone + Send + 'static {
+pub trait Features: Debug + Clone + Send + 'static {
     fn count(&self) -> usize;
 
     fn all(&self, position: &Position, color: Color) -> impl Iterator<Item = usize>;

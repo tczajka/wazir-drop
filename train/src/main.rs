@@ -1,4 +1,5 @@
 mod learn;
+mod linear;
 mod self_play;
 
 use clap::Parser;
