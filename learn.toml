@@ -2,6 +2,7 @@ log = "logs/learn.log"
 
 [command.learn]
 self_play_data = "data/self_play.cbor"
+save_weights = "data/linear_ps.weights"
 input_value_scale = 100
 features = "PS"
 model = "linear"

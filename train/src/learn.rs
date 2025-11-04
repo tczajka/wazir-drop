@@ -8,7 +8,7 @@ use serde::Deserialize;
 use serde_cbor::{Deserializer, StreamDeserializer, de::IoRead};
 use std::{error::Error, fs::File, io::BufReader, path::PathBuf, time::Instant};
 use tch::{
-    Device, Reduction, Tensor, kind,
+    Device, Kind, Reduction, Tensor, kind,
     nn::{self, OptimizerConfig},
 };
 use wazir_drop::{Features, PSFeatures};
@@ -16,6 +16,8 @@ use wazir_drop::{Features, PSFeatures};
 #[derive(Clone, Debug, Deserialize)]
 pub struct Config {
     self_play_data: PathBuf,
+    load_weights: Option<PathBuf>,
+    save_weights: PathBuf,
     input_value_scale: f32,
     features: FeaturesConfig,
     model: ModelConfig,
@@ -50,8 +52,11 @@ fn run_with_model<M: EvalModel>(
 ) -> Result<(), Box<dyn Error>> {
     let device = Device::cuda_if_available();
     log::info!("Using device: {device:?}");
-    let vs = nn::VarStore::new(device);
+    let mut vs = nn::VarStore::new(device);
     let model = M::new(features, vs.root());
+    if let Some(load_parameters) = &config.load_weights {
+        vs.load(load_parameters)?;
+    }
     let mut optimizer = nn::AdamW::default().build(&vs, config.learning_rate)?;
 
     for epoch in 0..config.epochs {
@@ -93,6 +98,7 @@ fn run_with_model<M: EvalModel>(
             examples_per_second = num_examples as f64 / elapsed_time.as_secs_f64()
         );
     }
+    vs.save(&config.save_weights)?;
     Ok(())
 }
 
@@ -133,16 +139,16 @@ impl Batch {
                 )
             });
             inputs.push(Tensor::stack(&feature_tensors, 0));
-            let value = sample.deep_value as f32 / input_value_scale;
+            let value = sample.deep_value;
             values.push(value);
-            let outcome = sample.game_points as f32 * 0.5 + 0.5;
+            let outcome = sample.game_points;
             outcomes.push(outcome);
         }
         Self {
             size: samples.len() as i64,
             input: Tensor::stack(&inputs, 0),
-            values: Tensor::from_slice(&values),
-            outcomes: Tensor::from_slice(&outcomes),
+            values: 1.0 / input_value_scale * Tensor::from_slice(&values).to_kind(Kind::Float),
+            outcomes: 0.5 + 0.5 * Tensor::from_slice(&outcomes).to_kind(Kind::Float),
         }
     }
 }
