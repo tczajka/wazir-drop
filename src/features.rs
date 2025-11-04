@@ -5,16 +5,16 @@ use crate::{
 };
 use std::{fmt::Debug, iter};
 
-pub trait Features: Debug + Clone + Send + 'static {
-    fn count(&self) -> usize;
+pub trait Features: Debug + Copy + Send + 'static {
+    fn count(self) -> usize;
 
-    fn all(&self, position: &Position, color: Color) -> impl Iterator<Item = usize>;
+    fn all(self, position: &Position, color: Color) -> impl Iterator<Item = usize>;
 
     /// Returns (added features, removed features).
     ///
     /// If it's too complicated, returns `None`. Caller should fall back to `all_features`.
     fn diff(
-        &self,
+        self,
         mov: Move,
         new_position: &Position,
         color: Color,
@@ -30,21 +30,21 @@ pub trait Features: Debug + Clone + Send + 'static {
     }
 
     fn diff_setup(
-        &self,
+        self,
         mov: SetupMove,
         new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)>;
 
     fn diff_regular(
-        &self,
+        self,
         mov: RegularMove,
         new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct PSFeatures;
 
 impl PSFeatures {
@@ -61,11 +61,11 @@ impl PSFeatures {
 }
 
 impl Features for PSFeatures {
-    fn count(&self) -> usize {
+    fn count(self) -> usize {
         Piece::COUNT * NormalizedSquare::COUNT + NUM_CAPTURED_INDEXES - 2
     }
 
-    fn all(&self, position: &Position, color: Color) -> impl Iterator<Item = usize> {
+    fn all(self, position: &Position, color: Color) -> impl Iterator<Item = usize> {
         Piece::all()
             .flat_map(move |piece| {
                 position
@@ -80,7 +80,7 @@ impl Features for PSFeatures {
     }
 
     fn diff_setup(
-        &self,
+        self,
         mov: SetupMove,
         _new_position: &Position,
         color: Color,
@@ -97,7 +97,7 @@ impl Features for PSFeatures {
     }
 
     fn diff_regular(
-        &self,
+        self,
         mov: RegularMove,
         new_position: &Position,
         color: Color,

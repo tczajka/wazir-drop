@@ -32,8 +32,8 @@ impl<F: Features> Evaluator for LinearEvaluator<F> {
     type Accumulator = i32;
     type Features = F;
 
-    fn features(&self) -> &Self::Features {
-        &self.features
+    fn features(&self) -> Self::Features {
+        self.features
     }
 
     fn new_accumulator(&self) -> Self::Accumulator {

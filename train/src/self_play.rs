@@ -27,17 +27,23 @@ pub struct Config {
     extra_depth: u16,
     temperature: i32,
     temperature_cutoff: i32,
+    features: FeaturesConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Sample {
     /// [to move, other]
-    features: [Vec<u32>; 2],
+    pub features: [Vec<u32>; 2],
     /// Value from deeper search.
     // i32::MAX is win, -i32::MAX is loss
-    deep_value: i32,
+    pub deep_value: i32,
     /// +1 = win, -1 = loss
-    game_points: i32,
+    pub game_points: i32,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub enum FeaturesConfig {
+    PS,
 }
 
 pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
@@ -46,7 +52,9 @@ pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
     let output = Serializer::new(output).packed_format();
     let output = Arc::new(Mutex::new(output));
 
-    run_games(config, PSFeatures, &output)?;
+    match config.features {
+        FeaturesConfig::PS => run_games(config, PSFeatures, &output)?,
+    }
     Ok(())
 }
 
@@ -62,15 +70,6 @@ fn run_games<F: Features, W: serde_cbor::ser::Write + Send + 'static>(
     loop {
         let cur_games = {
             let stats = stats.lock().unwrap();
-            log::info!(
-                "games {games} samples {samples} games/s {games_per_second:.2} \
-                pv_truncated {pv_truncated} invalid_pv {invalid_pv}",
-                games = stats.games,
-                samples = stats.samples,
-                games_per_second = stats.games as f64 / start_time.elapsed().as_secs_f64(),
-                pv_truncated = stats.pv_truncated,
-                invalid_pv = stats.invalid_pv
-            );
             if stats.games >= config.num_games {
                 break;
             }
@@ -81,7 +80,6 @@ fn run_games<F: Features, W: serde_cbor::ser::Write + Send + 'static>(
             let output = output.clone();
             let evaluator = evaluator.clone();
             let stats = stats.clone();
-            let features = features.clone();
             thread_pool.execute(
                 move || match play_game(&config, &output, &evaluator, features) {
                     Ok(s) => {
@@ -96,6 +94,19 @@ fn run_games<F: Features, W: serde_cbor::ser::Write + Send + 'static>(
             );
         }
         thread_pool.join();
+        {
+            let stats = stats.lock().unwrap();
+            log::info!(
+                "games {games} / {num_games} samples {samples} games/s {games_per_second:.2} \
+                pv_truncated {pv_truncated} invalid_pv {invalid_pv}",
+                games = stats.games,
+                num_games = config.num_games,
+                samples = stats.samples,
+                games_per_second = stats.games as f64 / start_time.elapsed().as_secs_f64(),
+                pv_truncated = stats.pv_truncated,
+                invalid_pv = stats.invalid_pv,
+            );
+        }
     }
     Ok(())
 }

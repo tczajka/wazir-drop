@@ -4,7 +4,7 @@ pub trait Evaluator {
     type Accumulator: Clone;
     type Features: Features;
 
-    fn features(&self) -> &Self::Features;
+    fn features(&self) -> Self::Features;
     fn new_accumulator(&self) -> Self::Accumulator;
     fn add_feature(&self, accumulator: &mut Self::Accumulator, feature: usize);
     fn remove_feature(&self, accumulator: &mut Self::Accumulator, feature: usize);
