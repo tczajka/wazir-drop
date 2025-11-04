@@ -208,7 +208,6 @@ impl<'de> DatasetIterator<'de> {
             return Ok(false);
         }
         self.current_chunk.shuffle(&mut self.rng);
-        log::info!("next chunk: {}", self.current_chunk.len());
         Ok(true)
     }
 }
