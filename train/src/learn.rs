@@ -84,7 +84,7 @@ fn run_with_model<M: EvalModel>(
 
         let elapsed_time = start_time.elapsed();
         log::info!(
-            "Epoch {epoch} / {num_epochs} value loss {value_loss:.3} outcome loss {outcome_loss:.3} time {elapsed:.2}s examples/s {examples_per_second:.2}",
+            "Epoch {epoch} / {num_epochs} value loss {value_loss:.3} outcome loss {outcome_loss:.3} time {elapsed:.2}s examples/s {examples_per_second:.0}",
             num_epochs = config.epochs,
             value_loss = total_value_loss / num_examples as f64,
             outcome_loss = total_outcome_loss / num_examples as f64,
