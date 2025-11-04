@@ -3,8 +3,8 @@ log = "logs/self_play.log"
 [command.self_play]
 output = "data/self_play.cbor"
 num_cpus = 30
-num_games = 10000
-batch_size = 1000
+num_games = 1000000
+batch_size = 10000
 ttable_size_mb = 16
 depth = 3
 extra_depth = 3
