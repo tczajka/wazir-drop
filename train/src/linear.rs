@@ -1,4 +1,4 @@
-use crate::model::EvalModel;
+use crate::model::{EvalModel, Export};
 use std::{
     error::Error,
     fs::File,
@@ -6,7 +6,7 @@ use std::{
     path::Path,
 };
 use tch::{Tensor, nn};
-use wazir_drop::Features;
+use wazir_drop::{Features, NormalizedSquare, PSFeatures, Piece, enums::SimpleEnumExt};
 
 #[derive(Debug)]
 pub struct LinearModel<F: Features> {
@@ -48,32 +48,6 @@ impl<F: Features> EvalModel for LinearModel<F> {
         self.weights -= &x * redundant;
         self.to_move += &x;
     }
-
-    fn export(&self, output: &Path, value_scale: f32) -> Result<(), Box<dyn Error>> {
-        let _guard = tch::no_grad_guard();
-        let max_abs = self.weights.max().max_other(&self.to_move.abs().max());
-        let max_abs = f32::try_from(max_abs).unwrap();
-        println!("max |weight| = {max_abs:.6}");
-        let mut f = BufWriter::new(File::create(output)?);
-        let to_move = (value_scale * &self.to_move).round();
-        let to_move: i16 = to_move.try_into().expect("out of range");
-        writeln!(f, "pub static TO_MOVE: i16 = {to_move};")?;
-        writeln!(f)?;
-        let weights = (value_scale * &self.weights).round();
-        let weights: Vec<i16> = weights.try_into().expect("out of range");
-        writeln!(f, "#[rustfmt::skip]")?;
-        write!(f, "pub static FEATURES: [i16; {}] = [", weights.len())?;
-        for (i, &weight) in weights.iter().enumerate() {
-            if i.is_multiple_of(10) {
-                write!(f, "\n    ")?;
-            } else {
-                write!(f, " ")?;
-            }
-            write!(f, "{weight},")?;
-        }
-        writeln!(f, "\n];")?;
-        Ok(())
-    }
 }
 
 impl<F: Features> nn::Module for LinearModel<F> {
@@ -87,5 +61,47 @@ impl<F: Features> nn::Module for LinearModel<F> {
         let res = xs.bmm(&weights).squeeze_dim(2);
         // res: [batch_size, 2]
         res.matmul(&self.side_weights) + &self.to_move
+    }
+}
+
+impl Export for LinearModel<PSFeatures> {
+    fn export(&self, output: &Path, value_scale: f32) -> Result<(), Box<dyn Error>> {
+        let _guard = tch::no_grad_guard();
+        let max_abs = self.weights.max().max_other(&self.to_move.abs().max());
+        let max_abs = f32::try_from(max_abs).unwrap();
+        println!("max |weight| = {max_abs:.6}");
+        let mut f = BufWriter::new(File::create(output)?);
+        let to_move = (value_scale * &self.to_move).round();
+        let to_move: i16 = to_move.try_into().expect("out of range");
+        writeln!(f, "pub static TO_MOVE: i16 = {to_move};")?;
+        writeln!(f)?;
+        let weights = (value_scale * &self.weights).round();
+        let weights: Vec<i16> = weights.try_into().expect("out of range");
+        writeln!(f, "#[rustfmt::skip]")?;
+        writeln!(f, "pub static FEATURES: [i16; {}] = [", weights.len())?;
+        let mut next = 0;
+        for piece in Piece::all() {
+            writeln!(f, "    // {}", piece.long_name())?;
+            write!(f, "   ")?;
+            for square in NormalizedSquare::all() {
+                assert_eq!(next, PSFeatures::board_feature(piece, square));
+                write!(f, " {},", weights[next])?;
+                next += 1;
+            }
+            writeln!(f)?;
+        }
+        for piece in Piece::all_non_wazir() {
+            writeln!(f, "    // captured {}", piece.long_name())?;
+            write!(f, "   ")?;
+            for index in 0..piece.total_count() {
+                assert_eq!(next, PSFeatures::captured_feature(piece, index));
+                write!(f, " {},", weights[next])?;
+                next += 1;
+            }
+            writeln!(f)?;
+        }
+        writeln!(f, "];")?;
+        assert_eq!(next, weights.len());
+        Ok(())
     }
 }

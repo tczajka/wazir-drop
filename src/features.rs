@@ -52,16 +52,16 @@ pub struct PSFeatures;
 impl PSFeatures {
     const CAPTURED_OFFSET: usize = Piece::COUNT * NormalizedSquare::COUNT;
 
-    fn board_feature_normalized(piece: Piece, normalized_square: NormalizedSquare) -> usize {
+    pub fn board_feature(piece: Piece, normalized_square: NormalizedSquare) -> usize {
         piece.index() * NormalizedSquare::COUNT + normalized_square.index()
     }
 
-    fn board_feature(piece: Piece, square: Square) -> usize {
+    fn board_feature_unnormalized(piece: Piece, square: Square) -> usize {
         let (_, normalized_square) = Symmetry::normalize(square);
-        Self::board_feature_normalized(piece, normalized_square)
+        Self::board_feature(piece, normalized_square)
     }
 
-    fn captured_feature(piece: Piece, index: usize) -> usize {
+    pub fn captured_feature(piece: Piece, index: usize) -> usize {
         Self::CAPTURED_OFFSET + captured_index(piece, index)
     }
 }
@@ -77,7 +77,7 @@ impl Features for PSFeatures {
                 position
                     .occupied_by_piece(piece.with_color(color))
                     .into_iter()
-                    .map(move |square| Self::board_feature(piece, square))
+                    .map(move |square| Self::board_feature_unnormalized(piece, square))
             })
             .chain(Piece::all_non_wazir().flat_map(move |piece| {
                 let offset = Self::captured_feature(piece, 0);
@@ -96,7 +96,7 @@ impl Features for PSFeatures {
             let symmetry = Symmetry::pov(color);
             for (index, &piece) in mov.pieces.iter().enumerate() {
                 let square = symmetry.apply(Square::from_index(index));
-                added.push(Self::board_feature(piece, square));
+                added.push(Self::board_feature_unnormalized(piece, square));
             }
         };
         Some((added.into_iter(), iter::empty()))
@@ -115,7 +115,7 @@ impl Features for PSFeatures {
             let piece = mov.colored_piece.piece();
             match mov.from {
                 Some(from) => {
-                    removed = Some(Self::board_feature(piece, from));
+                    removed = Some(Self::board_feature_unnormalized(piece, from));
                 }
                 None => {
                     // Note: This is a drop, so we're not capturing the same piece again.
@@ -125,7 +125,7 @@ impl Features for PSFeatures {
                     ));
                 }
             }
-            added.push(Self::board_feature(piece, mov.to));
+            added.push(Self::board_feature_unnormalized(piece, mov.to));
             if let Some(captured_piece) = mov.captured {
                 if captured_piece != Piece::Wazir {
                     // This is a capture, so we didn't drop the same piece.
@@ -136,7 +136,7 @@ impl Features for PSFeatures {
                 }
             }
         } else if let Some(captured_piece) = mov.captured {
-            removed = Some(Self::board_feature(captured_piece, mov.to));
+            removed = Some(Self::board_feature_unnormalized(captured_piece, mov.to));
         }
         Some((added.into_iter(), removed.into_iter()))
     }
@@ -144,7 +144,7 @@ impl Features for PSFeatures {
     fn redundant(self) -> impl Iterator<Item = impl Iterator<Item = usize>> {
         iter::once(
             // Wazir positions are redundant because there is always one Wazir.
-            NormalizedSquare::all().map(|ns| Self::board_feature_normalized(Piece::Wazir, ns)),
+            NormalizedSquare::all().map(|ns| Self::board_feature(Piece::Wazir, ns)),
         )
     }
 }

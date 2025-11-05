@@ -10,5 +10,8 @@ pub trait EvalModel: nn::Module {
 
     fn new(features: Self::Features, vs: nn::Path) -> Self;
     fn project_redundant(&mut self, redundant: &Tensor);
+}
+
+pub trait Export {
     fn export(&self, output: &Path, value_scale: f32) -> Result<(), Box<dyn Error>>;
 }

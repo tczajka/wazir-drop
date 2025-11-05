@@ -88,6 +88,16 @@ impl Piece {
     pub fn with_color(self, color: Color) -> ColoredPiece {
         ColoredPiece::from_index(self.index() * Color::COUNT + color.index())
     }
+
+    pub fn long_name(self) -> &'static str {
+        match self {
+            Self::Alfil => "alfil",
+            Self::Dabbaba => "dabbaba",
+            Self::Ferz => "ferz",
+            Self::Knight => "knight",
+            Self::Wazir => "wazir",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

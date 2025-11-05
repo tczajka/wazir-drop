@@ -2,9 +2,14 @@ use std::{error::Error, path::PathBuf};
 
 use serde::Deserialize;
 use tch::{Device, nn};
-use wazir_drop::{Features, PSFeatures};
+use wazir_drop::PSFeatures;
 
-use crate::{learn::ModelConfig, linear::LinearModel, model::EvalModel, self_play::FeaturesConfig};
+use crate::{
+    learn::ModelConfig,
+    linear::LinearModel,
+    model::{EvalModel, Export},
+    self_play::FeaturesConfig,
+};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -17,18 +22,14 @@ pub struct Config {
 }
 
 pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
-    match config.features {
-        FeaturesConfig::PS => run_with_features(config, PSFeatures),
+    match (&config.features, &config.model) {
+        (FeaturesConfig::PS, ModelConfig::Linear) => {
+            run_with_model::<LinearModel<_>>(config, PSFeatures)
+        }
     }
 }
 
-fn run_with_features<F: Features>(config: &Config, features: F) -> Result<(), Box<dyn Error>> {
-    match config.model {
-        ModelConfig::Linear => run_with_model::<LinearModel<F>>(config, features),
-    }
-}
-
-pub fn run_with_model<M: EvalModel>(
+pub fn run_with_model<M: EvalModel + Export>(
     config: &Config,
     features: M::Features,
 ) -> Result<(), Box<dyn Error>> {
