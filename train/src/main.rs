@@ -3,6 +3,7 @@ mod learn;
 mod linear;
 mod model;
 mod self_play;
+mod util;
 
 use clap::Parser;
 use log::LevelFilter;

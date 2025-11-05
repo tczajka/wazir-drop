@@ -23,18 +23,19 @@ pub struct Config {
 
 pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
     match (&config.features, &config.model) {
-        (FeaturesConfig::PS, ModelConfig::Linear) => {
-            run_with_model::<LinearModel<_>>(config, PSFeatures)
+        (FeaturesConfig::PS, ModelConfig::Linear(c)) => {
+            run_with_model::<LinearModel<_>>(PSFeatures, config, c)
         }
     }
 }
 
 pub fn run_with_model<M: EvalModel + Export>(
-    config: &Config,
     features: M::Features,
+    config: &Config,
+    model_config: &M::Config,
 ) -> Result<(), Box<dyn Error>> {
     let mut vs = nn::VarStore::new(Device::Cpu);
-    let model = M::new(features, vs.root());
+    let model = M::new(features, vs.root(), model_config);
     vs.load(&config.weights)?;
     model.export(&config.output, config.value_scale)?;
     Ok(())

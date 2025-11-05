@@ -43,7 +43,8 @@ pub trait Features: Debug + Copy + Send + 'static {
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)>;
 
-    fn redundant(self) -> impl Iterator<Item = impl Iterator<Item = usize>>;
+    /// Redundant feature sets that always sum to a constant.
+    fn redundant(self) -> impl Iterator<Item = impl Iterator<Item = (usize, i32)>>;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -141,10 +142,10 @@ impl Features for PSFeatures {
         Some((added.into_iter(), removed.into_iter()))
     }
 
-    fn redundant(self) -> impl Iterator<Item = impl Iterator<Item = usize>> {
+    fn redundant(self) -> impl Iterator<Item = impl Iterator<Item = (usize, i32)>> {
         iter::once(
             // Wazir positions are redundant because there is always one Wazir.
-            NormalizedSquare::all().map(|ns| Self::board_feature(Piece::Wazir, ns)),
+            NormalizedSquare::all().map(|ns| (Self::board_feature(Piece::Wazir, ns), 1)),
         )
     }
 }

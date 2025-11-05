@@ -1,16 +1,17 @@
 use crate::{
-    linear::LinearModel,
+    linear::{self, LinearModel},
     model::EvalModel,
     self_play::{FeaturesConfig, Sample},
+    util::sparse_1d_tensor,
 };
 use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 use serde::Deserialize;
 use serde_cbor::{Deserializer, StreamDeserializer, de::IoRead};
 use std::{error::Error, fs::File, io::BufReader, path::PathBuf, time::Instant};
-use tch::{Device, Kind, Reduction, Tensor, kind, nn};
+use tch::{Device, Kind, Reduction, Tensor, nn};
 use wazir_drop::{Features, PSFeatures};
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     self_play_data: PathBuf,
@@ -19,47 +20,43 @@ pub struct Config {
     input_value_scale: f32,
     features: FeaturesConfig,
     model: ModelConfig,
-    learning_rate: f64,
     epochs: u32,
     chunk_size: usize,
     batch_size: usize,
     outcome_weight: f32,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModelConfig {
-    Linear,
+    Linear(linear::Config),
 }
 
 pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
     match config.features {
-        FeaturesConfig::PS => run_with_features(config, PSFeatures),
+        FeaturesConfig::PS => run_with_features(PSFeatures, config),
     }
 }
 
-fn run_with_features<F: Features>(config: &Config, features: F) -> Result<(), Box<dyn Error>> {
-    match config.model {
-        ModelConfig::Linear => run_with_model::<LinearModel<F>>(config, features),
+fn run_with_features<F: Features>(features: F, config: &Config) -> Result<(), Box<dyn Error>> {
+    match &config.model {
+        ModelConfig::Linear(c) => run_with_model::<LinearModel<F>>(features, config, c),
     }
 }
 
 fn run_with_model<M: EvalModel>(
-    config: &Config,
     features: M::Features,
+    config: &Config,
+    model_config: &M::Config,
 ) -> Result<(), Box<dyn Error>> {
     let device = Device::cuda_if_available();
     log::info!("Using device: {device:?}");
     let mut vs = nn::VarStore::new(device);
-    let mut model = M::new(features, vs.root());
+    let mut model = M::new(features, vs.root(), model_config);
     if let Some(load_parameters) = &config.load_weights {
         vs.load(load_parameters)?;
     }
-    let redundant: Vec<Tensor> = features
-        .redundant()
-        .map(|iter| tensor_from_indices(iter, features.count()).to_device(device))
-        .collect();
-    let mut optimizer = model.optimizer(&vs, config.learning_rate)?;
+    let mut optimizer = model.optimizer(&vs)?;
 
     for epoch in 0..config.epochs {
         let mut num_examples = 0;
@@ -87,9 +84,7 @@ fn run_with_model<M: EvalModel>(
             total_outcome_loss += batch.size as f64 * f64::try_from(&outcome_loss).unwrap();
 
             optimizer.backward_step(&loss);
-            for redundant in &redundant {
-                model.project_redundant(redundant);
-            }
+            model.clean_up();
         }
 
         let elapsed_time = start_time.elapsed();
@@ -105,17 +100,6 @@ fn run_with_model<M: EvalModel>(
     }
     vs.save(&config.save_weights)?;
     Ok(())
-}
-
-fn tensor_from_indices(indices: impl Iterator<Item = usize>, size: usize) -> Tensor {
-    let features: Vec<i64> = indices.map(|index| index as i64).collect();
-    Tensor::sparse_coo_tensor_indices_size(
-        &Tensor::from_slice(&features).unsqueeze(0),
-        &Tensor::ones(features.len() as i64, kind::FLOAT_CPU),
-        [size as i64],
-        kind::FLOAT_CPU,
-        false,
-    )
 }
 
 /// A batch of data.
@@ -145,13 +129,9 @@ impl Batch {
         let mut outcomes = Vec::with_capacity(samples.len());
         for sample in samples {
             let feature_tensors: [Tensor; 2] = sample.features.each_ref().map(|features| {
-                let features: Vec<i64> = features.iter().map(|&feature| feature as i64).collect();
-                Tensor::sparse_coo_tensor_indices_size(
-                    &Tensor::from_slice(&features).unsqueeze(0),
-                    &Tensor::ones(features.len() as i64, kind::FLOAT_CPU),
-                    [num_features as i64],
-                    kind::FLOAT_CPU,
-                    false,
+                sparse_1d_tensor(
+                    features.iter().map(|&feature| (feature as usize, 1)),
+                    num_features,
                 )
             });
             inputs.push(Tensor::stack(&feature_tensors, 0));
