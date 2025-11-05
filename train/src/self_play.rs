@@ -12,7 +12,7 @@ use std::{
 };
 use threadpool::ThreadPool;
 use wazir_drop::{
-    DefaultEvaluator, Features, PSFeatures, Position, Score, ScoreExpanded, Search, Stage,
+    DefaultEvaluator, Features, Outcome, PSFeatures, Position, Score, ScoreExpanded, Search, Stage,
     TopVariation, constants::Hyperparameters,
 };
 
@@ -98,14 +98,15 @@ fn run_games<F: Features, W: serde_cbor::ser::Write + Send + 'static>(
         {
             let stats = stats.lock().unwrap();
             log::info!(
-                "games {games} / {num_games} samples {samples} games/s {games_per_second:.2} \
-                pv_truncated {pv_truncated} invalid_pv {invalid_pv}",
+                "games {games} / {num_games} samples {samples} games/s {games_per_second:.2}  \
+                pv_truncated {pv_truncated} invalid_pv {invalid_pv} draws {draws_percentage:.2}%",
                 games = stats.games,
                 num_games = config.num_games,
                 samples = stats.samples,
                 games_per_second = stats.games as f64 / start_time.elapsed().as_secs_f64(),
                 pv_truncated = stats.pv_truncated,
                 invalid_pv = stats.invalid_pv,
+                draws_percentage = stats.draws as f64 / stats.games as f64 * 100.0,
             );
         }
     }
@@ -182,6 +183,9 @@ fn play_game<F: Features, W: serde_cbor::ser::Write>(
         }
     };
     stats.games += 1;
+    if outcome == Outcome::Draw {
+        stats.draws += 1;
+    }
     let mut output = output.lock().unwrap();
     for entry in entries {
         let to_move = entry.pv_position.to_move();
@@ -267,6 +271,7 @@ fn select_variation<'a>(
 
 struct Stats {
     games: u64,
+    draws: u64,
     samples: u64,
     pv_truncated: u64,
     invalid_pv: u64,
@@ -276,6 +281,7 @@ impl Stats {
     fn new() -> Self {
         Self {
             games: 0,
+            draws: 0,
             samples: 0,
             pv_truncated: 0,
             invalid_pv: 0,
@@ -284,6 +290,7 @@ impl Stats {
 
     fn add(&mut self, stats: &Stats) {
         self.games += stats.games;
+        self.draws += stats.draws;
         self.samples += stats.samples;
         self.pv_truncated += stats.pv_truncated;
         self.invalid_pv += stats.invalid_pv;
