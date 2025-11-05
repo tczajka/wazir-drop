@@ -98,7 +98,7 @@ fn run_games<F: Features, W: serde_cbor::ser::Write + Send + 'static>(
         {
             let stats = stats.lock().unwrap();
             log::info!(
-                "games {games} / {num_games} samples {samples} games/s {games_per_second:.2}  \
+                "games {games} / {num_games} samples {samples} games/s {games_per_second:.2}\n  \
                 pv_truncated {pv_truncated} invalid_pv {invalid_pv} draws {draws_percentage:.2}%",
                 games = stats.games,
                 num_games = config.num_games,
