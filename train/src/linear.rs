@@ -37,12 +37,20 @@ impl<F: Features> EvalModel for LinearModel<F> {
     }
 
     fn project_redundant(&mut self, redundant: &Tensor) {
-        let x = self.weights.dot(redundant) / redundant.sum(None);
+        let _guard = tch::no_grad_guard();
+        let x = self
+            .weights
+            .unsqueeze(0)
+            .mm(&redundant.unsqueeze(1))
+            .squeeze_dim(0)
+            .squeeze_dim(0)
+            / redundant.sum(None);
         self.weights -= &x * redundant;
         self.to_move += &x;
     }
 
     fn export(&self, output: &Path, value_scale: f32) -> Result<(), Box<dyn Error>> {
+        let _guard = tch::no_grad_guard();
         let max_abs = self.weights.max().max_other(&self.to_move.abs().max());
         let max_abs = f32::try_from(max_abs).unwrap();
         println!("max |weight| = {max_abs:.6}");

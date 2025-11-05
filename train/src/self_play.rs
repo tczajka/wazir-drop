@@ -242,11 +242,7 @@ fn calc_deep_score(
     }
     *prev_pv_position_hash = hash;
     let result = search.search(&pv_position, Some(extra_depth), None);
-    let mut deep_score = result.score;
-    if pv_position.to_move() != position.to_move() {
-        deep_score = -deep_score;
-    }
-    Ok((pv_position, deep_score))
+    Ok((pv_position, result.score))
 }
 
 fn select_variation<'a>(
