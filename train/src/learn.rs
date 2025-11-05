@@ -54,10 +54,14 @@ fn run_with_model<M: EvalModel>(
     let device = Device::cuda_if_available();
     log::info!("Using device: {device:?}");
     let mut vs = nn::VarStore::new(device);
-    let model = M::new(features, vs.root());
+    let mut model = M::new(features, vs.root());
     if let Some(load_parameters) = &config.load_weights {
         vs.load(load_parameters)?;
     }
+    let redundant: Vec<Tensor> = features
+        .redundant()
+        .map(|iter| tensor_from_indices(iter, features.count()).to_device(device))
+        .collect();
     let mut optimizer = nn::AdamW::default().build(&vs, config.learning_rate)?;
 
     for epoch in 0..config.epochs {
@@ -86,6 +90,9 @@ fn run_with_model<M: EvalModel>(
             total_outcome_loss += f64::try_from(&outcome_loss).unwrap();
 
             optimizer.backward_step(&loss);
+            for redundant in &redundant {
+                model.project_redundant(redundant);
+            }
         }
 
         let elapsed_time = start_time.elapsed();
@@ -101,6 +108,17 @@ fn run_with_model<M: EvalModel>(
     }
     vs.save(&config.save_weights)?;
     Ok(())
+}
+
+fn tensor_from_indices(indices: impl Iterator<Item = usize>, size: usize) -> Tensor {
+    let features: Vec<i64> = indices.map(|index| index as i64).collect();
+    Tensor::sparse_coo_tensor_indices_size(
+        &Tensor::from_slice(&features).unsqueeze(0),
+        &Tensor::ones(features.len() as i64, kind::FLOAT_CPU),
+        [size as i64],
+        kind::FLOAT_CPU,
+        false,
+    )
 }
 
 /// A batch of data.

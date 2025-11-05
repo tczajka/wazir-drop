@@ -42,6 +42,8 @@ pub trait Features: Debug + Copy + Send + 'static {
         new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)>;
+
+    fn redundant(self) -> impl Iterator<Item = impl Iterator<Item = usize>>;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -50,9 +52,13 @@ pub struct PSFeatures;
 impl PSFeatures {
     const CAPTURED_OFFSET: usize = Piece::COUNT * NormalizedSquare::COUNT;
 
+    fn board_feature_normalized(piece: Piece, normalized_square: NormalizedSquare) -> usize {
+        piece.index() * NormalizedSquare::COUNT + normalized_square.index()
+    }
+
     fn board_feature(piece: Piece, square: Square) -> usize {
         let (_, normalized_square) = Symmetry::normalize(square);
-        piece.index() * NormalizedSquare::COUNT + normalized_square.index()
+        Self::board_feature_normalized(piece, normalized_square)
     }
 
     fn captured_feature(piece: Piece, index: usize) -> usize {
@@ -133,5 +139,12 @@ impl Features for PSFeatures {
             removed = Some(Self::board_feature(captured_piece, mov.to));
         }
         Some((added.into_iter(), removed.into_iter()))
+    }
+
+    fn redundant(self) -> impl Iterator<Item = impl Iterator<Item = usize>> {
+        iter::once(
+            // Wazir positions are redundant because there is always one Wazir.
+            NormalizedSquare::all().map(|ns| Self::board_feature_normalized(Piece::Wazir, ns)),
+        )
     }
 }

@@ -36,6 +36,12 @@ impl<F: Features> EvalModel for LinearModel<F> {
         }
     }
 
+    fn project_redundant(&mut self, redundant: &Tensor) {
+        let x = self.weights.dot(redundant) / redundant.sum(None);
+        self.weights -= &x * redundant;
+        self.to_move += &x;
+    }
+
     fn export(&self, output: &Path, value_scale: f32) -> Result<(), Box<dyn Error>> {
         let max_abs = self.weights.max().max_other(&self.to_move.abs().max());
         let max_abs = f32::try_from(max_abs).unwrap();
