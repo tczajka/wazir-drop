@@ -1,4 +1,10 @@
 use crate::model::EvalModel;
+use std::{
+    error::Error,
+    fs::File,
+    io::{BufWriter, Write},
+    path::Path,
+};
 use tch::{Tensor, nn};
 use wazir_drop::Features;
 
@@ -28,6 +34,31 @@ impl<F: Features> EvalModel for LinearModel<F> {
             to_move,
             side_weights,
         }
+    }
+
+    fn export(&self, output: &Path, value_scale: f32) -> Result<(), Box<dyn Error>> {
+        let max_abs = self.weights.max().max_other(&self.to_move.abs().max());
+        let max_abs = f32::try_from(max_abs).unwrap();
+        println!("max |weight| = {max_abs:.6}");
+        let mut f = BufWriter::new(File::create(output)?);
+        let to_move = (value_scale * &self.to_move).round();
+        let to_move: i16 = to_move.try_into().expect("out of range");
+        writeln!(f, "pub static TO_MOVE: i16 = {to_move};")?;
+        writeln!(f)?;
+        let weights = (value_scale * &self.weights).round();
+        let weights: Vec<i16> = weights.try_into().expect("out of range");
+        writeln!(f, "#[rustfmt::skip]")?;
+        write!(f, "pub static FEATURES: [i16; {}] = [", weights.len())?;
+        for (i, &weight) in weights.iter().enumerate() {
+            if i.is_multiple_of(10) {
+                write!(f, "\n    ")?;
+            } else {
+                write!(f, " ")?;
+            }
+            write!(f, "{weight},")?;
+        }
+        writeln!(f, "\n];")?;
+        Ok(())
     }
 }
 

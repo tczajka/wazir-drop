@@ -14,6 +14,7 @@ use tch::{
 use wazir_drop::{Features, PSFeatures};
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     self_play_data: PathBuf,
     load_weights: Option<PathBuf>,

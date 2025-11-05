@@ -1,3 +1,4 @@
+mod export;
 mod learn;
 mod linear;
 mod model;
@@ -31,6 +32,7 @@ struct Config {
 enum Command {
     SelfPlay(self_play::Config),
     Learn(learn::Config),
+    Export(export::Config),
 }
 
 fn main() -> ExitCode {
@@ -64,6 +66,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     match &config.command {
         Command::SelfPlay(config) => self_play::run(config)?,
         Command::Learn(config) => learn::run(config)?,
+        Command::Export(config) => export::run(config)?,
     }
 
     Ok(())

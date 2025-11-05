@@ -17,6 +17,7 @@ use wazir_drop::{
 };
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     output: PathBuf,
     num_cpus: usize,

@@ -1,3 +1,5 @@
+use std::{error::Error, path::Path};
+
 use tch::nn;
 use wazir_drop::Features;
 
@@ -7,4 +9,5 @@ pub trait EvalModel: nn::Module {
     type Features: Features;
 
     fn new(features: Self::Features, vs: nn::Path) -> Self;
+    fn export(&self, output: &Path, value_scale: f32) -> Result<(), Box<dyn Error>>;
 }

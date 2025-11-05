@@ -1,0 +1,8 @@
+log = "logs/export.log"
+
+[command.export]
+weights = "data/linear_ps.weights"
+output = "data/linear_ps.rs"
+features = "PS"
+model = "linear"
+value_scale = 1000
