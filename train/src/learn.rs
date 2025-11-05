@@ -24,6 +24,7 @@ pub struct Config {
     chunk_size: usize,
     batch_size: usize,
     outcome_weight: f32,
+    log_period_seconds: f32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -63,9 +64,27 @@ fn run_with_model<M: EvalModel>(
         let mut total_value_loss: f64 = 0.0;
         let mut total_outcome_loss: f64 = 0.0;
         let start_time = Instant::now();
+        let mut last_log_time = start_time;
 
         let mut dataset_iterator = DatasetIterator::new(config, features.count())?;
-        while let Some(batch) = dataset_iterator.next_batch()? {
+        loop {
+            let batch = dataset_iterator.next_batch()?;
+            if batch.is_none() || last_log_time.elapsed().as_secs_f32() >= config.log_period_seconds
+            {
+                let elapsed_time = start_time.elapsed().as_secs_f64();
+                log::info!(
+                    "Epoch {epoch} / {num_epochs} examples {num_examples} time {elapsed_time:.2}s examples/s {examples_per_second:.0}\n  \
+                    value loss {value_loss:.3} outcome loss {outcome_loss:.3}",
+                    num_epochs = config.epochs,
+                    value_loss = total_value_loss / num_examples as f64,
+                    outcome_loss = total_outcome_loss / num_examples as f64,
+                    examples_per_second = num_examples as f64 / elapsed_time
+                );
+                last_log_time = Instant::now();
+            }
+            let Some(batch) = batch else {
+                break;
+            };
             let batch = batch.to_device(device);
             let values = model.forward(&batch.input);
             let win_prob = values.sigmoid();
@@ -86,17 +105,6 @@ fn run_with_model<M: EvalModel>(
             optimizer.backward_step(&loss);
             model.clean_up();
         }
-
-        let elapsed_time = start_time.elapsed();
-        log::info!(
-            "Epoch {epoch} / {num_epochs} examples {num_examples} time {elapsed:.2}s examples/s {examples_per_second:.0}\n  \
-            value loss {value_loss:.3} outcome loss {outcome_loss:.3}",
-            num_epochs = config.epochs,
-            value_loss = total_value_loss / num_examples as f64,
-            outcome_loss = total_outcome_loss / num_examples as f64,
-            elapsed = elapsed_time.as_secs_f64(),
-            examples_per_second = num_examples as f64 / elapsed_time.as_secs_f64()
-        );
     }
     vs.save(&config.save_weights)?;
     Ok(())

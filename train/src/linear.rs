@@ -15,7 +15,8 @@ use tch::{
 };
 use wazir_drop::{Features, NormalizedSquare, PSFeatures, Piece, enums::SimpleEnumExt};
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     learning_rate: f64,
 }
@@ -23,7 +24,7 @@ pub struct Config {
 #[derive(Debug)]
 pub struct LinearModel<F: Features> {
     _features: F,
-    learning_rate: f64,
+    config: Config,
     // [features.count()]
     weights: Tensor,
     // []
@@ -57,13 +58,15 @@ impl<F: Features> EvalModel for LinearModel<F> {
         // R @ R^T = diag(R^2.sum(1))
         // R @ R^T @ diag(R^2.sum(1))^-1 = I
         // R_inv = R^T @ diag(R^2.sum(1))^-1
-        // mult: [D]
-        let mult = redundant.square().sum_dim_intlist(1, true, None);
-        let redundant_inv = redundant.transpose(0, 1) / mult;
+        let div = redundant
+            .square()
+            .sum_dim_intlist(1, false, None)
+            .to_dense(None, true);
+        let redundant_inv = redundant.transpose(0, 1) * (1.0f32 / div);
 
         Self {
             _features: features,
-            learning_rate: config.learning_rate,
+            config: config.clone(),
             weights,
             to_move,
             side_weights,
@@ -73,7 +76,7 @@ impl<F: Features> EvalModel for LinearModel<F> {
     }
 
     fn optimizer(&self, vs: &nn::VarStore) -> Result<nn::Optimizer, TchError> {
-        nn::Adam::default().build(vs, self.learning_rate)
+        nn::Adam::default().build(vs, self.config.learning_rate)
     }
 
     fn clean_up(&mut self) {

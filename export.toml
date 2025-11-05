@@ -4,5 +4,7 @@ log = "logs/export.log"
 weights = "data/linear_ps_1.weights"
 output = "data/linear_ps_weights.rs"
 features = "PS"
-model = "linear"
 value_scale = 1000
+
+[command.export.model.linear]
+learning_rate = 1e-3  # doesn't matter
