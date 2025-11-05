@@ -7,10 +7,7 @@ use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 use serde::Deserialize;
 use serde_cbor::{Deserializer, StreamDeserializer, de::IoRead};
 use std::{error::Error, fs::File, io::BufReader, path::PathBuf, time::Instant};
-use tch::{
-    Device, Kind, Reduction, Tensor, kind,
-    nn::{self, OptimizerConfig},
-};
+use tch::{Device, Kind, Reduction, Tensor, kind, nn};
 use wazir_drop::{Features, PSFeatures};
 
 #[derive(Clone, Debug, Deserialize)]
@@ -62,7 +59,7 @@ fn run_with_model<M: EvalModel>(
         .redundant()
         .map(|iter| tensor_from_indices(iter, features.count()).to_device(device))
         .collect();
-    let mut optimizer = nn::AdamW::default().build(&vs, config.learning_rate)?;
+    let mut optimizer = model.optimizer(&vs, config.learning_rate)?;
 
     for epoch in 0..config.epochs {
         let mut num_examples = 0;
@@ -75,19 +72,19 @@ fn run_with_model<M: EvalModel>(
             let batch = batch.to_device(device);
             let values = model.forward(&batch.input);
             let win_prob = values.sigmoid();
-            let value_loss = win_prob.mse_loss(&batch.values.sigmoid(), Reduction::Sum);
+            let value_loss = win_prob.mse_loss(&batch.values.sigmoid(), Reduction::Mean);
             let outcome_loss = values.binary_cross_entropy_with_logits::<Tensor>(
                 &batch.outcomes,
                 None,
                 None,
-                Reduction::Sum,
+                Reduction::Mean,
             );
             let loss =
                 (1.0 - config.outcome_weight) * &value_loss + config.outcome_weight * &outcome_loss;
 
             num_examples += batch.size;
-            total_value_loss += f64::try_from(&value_loss).unwrap();
-            total_outcome_loss += f64::try_from(&outcome_loss).unwrap();
+            total_value_loss += batch.size as f64 * f64::try_from(&value_loss).unwrap();
+            total_outcome_loss += batch.size as f64 * f64::try_from(&outcome_loss).unwrap();
 
             optimizer.backward_step(&loss);
             for redundant in &redundant {

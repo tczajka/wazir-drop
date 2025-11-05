@@ -5,7 +5,10 @@ use std::{
     io::{BufWriter, Write},
     path::Path,
 };
-use tch::{Tensor, nn};
+use tch::{
+    TchError, Tensor,
+    nn::{self, OptimizerConfig},
+};
 use wazir_drop::{Features, NormalizedSquare, PSFeatures, Piece, enums::SimpleEnumExt};
 
 #[derive(Debug)]
@@ -34,6 +37,10 @@ impl<F: Features> EvalModel for LinearModel<F> {
             to_move,
             side_weights,
         }
+    }
+
+    fn optimizer(&self, vs: &nn::VarStore, learning_rate: f64) -> Result<nn::Optimizer, TchError> {
+        nn::Adam::default().build(vs, learning_rate)
     }
 
     fn project_redundant(&mut self, redundant: &Tensor) {
