@@ -18,6 +18,7 @@ mod eval;
 mod features;
 mod linear_eval;
 pub mod linear_ps_weights;
+pub mod linear_wps_weights;
 mod main_player;
 pub mod movegen;
 mod moves;
@@ -56,4 +57,4 @@ pub use square::{Coord, Direction, Square};
 pub use symmetry::{NormalizedSquare, Symmetry};
 pub use wps_features::WPSFeatures;
 
-pub type DefaultEvaluator = LinearEvaluator<PSFeatures>;
+pub type DefaultEvaluator = LinearEvaluator<WPSFeatures>;

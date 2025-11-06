@@ -155,16 +155,11 @@ impl Export for LinearModel<WPSFeatures> {
                                     square
                                 )
                             );
-                            write!(f, " {},", weights[next])?;
+                            write!(f, "{:5},", weights[next])?;
                             next += 1;
                         }
                         writeln!(f)?;
                     }
-                    for square in NormalizedSquare::all() {
-                        assert_eq!(next, PSFeatures::board_feature(piece, square));
-                        next += 1;
-                    }
-                    writeln!(f)?;
                 }
             }
             for is_other_color in [false, true] {
