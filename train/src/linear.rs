@@ -16,6 +16,7 @@ use wazir_drop::{Features, NormalizedSquare, PSFeatures, Piece, enums::SimpleEnu
 #[serde(deny_unknown_fields)]
 pub struct Config {
     learning_rate: f64,
+    weight_decay: f64,
 }
 
 #[derive(Debug)]
@@ -50,7 +51,11 @@ impl<F: Features> EvalModel for LinearModel<F> {
     }
 
     fn optimizer(&self, vs: &nn::VarStore) -> Result<nn::Optimizer, TchError> {
-        nn::Adam::default().build(vs, self.config.learning_rate)
+        let adamw = nn::AdamW {
+            wd: self.config.weight_decay,
+            ..Default::default()
+        };
+        adamw.build(vs, self.config.learning_rate)
     }
 }
 

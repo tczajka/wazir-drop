@@ -14,3 +14,4 @@ log_period_seconds = 60
 
 [command.learn.model.linear]
 learning_rate = 1e-3
+weight_decay = 1e-5
