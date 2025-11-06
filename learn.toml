@@ -2,11 +2,11 @@ log = "logs/learn.log"
 
 [command.learn]
 self_play_data = "data/self_play.cbor"
-load_weights = "data/linear_ps_1.weights"
-save_weights = "data/linear_ps_2.weights"
+load_weights = "data/linear_ps_2.weights"
+save_weights = "data/linear_ps_test.weights"
 input_value_scale = 1000
 features = "PS"
-epochs = 3
+epochs = 1
 chunk_size = 4194304
 batch_size = 8192
 outcome_weight = 0.25

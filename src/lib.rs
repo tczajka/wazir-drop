@@ -54,5 +54,6 @@ pub use score::{Score, ScoreExpanded};
 pub use search::{Search, TopVariation, Variation};
 pub use square::{Coord, Direction, Square};
 pub use symmetry::{NormalizedSquare, Symmetry};
+pub use wps_features::WPSFeatures;
 
 pub type DefaultEvaluator = LinearEvaluator<PSFeatures>;

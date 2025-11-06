@@ -4,6 +4,7 @@ use crate::{
 };
 use std::{fmt::Debug, iter};
 
+/// Piece-Square features.
 #[derive(Debug, Clone, Copy)]
 pub struct PSFeatures;
 
