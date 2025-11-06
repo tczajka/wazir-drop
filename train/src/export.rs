@@ -1,7 +1,8 @@
+use extra::PSFeatures;
 use serde::Deserialize;
 use std::{error::Error, path::PathBuf};
 use tch::{Device, nn};
-use wazir_drop::{PSFeatures, WPSFeatures};
+use wazir_drop::WPSFeatures;
 
 use crate::{
     learn::ModelConfig,

@@ -1,8 +1,11 @@
-use crate::{
-    captured_index, enums::SimpleEnumExt, smallvec::SmallVec, Color, Features, NormalizedSquare,
-    Piece, Position, RegularMove, SetupMove, Square, Symmetry, NUM_CAPTURED_INDEXES,
-};
 use std::{fmt::Debug, iter};
+use wazir_drop::{
+    Color, Features, LinearEvaluator, NUM_CAPTURED_INDEXES, NormalizedSquare, Piece, Position,
+    RegularMove, SetupMove, Square, Symmetry, captured_index, enums::SimpleEnumExt,
+    smallvec::SmallVec,
+};
+
+use crate::linear_ps_weights;
 
 /// Piece-Square features.
 #[derive(Debug, Clone, Copy)]
@@ -85,18 +88,26 @@ impl Features for PSFeatures {
                 }
             }
             added.push(Self::board_feature_unnormalized(piece, mov.to));
-            if let Some(captured_piece) = mov.captured {
-                if captured_piece != Piece::Wazir {
-                    // This is a capture, so we didn't drop the same piece.
-                    added.push(Self::captured_feature(
-                        captured_piece,
-                        new_position.num_captured(captured_piece.with_color(color)) - 1,
-                    ));
-                }
+            if let Some(captured_piece) = mov.captured
+                && captured_piece != Piece::Wazir
+            {
+                // This is a capture, so we didn't drop the same piece.
+                added.push(Self::captured_feature(
+                    captured_piece,
+                    new_position.num_captured(captured_piece.with_color(color)) - 1,
+                ));
             }
         } else if let Some(captured_piece) = mov.captured {
             removed = Some(Self::board_feature_unnormalized(captured_piece, mov.to));
         }
         Some((added.into_iter(), removed.into_iter()))
     }
+}
+
+pub fn default_linear_ps_features() -> LinearEvaluator<PSFeatures> {
+    LinearEvaluator::new(
+        PSFeatures,
+        linear_ps_weights::TO_MOVE,
+        &linear_ps_weights::FEATURES,
+    )
 }

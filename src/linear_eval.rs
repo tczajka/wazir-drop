@@ -1,7 +1,4 @@
-use crate::{
-    enums::EnumMap, linear_ps_weights, linear_wps_weights, Color, Evaluator, Features, PSFeatures,
-    WPSFeatures,
-};
+use crate::{enums::EnumMap, Color, Evaluator, Features};
 
 #[derive(Debug)]
 pub struct LinearEvaluator<F> {
@@ -18,26 +15,6 @@ impl<F: Features> LinearEvaluator<F> {
             to_move_weight,
             feature_weights: feature_weights.to_vec(),
         }
-    }
-}
-
-impl Default for LinearEvaluator<PSFeatures> {
-    fn default() -> Self {
-        Self::new(
-            PSFeatures,
-            linear_ps_weights::TO_MOVE,
-            &linear_ps_weights::FEATURES,
-        )
-    }
-}
-
-impl Default for LinearEvaluator<WPSFeatures> {
-    fn default() -> Self {
-        Self::new(
-            WPSFeatures,
-            linear_wps_weights::TO_MOVE,
-            &linear_wps_weights::FEATURES,
-        )
     }
 }
 

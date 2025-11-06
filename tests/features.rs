@@ -1,8 +1,8 @@
-use extra::moverand;
+use extra::{moverand, PSFeatures};
 use rand::{rngs::StdRng, SeedableRng};
 use wazir_drop::{
     enums::{EnumMap, SimpleEnumExt},
-    Color, Features, PSFeatures, Position, Stage, WPSFeatures,
+    Color, Features, Position, Stage, WPSFeatures,
 };
 
 #[test]

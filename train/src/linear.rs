@@ -1,4 +1,5 @@
 use crate::model::{EvalModel, Export};
+use extra::PSFeatures;
 use serde::Deserialize;
 use std::{
     error::Error,
@@ -11,7 +12,7 @@ use tch::{
     nn::{self, OptimizerConfig},
 };
 use wazir_drop::{
-    Coord, Features, NormalizedSquare, PSFeatures, Piece, Square, WPSFeatures, enums::SimpleEnumExt,
+    Coord, Features, NormalizedSquare, Piece, Square, WPSFeatures, enums::SimpleEnumExt,
 };
 
 #[derive(Clone, Debug, Deserialize)]

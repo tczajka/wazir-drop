@@ -1,4 +1,4 @@
-use extra::moverand;
+use extra::{PSFeatures, moverand};
 use rand::{SeedableRng, rngs::StdRng, seq::IndexedRandom};
 use serde::{Deserialize, Serialize};
 use serde_cbor::ser::{IoWrite, Serializer};
@@ -12,7 +12,7 @@ use std::{
 };
 use threadpool::ThreadPool;
 use wazir_drop::{
-    DefaultEvaluator, Features, Outcome, PSFeatures, Position, Score, ScoreExpanded, Search, Stage,
+    DefaultEvaluator, Features, Outcome, Position, Score, ScoreExpanded, Search, Stage,
     TopVariation, WPSFeatures, constants::Hyperparameters,
 };
 

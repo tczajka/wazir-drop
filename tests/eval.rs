@@ -1,12 +1,13 @@
-use extra::moverand;
+use extra::{moverand, PSFeatures};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use wazir_drop::{
-    EvaluatedPosition, Evaluator, Features, LinearEvaluator, PSFeatures, Position, Stage,
+    EvaluatedPosition, Evaluator, Features, LinearEvaluator, Position, Stage, WPSFeatures,
 };
 
 #[test]
 fn test_linear_piece_square_evaluator() {
     test_linear_evaluator(PSFeatures);
+    test_linear_evaluator(WPSFeatures);
 }
 
 fn test_linear_evaluator<F: Features>(features: F) {

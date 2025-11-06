@@ -4,12 +4,13 @@ use crate::{
     self_play::{FeaturesConfig, Sample},
     util::sparse_1d_tensor,
 };
+use extra::PSFeatures;
 use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 use serde::Deserialize;
 use serde_cbor::{Deserializer, StreamDeserializer, de::IoRead};
 use std::{error::Error, fs::File, io::BufReader, path::PathBuf, time::Instant};
 use tch::{Device, Kind, Reduction, Tensor, nn};
-use wazir_drop::{Features, PSFeatures, WPSFeatures};
+use wazir_drop::{Features, WPSFeatures};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
