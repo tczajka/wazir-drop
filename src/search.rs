@@ -114,7 +114,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 break;
             }
             let epos2 = eposition.make_regular_move(moves[0]).unwrap();
-            let Ok(result) = self.search_alpha_beta(
+            let Ok(result) = self.search_alpha_beta::<Variation>(
                 &epos2,
                 -Score::IMMEDIATE_WIN,
                 Score::IMMEDIATE_WIN,
@@ -131,7 +131,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             for move_idx in 1..moves.len() {
                 let mov = moves[move_idx];
                 let epos2 = eposition.make_regular_move(mov).unwrap();
-                let Ok(result) = self.search_alpha_beta(
+                let Ok(result) = self.search_alpha_beta::<Variation>(
                     &epos2,
                     -Score::IMMEDIATE_WIN,
                     -search_result.score,
@@ -166,7 +166,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
     fn search_one_ply(
         &mut self,
         eposition: &EvaluatedPosition<E>,
-    ) -> (SearchResultInternal, Vec<(RegularMove, Score)>) {
+    ) -> (SearchResultInternal<Variation>, Vec<(RegularMove, Score)>) {
         let mut moves: Vec<(RegularMove, Score)> = Vec::new();
         let mut search_result = SearchResultInternal {
             score: -Score::IMMEDIATE_WIN,
@@ -177,7 +177,12 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         for mov in movegen::regular_pseudomoves(eposition.position()) {
             let epos2 = eposition.make_regular_move(mov).unwrap();
             let result = self
-                .search_alpha_beta(&epos2, -Score::IMMEDIATE_WIN, Score::IMMEDIATE_WIN, 0)
+                .search_alpha_beta::<Variation>(
+                    &epos2,
+                    -Score::IMMEDIATE_WIN,
+                    Score::IMMEDIATE_WIN,
+                    0,
+                )
                 .unwrap();
             search_result.inf_depth &= result.inf_depth;
             let score = -result.score;
@@ -196,13 +201,13 @@ impl<E: Evaluator> SearchInstance<'_, E> {
     }
 
     /// Recursive search function.
-    fn search_alpha_beta(
+    fn search_alpha_beta<V: PVExtendible>(
         &mut self,
         eposition: &EvaluatedPosition<E>,
         alpha: Score,
         beta: Score,
         depth: u16,
-    ) -> Result<SearchResultInternal, Timeout> {
+    ) -> Result<SearchResultInternal<V>, Timeout> {
         self.new_node()?;
         let move_number = eposition.position().move_number();
 
@@ -211,7 +216,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             return Ok(SearchResultInternal {
                 score: outcome.to_score(move_number),
                 inf_depth: true,
-                pv: Variation::empty(),
+                pv: V::empty(),
             });
         }
 
@@ -222,7 +227,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 return Ok(SearchResultInternal {
                     score: best_win,
                     inf_depth: true,
-                    pv: Variation::empty_truncated(),
+                    pv: V::empty_truncated(),
                 });
             }
             let worst_loss = ScoreExpanded::Loss(move_number + 2).into();
@@ -230,7 +235,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 return Ok(SearchResultInternal {
                     score: worst_loss,
                     inf_depth: true,
-                    pv: Variation::empty_truncated(),
+                    pv: V::empty_truncated(),
                 });
             }
         }
@@ -253,7 +258,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                         return Ok(SearchResultInternal {
                             score,
                             inf_depth: ttentry.depth == u16::MAX,
-                            pv: Variation::empty_truncated(),
+                            pv: V::empty_truncated(),
                         });
                     }
                 }
@@ -261,7 +266,9 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             }
         }
 
-        let result = self.search_alpha_beta_real_work(eposition, alpha, beta, depth, tt_move)?;
+        // Search with V::Extended so that we have a TT move.
+        let result = self
+            .search_alpha_beta_real_work::<V::Extended>(eposition, alpha, beta, depth, tt_move)?;
 
         if depth >= self.hyperparameters.min_ttable_depth {
             let score_type = if result.score >= beta {
@@ -276,31 +283,35 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 eposition.position().hash(),
                 TTableEntry {
                     depth: if result.inf_depth { u16::MAX } else { depth },
-                    mov: result.pv.moves.first().copied(),
+                    mov: result.pv.first(),
                     score_type,
                     score: result.score.to_relative(move_number),
                 },
             );
         }
 
-        Ok(result)
+        Ok(SearchResultInternal {
+            score: result.score,
+            inf_depth: result.inf_depth,
+            pv: result.pv.truncate(),
+        })
     }
 
     // No early cutoff, we have to do real work.
-    fn search_alpha_beta_real_work(
+    fn search_alpha_beta_real_work<V: PVWithFirstMove>(
         &mut self,
         eposition: &EvaluatedPosition<E>,
         alpha: Score,
         beta: Score,
         depth: u16,
         tt_move: Option<RegularMove>,
-    ) -> Result<SearchResultInternal, Timeout> {
+    ) -> Result<SearchResultInternal<V>, Timeout> {
         // Leaf node.
         if depth == 0 {
             return Ok(SearchResultInternal {
                 score: ScoreExpanded::Eval(eposition.evaluate()).into(),
                 inf_depth: false,
-                pv: Variation::empty(),
+                pv: V::empty(),
             });
         }
 
@@ -312,7 +323,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         let mut result = SearchResultInternal {
             score: -Score::IMMEDIATE_WIN,
             inf_depth: true,
-            pv: Variation::empty(),
+            pv: V::empty(),
         };
 
         for mov in moves {
@@ -321,8 +332,12 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 // or invalid killer move.
                 continue;
             };
-            let result2 =
-                self.search_alpha_beta(&epos2, -beta, -alpha.max(result.score), depth - 1)?;
+            let result2 = self.search_alpha_beta::<V::Truncated>(
+                &epos2,
+                -beta,
+                -alpha.max(result.score),
+                depth - 1,
+            )?;
             let score = -result2.score;
             result.inf_depth &= result2.inf_depth;
             if score > result.score {
@@ -356,7 +371,12 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         for mov in movegen::regular_pseudomoves(eposition.position()) {
             let epos2 = eposition.make_regular_move(mov).unwrap();
             let result = self
-                .search_alpha_beta(&epos2, -Score::IMMEDIATE_WIN, Score::IMMEDIATE_WIN, 0)
+                .search_alpha_beta::<Variation>(
+                    &epos2,
+                    -Score::IMMEDIATE_WIN,
+                    Score::IMMEDIATE_WIN,
+                    0,
+                )
                 .unwrap();
             let score = -result.score;
             variations.push(TopVariation {
@@ -371,7 +391,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             let mov = variations[0].variation.moves[0];
             let epos2 = eposition.make_regular_move(mov).unwrap();
             let result = self
-                .search_alpha_beta(
+                .search_alpha_beta::<Variation>(
                     &epos2,
                     -Score::IMMEDIATE_WIN,
                     Score::IMMEDIATE_WIN,
@@ -387,7 +407,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 let mov = variations[move_idx].variation.moves[0];
                 let epos2 = eposition.make_regular_move(mov).unwrap();
                 let result = self
-                    .search_alpha_beta(
+                    .search_alpha_beta::<Variation>(
                         &epos2,
                         -Score::IMMEDIATE_WIN,
                         -variations[0].score.offset(-max_eval_diff).prev(),
@@ -437,10 +457,26 @@ pub struct TopVariation {
     pub variation: Variation,
 }
 
-struct SearchResultInternal {
+struct SearchResultInternal<V> {
     score: Score,
     inf_depth: bool,
-    pv: Variation,
+    pv: V,
+}
+
+trait PV {
+    fn empty() -> Self;
+    fn empty_truncated() -> Self;
+}
+
+trait PVExtendible: PV {
+    type Extended: PVWithFirstMove<Truncated = Self>;
+    fn add_front(self, mov: RegularMove) -> Self::Extended;
+}
+
+trait PVWithFirstMove: PV {
+    type Truncated: PVExtendible<Extended = Self>;
+    fn first(&self) -> Option<RegularMove>;
+    fn truncate(self) -> Self::Truncated;
 }
 
 pub struct Variation {
@@ -450,38 +486,6 @@ pub struct Variation {
 
 impl Variation {
     pub const MAX_LENGTH: usize = 100;
-
-    pub fn empty() -> Self {
-        Self {
-            moves: SmallVec::new(),
-            truncated: false,
-        }
-    }
-
-    pub fn empty_truncated() -> Self {
-        Self {
-            moves: SmallVec::new(),
-            truncated: true,
-        }
-    }
-
-    pub fn add_front(&self, mov: RegularMove) -> Self {
-        let mut res = Self::empty();
-        res.moves.push(mov);
-        for &mov in self.moves.iter() {
-            if res.moves.len() >= Self::MAX_LENGTH {
-                res.truncated = true;
-                break;
-            }
-            res.moves.push(mov);
-        }
-
-        if self.truncated {
-            res.truncated = true;
-        }
-
-        res
-    }
 }
 
 impl Deref for Variation {
@@ -507,5 +511,121 @@ impl Display for Variation {
     }
 }
 
+impl PV for Variation {
+    fn empty() -> Self {
+        Self {
+            moves: SmallVec::new(),
+            truncated: false,
+        }
+    }
+
+    fn empty_truncated() -> Self {
+        Self {
+            moves: SmallVec::new(),
+            truncated: true,
+        }
+    }
+}
+
+impl PVExtendible for Variation {
+    type Extended = Self;
+
+    fn add_front(self, mov: RegularMove) -> Self {
+        let mut res = Self::empty();
+        res.moves.push(mov);
+        for &mov in self.moves.iter() {
+            if res.moves.len() >= Self::MAX_LENGTH {
+                res.truncated = true;
+                break;
+            }
+            res.moves.push(mov);
+        }
+
+        if self.truncated {
+            res.truncated = true;
+        }
+
+        res
+    }
+}
+
+impl PVWithFirstMove for Variation {
+    type Truncated = Self;
+
+    fn truncate(self) -> Self::Truncated {
+        self
+    }
+
+    fn first(&self) -> Option<RegularMove> {
+        self.moves.first().copied()
+    }
+}
+
+struct EmptyVariation;
+
+impl PV for EmptyVariation {
+    fn empty() -> Self {
+        Self
+    }
+    fn empty_truncated() -> Self {
+        Self
+    }
+}
+
+impl PVExtendible for EmptyVariation {
+    type Extended = OneMoveVariation;
+
+    fn add_front(self, mov: RegularMove) -> Self::Extended {
+        OneMoveVariation { mov: Some(mov) }
+    }
+}
+
+struct OneMoveVariation {
+    mov: Option<RegularMove>,
+}
+
+impl PV for OneMoveVariation {
+    fn empty() -> Self {
+        Self { mov: None }
+    }
+
+    fn empty_truncated() -> Self {
+        Self { mov: None }
+    }
+}
+
+impl PVWithFirstMove for OneMoveVariation {
+    type Truncated = EmptyVariation;
+
+    fn truncate(self) -> Self::Truncated {
+        EmptyVariation
+    }
+
+    fn first(&self) -> Option<RegularMove> {
+        self.mov
+    }
+}
+
 #[derive(Debug)]
 struct Timeout;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_variation() {
+        let mut variation = Variation::empty();
+        variation = variation.add_front(RegularMove::from_str("A@a1").unwrap());
+        variation = variation.add_front(RegularMove::from_str("a@a2").unwrap());
+        assert_eq!(variation.to_string(), "a@a2 A@a1");
+        assert!(!variation.truncated);
+
+        for _ in 0..200 {
+            variation = variation.add_front(RegularMove::from_str("A@a1").unwrap());
+        }
+        assert!(variation.truncated);
+        assert_eq!(variation.len(), Variation::MAX_LENGTH);
+    }
+}
