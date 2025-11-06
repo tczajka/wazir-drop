@@ -26,7 +26,7 @@ impl PSFeatures {
 
 impl Features for PSFeatures {
     fn count(self) -> usize {
-        Piece::COUNT * NormalizedSquare::COUNT + NUM_CAPTURED_INDEXES - 2
+        Self::CAPTURED_OFFSET + NUM_CAPTURED_INDEXES - 2
     }
 
     fn all(self, position: &Position, color: Color) -> impl Iterator<Item = usize> {
@@ -97,12 +97,5 @@ impl Features for PSFeatures {
             removed = Some(Self::board_feature_unnormalized(captured_piece, mov.to));
         }
         Some((added.into_iter(), removed.into_iter()))
-    }
-
-    fn redundant(self) -> impl Iterator<Item = impl Iterator<Item = (usize, i32)>> {
-        iter::once(
-            // Wazir positions are redundant because there is always one Wazir.
-            NormalizedSquare::all().map(|ns| (Self::board_feature(Piece::Wazir, ns), 1)),
-        )
     }
 }

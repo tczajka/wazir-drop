@@ -30,6 +30,7 @@ mod search;
 mod square;
 mod symmetry;
 mod ttable;
+mod wps_features;
 mod zobrist;
 
 #[cfg(test)]

@@ -10,7 +10,6 @@ pub trait EvalModel: nn::Module {
 
     fn new(features: Self::Features, vs: nn::Path, config: &Self::Config) -> Self;
     fn optimizer(&self, vs: &nn::VarStore) -> Result<nn::Optimizer, TchError>;
-    fn clean_up(&mut self);
 }
 
 pub trait Export {

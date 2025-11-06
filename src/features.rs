@@ -38,7 +38,4 @@ pub trait Features: Debug + Copy + Send + 'static {
         new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)>;
-
-    /// Redundant feature sets that always sum to a constant.
-    fn redundant(self) -> impl Iterator<Item = impl Iterator<Item = (usize, i32)>>;
 }

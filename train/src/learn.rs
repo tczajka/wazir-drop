@@ -53,7 +53,7 @@ fn run_with_model<M: EvalModel>(
     let device = Device::cuda_if_available();
     log::info!("Using device: {device:?}");
     let mut vs = nn::VarStore::new(device);
-    let mut model = M::new(features, vs.root(), model_config);
+    let model = M::new(features, vs.root(), model_config);
     if let Some(load_parameters) = &config.load_weights {
         vs.load(load_parameters)?;
     }
@@ -103,7 +103,6 @@ fn run_with_model<M: EvalModel>(
             total_outcome_loss += batch.size as f64 * f64::try_from(&outcome_loss).unwrap();
 
             optimizer.backward_step(&loss);
-            model.clean_up();
         }
     }
     vs.save(&config.save_weights)?;
