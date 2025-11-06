@@ -1,12 +1,12 @@
 log = "logs/export.log"
 
 [command.export]
-weights = "data/linear_ps_2.weights"
-output = "data/linear_ps_weights.rs"
-features = "PS"
+weights = "data/linear_wps_0.weights"
+output = "data/linear_wps_weights.rs"
+features = "WPS"
 value_scale = 1000
 
 [command.export.model.linear]
 # doesn't matter
-learning_rate = 1e-3
+learning_rate = 0
 weight_decay = 0

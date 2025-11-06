@@ -10,4 +10,4 @@ depth = 3
 extra_depth = 3
 temperature = 10
 temperature_cutoff = 30
-features = "PS"
+features = "WPS"

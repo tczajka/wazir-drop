@@ -2,14 +2,13 @@ log = "logs/learn.log"
 
 [command.learn]
 self_play_data = "data/self_play.cbor"
-load_weights = "data/linear_ps_2.weights"
-save_weights = "data/linear_ps_test.weights"
+save_weights = "data/linear_wps_0.weights"
 input_value_scale = 1000
-features = "PS"
-epochs = 1
+features = "WPS"
+epochs = 10
 chunk_size = 4194304
 batch_size = 8192
-outcome_weight = 0.25
+outcome_weight = 1.0
 log_period_seconds = 60
 
 [command.learn.model.linear]
