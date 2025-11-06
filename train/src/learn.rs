@@ -9,7 +9,7 @@ use serde::Deserialize;
 use serde_cbor::{Deserializer, StreamDeserializer, de::IoRead};
 use std::{error::Error, fs::File, io::BufReader, path::PathBuf, time::Instant};
 use tch::{Device, Kind, Reduction, Tensor, nn};
-use wazir_drop::{Features, PSFeatures};
+use wazir_drop::{Features, PSFeatures, WPSFeatures};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -36,6 +36,7 @@ pub enum ModelConfig {
 pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
     match config.features {
         FeaturesConfig::PS => run_with_features(PSFeatures, config),
+        FeaturesConfig::WPS => run_with_features(WPSFeatures, config),
     }
 }
 

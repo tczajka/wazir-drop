@@ -1,3 +1,5 @@
+use std::fmt::{self, Display, Formatter};
+
 use crate::{enums::EnumMap, unsafe_simple_enum, Color, Coord, Square};
 
 /// Apply FlipX, FlipY and SwapXY in that order.
@@ -92,6 +94,12 @@ impl From<NormalizedSquare> for Square {
             NormalizedSquare::C4 => Square::C4,
             NormalizedSquare::D4 => Square::D4,
         }
+    }
+}
+
+impl Display for NormalizedSquare {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{s}", s = Square::from(*self))
     }
 }
 

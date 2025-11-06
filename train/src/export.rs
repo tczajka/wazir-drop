@@ -1,8 +1,7 @@
-use std::{error::Error, path::PathBuf};
-
 use serde::Deserialize;
+use std::{error::Error, path::PathBuf};
 use tch::{Device, nn};
-use wazir_drop::PSFeatures;
+use wazir_drop::{PSFeatures, WPSFeatures};
 
 use crate::{
     learn::ModelConfig,
@@ -25,6 +24,9 @@ pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
     match (&config.features, &config.model) {
         (FeaturesConfig::PS, ModelConfig::Linear(c)) => {
             run_with_model::<LinearModel<_>>(PSFeatures, config, c)
+        }
+        (FeaturesConfig::WPS, ModelConfig::Linear(c)) => {
+            run_with_model::<LinearModel<_>>(WPSFeatures, config, c)
         }
     }
 }

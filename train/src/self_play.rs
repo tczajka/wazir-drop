@@ -13,7 +13,7 @@ use std::{
 use threadpool::ThreadPool;
 use wazir_drop::{
     DefaultEvaluator, Features, Outcome, PSFeatures, Position, Score, ScoreExpanded, Search, Stage,
-    TopVariation, constants::Hyperparameters,
+    TopVariation, WPSFeatures, constants::Hyperparameters,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -43,8 +43,10 @@ pub struct Sample {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum FeaturesConfig {
     PS,
+    WPS,
 }
 
 pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
@@ -55,6 +57,7 @@ pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
 
     match config.features {
         FeaturesConfig::PS => run_games(config, PSFeatures, &output)?,
+        FeaturesConfig::WPS => run_games(config, WPSFeatures, &output)?,
     }
     Ok(())
 }
