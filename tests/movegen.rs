@@ -2,10 +2,10 @@ use std::str::FromStr;
 
 use wazir_drop::{
     movegen::{
-        attacked_by, captures, drops, in_check, move_bitboard, move_from_short_move, pseudojumps,
-        setup_moves, validate_from_to, wazir_captures,
+        attacked_by, captures, check_evasion_captures, drops, in_check, move_bitboard,
+        move_from_short_move, pseudojumps, setup_moves, validate_from_to, wazir_captures,
     },
-    Color, Piece, Position, ShortMove, Square,
+    Color, Piece, Position, RegularMove, ShortMove, Square,
 };
 
 #[test]
@@ -340,4 +340,50 @@ add....a
         .map(|mov| mov.to_string())
         .collect();
     assert_eq!(&moves, &["Ab4xwd6", "Ab8xwd6", "Db6xwd6", "Nf7xwd6"]);
+}
+
+#[test]
+fn test_check_evasion_captures() {
+    let position = Position::from_str(
+        "\
+regular
+4
+Af
+FW.A.D.D
+AFfAD.DA
+..A...A.
+....A.A.
+...a..ad
+..d..nN.
+a.a...a.
+addw...a
+",
+    )
+    .unwrap();
+
+    let moves: Vec<String> = check_evasion_captures(&position)
+        .map(|mov| mov.to_string())
+        .collect();
+    assert_eq!(&moves, &["Ad5xfb3", "Db5xfb3"]);
+
+    // Double check.
+    let position = Position::from_str(
+        "\
+regular
+4
+Af
+FW.A.D.D
+AFfAD.DA
+.dA...A.
+....A.A.
+...a..ad
+..d..nN.
+a.a...a.
+a.dw...a
+",
+    )
+    .unwrap();
+
+    let moves: Vec<RegularMove> = check_evasion_captures(&position).collect();
+    assert!(moves.is_empty());
 }

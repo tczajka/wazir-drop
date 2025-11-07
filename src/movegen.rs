@@ -281,3 +281,37 @@ pub fn wazir_captures<'a>(position: &'a Position) -> impl Iterator<Item = Regula
         })
     })
 }
+
+// Must be in check. Generates all captures that escape the check.
+pub fn check_evasion_captures<'a>(
+    position: &'a Position,
+) -> impl Iterator<Item = RegularMove> + 'a {
+    assert!(position.stage() == Stage::Regular);
+    let to_move = position.to_move();
+    let opp = to_move.opposite();
+    let wazir_square = position
+        .occupied_by_piece(Piece::Wazir.with_color(to_move))
+        .first()
+        .unwrap();
+    let checked_by = attacked_by(position, wazir_square, opp);
+    let mut checked_by_iter = checked_by.into_iter();
+    let mut only_checked_by = Some(checked_by_iter.next().expect("Not in check"));
+    if checked_by_iter.next().is_some() {
+        // checked by multiple pieces
+        only_checked_by = None;
+    }
+    only_checked_by.into_iter().flat_map(move |to| {
+        let attacker_piece = position.square(to).unwrap().piece();
+        Piece::all().flat_map(move |defender_piece| {
+            let colored_piece = defender_piece.with_color(to_move);
+            let defender_squares =
+                move_bitboard(defender_piece, to) & position.occupied_by_piece(colored_piece);
+            defender_squares.into_iter().map(move |from| RegularMove {
+                colored_piece: defender_piece.with_color(to_move),
+                from: Some(from),
+                captured: Some(attacker_piece),
+                to,
+            })
+        })
+    })
+}
