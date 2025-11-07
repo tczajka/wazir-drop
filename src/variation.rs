@@ -1,10 +1,10 @@
-use crate::{smallvec::SmallVec, RegularMove};
+use crate::{constants::MAX_VARIATION_LENGTH, smallvec::SmallVec, PVTable, RegularMove};
 use std::{
     fmt::{self, Display, Formatter},
     ops::Deref,
 };
 
-pub trait Variation {
+pub trait Variation: Clone {
     fn empty() -> Self;
     fn empty_truncated() -> Self;
 }
@@ -12,6 +12,8 @@ pub trait Variation {
 pub trait ExtendableVariation: Variation {
     type Extended: NonEmptyVariation<Truncated = Self>;
     fn add_front(self, mov: RegularMove) -> Self::Extended;
+    fn pvtable_get(pvtable: &mut PVTable, hash: u64) -> Option<Self>;
+    fn pvtable_set(pvtable: &mut PVTable, hash: u64, variation: Self);
 }
 
 pub trait NonEmptyVariation: Variation {
@@ -20,13 +22,16 @@ pub trait NonEmptyVariation: Variation {
     fn truncate(self) -> Self::Truncated;
 }
 
+#[derive(Clone)]
 pub struct LongVariation {
-    pub moves: SmallVec<RegularMove, { Self::MAX_LENGTH }>,
+    pub moves: SmallVec<RegularMove, MAX_VARIATION_LENGTH>,
     pub truncated: bool,
 }
 
-impl LongVariation {
-    pub const MAX_LENGTH: usize = 100;
+impl Default for LongVariation {
+    fn default() -> Self {
+        Self::empty()
+    }
 }
 
 impl Deref for LongVariation {
@@ -75,7 +80,7 @@ impl ExtendableVariation for LongVariation {
         let mut res = Self::empty();
         res.moves.push(mov);
         for &mov in self.moves.iter() {
-            if res.moves.len() >= Self::MAX_LENGTH {
+            if res.moves.len() >= MAX_VARIATION_LENGTH {
                 res.truncated = true;
                 break;
             }
@@ -87,6 +92,14 @@ impl ExtendableVariation for LongVariation {
         }
 
         res
+    }
+
+    fn pvtable_get(pvtable: &mut PVTable, hash: u64) -> Option<Self> {
+        pvtable.get(hash)
+    }
+
+    fn pvtable_set(pvtable: &mut PVTable, hash: u64, variation: Self) {
+        pvtable.set(hash, variation);
     }
 }
 
@@ -102,7 +115,7 @@ impl NonEmptyVariation for LongVariation {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct EmptyVariation;
 
 impl Variation for EmptyVariation {
@@ -120,9 +133,15 @@ impl ExtendableVariation for EmptyVariation {
     fn add_front(self, mov: RegularMove) -> Self::Extended {
         OneMoveVariation { mov: Some(mov) }
     }
+
+    fn pvtable_get(_pvtable: &mut PVTable, _hash: u64) -> Option<Self> {
+        None
+    }
+
+    fn pvtable_set(_pvtable: &mut PVTable, _hash: u64, _variation: Self) {}
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct OneMoveVariation {
     mov: Option<RegularMove>,
 }

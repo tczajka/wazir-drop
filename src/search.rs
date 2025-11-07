@@ -3,8 +3,8 @@ use crate::{
     movegen,
     ttable::{TTable, TTableEntry, TTableScoreType},
     variation::LongVariation,
-    EmptyVariation, EvaluatedPosition, Evaluator, ExtendableVariation, NonEmptyVariation, Position,
-    RegularMove, Score, ScoreExpanded, Stage, Variation,
+    EmptyVariation, EvaluatedPosition, Evaluator, ExtendableVariation, NonEmptyVariation, PVTable,
+    Position, RegularMove, Score, ScoreExpanded, Stage, Variation,
 };
 use std::{sync::Arc, time::Instant};
 
@@ -12,6 +12,7 @@ pub struct Search<E> {
     hyperparameters: Hyperparameters,
     evaluator: Arc<E>,
     ttable: TTable,
+    pvtable: PVTable,
 }
 
 impl<E: Evaluator> Search<E> {
@@ -20,6 +21,7 @@ impl<E: Evaluator> Search<E> {
             hyperparameters: hyperparameters.clone(),
             evaluator: Arc::clone(evaluator),
             ttable: TTable::new(hyperparameters.ttable_size),
+            pvtable: PVTable::new(hyperparameters.pvtable_size),
         }
     }
 
@@ -48,6 +50,7 @@ impl<E: Evaluator> Search<E> {
             hyperparameters: self.hyperparameters.clone(),
             evaluator: &self.evaluator,
             ttable: &mut self.ttable,
+            pvtable: &mut self.pvtable,
             deadline: None,
             nodes: 0,
         }
@@ -58,6 +61,7 @@ struct SearchInstance<'a, E: Evaluator> {
     hyperparameters: Hyperparameters,
     evaluator: &'a E,
     ttable: &'a mut TTable,
+    pvtable: &'a mut PVTable,
     deadline: Option<Instant>,
     nodes: u64,
 }
@@ -252,9 +256,17 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 // Transposition table cutoff.
                 if ttentry.depth >= depth {
                     let score = ttentry.score.to_absolute(move_number);
+                    let mut pv = V::empty_truncated();
                     let cutoff = match ttentry.score_type {
                         TTableScoreType::None => false,
-                        TTableScoreType::Exact => true,
+                        TTableScoreType::Exact => {
+                            if let Some(v) =
+                                V::pvtable_get(self.pvtable, eposition.position().hash())
+                            {
+                                pv = v;
+                            }
+                            true
+                        }
                         TTableScoreType::LowerBound => score >= beta,
                         TTableScoreType::UpperBound => score <= alpha,
                     };
@@ -262,7 +274,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                         return Ok(SearchResultInternal {
                             score,
                             inf_depth: ttentry.depth == u16::MAX,
-                            pv: V::empty_truncated(),
+                            pv,
                         });
                     }
                 }
@@ -273,6 +285,8 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         // Search with V::Extended so that we have a TT move.
         let result = self
             .search_alpha_beta_real_work::<V::Extended>(eposition, alpha, beta, depth, tt_move)?;
+        let mov = result.pv.first();
+        let pv = result.pv.truncate();
 
         if depth >= self.hyperparameters.min_ttable_depth {
             let score_type = if result.score >= beta {
@@ -280,6 +294,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             } else if result.score <= alpha {
                 TTableScoreType::UpperBound
             } else {
+                V::pvtable_set(self.pvtable, eposition.position().hash(), pv.clone());
                 TTableScoreType::Exact
             };
 
@@ -287,7 +302,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 eposition.position().hash(),
                 TTableEntry {
                     depth: if result.inf_depth { u16::MAX } else { depth },
-                    mov: result.pv.first(),
+                    mov,
                     score_type,
                     score: result.score.to_relative(move_number),
                 },
@@ -297,7 +312,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         Ok(SearchResultInternal {
             score: result.score,
             inf_depth: result.inf_depth,
-            pv: result.pv.truncate(),
+            pv,
         })
     }
 

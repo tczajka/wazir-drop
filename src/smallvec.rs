@@ -95,6 +95,16 @@ impl<T, const N: usize> IntoIterator for SmallVec<T, N> {
     }
 }
 
+impl<T: Clone, const N: usize> Clone for SmallVec<T, N> {
+    fn clone(&self) -> Self {
+        let mut new = Self::new();
+        for item in self.iter() {
+            new.push(item.clone());
+        }
+        new
+    }
+}
+
 pub struct SmallVecIter<T, const N: usize> {
     v: SmallVec<T, N>,
     index: usize,

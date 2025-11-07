@@ -8,7 +8,9 @@ pub struct TTable {
 
 impl TTable {
     pub fn new(size: usize) -> Self {
-        let num_buckets = 1 << (size / mem::size_of::<Bucket>()).ilog2();
+        let num_buckets = size / mem::size_of::<Bucket>();
+        assert!(num_buckets > 0);
+        let num_buckets = 1 << num_buckets.ilog2();
         Self {
             buckets: vec![Bucket::default(); num_buckets],
             epoch: 1,

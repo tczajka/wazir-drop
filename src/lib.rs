@@ -24,6 +24,7 @@ mod moves;
 mod piece;
 mod player;
 mod position;
+mod pvtable;
 mod score;
 mod search;
 mod square;
@@ -49,6 +50,7 @@ pub use moves::{InvalidMove, Move, RegularMove, SetupMove, ShortMove, ShortMoveF
 pub use piece::{ColoredPiece, Piece};
 pub use player::{Player, PlayerFactory};
 pub use position::{Outcome, Position, Stage};
+pub use pvtable::PVTable;
 pub use score::{Score, ScoreExpanded};
 pub use search::{Search, TopVariation};
 pub use square::{Coord, Direction, Square};
