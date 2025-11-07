@@ -1,5 +1,5 @@
 use crate::{
-    constants::MAX_MOVES_IN_GAME,
+    constants::{MoveNumber, MOVE_NUMBER_DRAW},
     enums::SimpleEnumExt,
     error::Invalid,
     impl_from_str_for_parsable, movegen,
@@ -43,7 +43,7 @@ impl Outcome {
         }
     }
 
-    pub fn to_score(self, move_number: u8) -> Score {
+    pub fn to_score(self, move_number: MoveNumber) -> Score {
         match self {
             Self::Draw => ScoreExpanded::Eval(0),
             _ => ScoreExpanded::Loss(move_number),
@@ -97,7 +97,7 @@ impl Display for Stage {
 #[derive(Debug, Clone)]
 pub struct Position {
     stage: Stage,
-    move_number: u8,
+    move_number: MoveNumber,
     board: Board,
     captured: Captured,
 }
@@ -116,7 +116,7 @@ impl Position {
         self.stage
     }
 
-    pub fn move_number(&self) -> u8 {
+    pub fn move_number(&self) -> MoveNumber {
         self.move_number
     }
 
@@ -170,7 +170,7 @@ impl Position {
 
     fn from_parts(
         stage: Stage,
-        move_number: u8,
+        move_number: MoveNumber,
         board: Board,
         captured: Captured,
     ) -> Result<Position, Invalid> {
@@ -199,17 +199,17 @@ impl Position {
                 }
             }
             Stage::Regular => {
-                if !(Color::COUNT as u8..MAX_MOVES_IN_GAME).contains(&move_number) {
+                if !(Color::COUNT as MoveNumber..MOVE_NUMBER_DRAW).contains(&move_number) {
                     return Err(Invalid);
                 }
             }
             Stage::End(Outcome::Draw) => {
-                if move_number != MAX_MOVES_IN_GAME {
+                if move_number != MOVE_NUMBER_DRAW {
                     return Err(Invalid);
                 }
             }
             Stage::End(outcome) => {
-                if !(Color::COUNT as u8..=MAX_MOVES_IN_GAME).contains(&move_number)
+                if !(Color::COUNT as MoveNumber..=MOVE_NUMBER_DRAW).contains(&move_number)
                     || outcome != Outcome::win(to_move.opposite())
                 {
                     return Err(Invalid);
@@ -332,7 +332,7 @@ impl Position {
             .place_piece(mov.to, mov.colored_piece)
             .map_err(|_| InvalidMove)?;
         new_position.move_number += 1;
-        if new_position.move_number() == MAX_MOVES_IN_GAME && new_position.stage == Stage::Regular {
+        if new_position.move_number() == MOVE_NUMBER_DRAW && new_position.stage == Stage::Regular {
             new_position.stage = Stage::End(Outcome::Draw);
         }
         Ok(new_position)

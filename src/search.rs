@@ -1,5 +1,7 @@
 use crate::{
-    constants::{Hyperparameters, CHECK_TIMEOUT_NODES, MAX_SEARCH_DEPTH},
+    constants::{
+        Depth, Eval, Hyperparameters, CHECK_TIMEOUT_NODES, INFINITE_DEPTH, MAX_SEARCH_DEPTH,
+    },
     movegen,
     ttable::{TTable, TTableEntry, TTableScoreType},
     variation::LongVariation,
@@ -28,7 +30,7 @@ impl<E: Evaluator> Search<E> {
     pub fn search(
         &mut self,
         position: &Position,
-        max_depth: Option<u16>,
+        max_depth: Option<Depth>,
         deadline: Option<Instant>,
     ) -> SearchResult {
         let mut instance = self.instance();
@@ -38,8 +40,8 @@ impl<E: Evaluator> Search<E> {
     pub fn search_top_variations(
         &mut self,
         position: &Position,
-        max_depth: u16,
-        max_eval_diff: i32,
+        max_depth: Depth,
+        max_eval_diff: Eval,
     ) -> Vec<TopVariation> {
         let mut instance = self.instance();
         instance.search_top_variations(position, max_depth, max_eval_diff)
@@ -70,7 +72,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
     fn search(
         &mut self,
         position: &Position,
-        max_depth: Option<u16>,
+        max_depth: Option<Depth>,
         deadline: Option<Instant>,
     ) -> SearchResult {
         match position.stage() {
@@ -80,7 +82,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 return SearchResult {
                     score: outcome.to_score(position.move_number()),
                     pv: LongVariation::empty(),
-                    depth: u16::MAX,
+                    depth: INFINITE_DEPTH,
                     root_moves_considered: 0,
                     root_all_moves: 0,
                     nodes: 0,
@@ -105,7 +107,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         _ = || -> Result<(), Timeout> {
             loop {
                 if search_result.inf_depth {
-                    depth = u16::MAX;
+                    depth = INFINITE_DEPTH;
                     return Ok(());
                 }
                 if depth >= max_depth {
@@ -215,7 +217,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         eposition: &EvaluatedPosition<E>,
         alpha: Score,
         beta: Score,
-        depth: u16,
+        depth: Depth,
     ) -> Result<SearchResultInternal<V>, Timeout> {
         self.new_node()?;
         let move_number = eposition.position().move_number();
@@ -274,7 +276,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                     if cutoff {
                         return Ok(SearchResultInternal {
                             score,
-                            inf_depth: ttentry.depth == u16::MAX,
+                            inf_depth: ttentry.depth == INFINITE_DEPTH,
                             pv,
                         });
                     }
@@ -302,7 +304,11 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             self.ttable.set(
                 eposition.position().hash(),
                 TTableEntry {
-                    depth: if result.inf_depth { u16::MAX } else { depth },
+                    depth: if result.inf_depth {
+                        INFINITE_DEPTH
+                    } else {
+                        depth
+                    },
                     mov,
                     score_type,
                     score: result.score.to_relative(move_number),
@@ -323,11 +329,11 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         eposition: &EvaluatedPosition<E>,
         alpha: Score,
         beta: Score,
-        depth: u16,
+        depth: Depth,
         tt_move: Option<RegularMove>,
     ) -> Result<SearchResultInternal<V>, Timeout> {
         // Leaf node.
-        if depth == 0 {
+        if depth <= 0 {
             return Ok(SearchResultInternal {
                 score: ScoreExpanded::Eval(eposition.evaluate()).into(),
                 inf_depth: false,
@@ -390,8 +396,8 @@ impl<E: Evaluator> SearchInstance<'_, E> {
     pub fn search_top_variations(
         &mut self,
         position: &Position,
-        max_depth: u16,
-        max_eval_diff: i32,
+        max_depth: Depth,
+        max_eval_diff: Eval,
     ) -> Vec<TopVariation> {
         assert_eq!(position.stage(), Stage::Regular);
         assert!(max_eval_diff >= 0);
@@ -492,7 +498,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
 pub struct SearchResult {
     pub score: Score,
     pub pv: LongVariation,
-    pub depth: u16,
+    pub depth: Depth,
     pub root_moves_considered: usize,
     pub root_all_moves: usize,
     pub nodes: u64,

@@ -1,4 +1,4 @@
-use crate::{enums::EnumMap, Color, Evaluator, Features};
+use crate::{constants::Eval, enums::EnumMap, Color, Evaluator, Features};
 
 #[derive(Debug)]
 pub struct LinearEvaluator<F> {
@@ -19,7 +19,7 @@ impl<F: Features> LinearEvaluator<F> {
 }
 
 impl<F: Features> Evaluator for LinearEvaluator<F> {
-    type Accumulator = i32;
+    type Accumulator = Eval;
     type Features = F;
 
     fn features(&self) -> Self::Features {
@@ -31,14 +31,14 @@ impl<F: Features> Evaluator for LinearEvaluator<F> {
     }
 
     fn add_feature(&self, accumulator: &mut Self::Accumulator, feature: usize) {
-        *accumulator += i32::from(self.feature_weights[feature]);
+        *accumulator += Eval::from(self.feature_weights[feature]);
     }
 
     fn remove_feature(&self, accumulator: &mut Self::Accumulator, feature: usize) {
-        *accumulator -= i32::from(self.feature_weights[feature]);
+        *accumulator -= Eval::from(self.feature_weights[feature]);
     }
 
-    fn evaluate(&self, accumulators: &EnumMap<Color, Self::Accumulator>, to_move: Color) -> i32 {
-        accumulators[to_move] - accumulators[to_move.opposite()] + i32::from(self.to_move_weight)
+    fn evaluate(&self, accumulators: &EnumMap<Color, Self::Accumulator>, to_move: Color) -> Eval {
+        accumulators[to_move] - accumulators[to_move.opposite()] + Eval::from(self.to_move_weight)
     }
 }

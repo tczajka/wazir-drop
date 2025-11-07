@@ -1,3 +1,4 @@
+use crate::constants::{Eval, MoveNumber};
 use std::{
     fmt::{self, Display, Formatter},
     ops::Neg,
@@ -5,13 +6,13 @@ use std::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScoreExpanded {
-    Win(u8),
-    Loss(u8),
-    Eval(i32),
+    Win(MoveNumber),
+    Loss(MoveNumber),
+    Eval(Eval),
 }
 
 impl ScoreExpanded {
-    pub fn to_relative(self, move_number: u8) -> Self {
+    pub fn to_relative(self, move_number: MoveNumber) -> Self {
         match self {
             Self::Win(distance) => Self::Win(distance.saturating_sub(move_number)),
             Self::Loss(distance) => Self::Loss(distance.saturating_sub(move_number)),
@@ -19,7 +20,7 @@ impl ScoreExpanded {
         }
     }
 
-    pub fn to_absolute(self, move_number: u8) -> Self {
+    pub fn to_absolute(self, move_number: MoveNumber) -> Self {
         match self {
             Self::Win(distance) => Self::Win(distance.saturating_add(move_number)),
             Self::Loss(distance) => Self::Loss(distance.saturating_add(move_number)),
@@ -27,7 +28,7 @@ impl ScoreExpanded {
         }
     }
 
-    pub fn offset(self, offset: i32) -> Self {
+    pub fn offset(self, offset: Eval) -> Self {
         match self {
             Self::Eval(eval) => Self::Eval(eval.saturating_add(offset)),
             _ => self,
@@ -46,11 +47,11 @@ impl Display for ScoreExpanded {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Score(i32);
+pub struct Score(Eval);
 
 impl Score {
     pub const IMMEDIATE_WIN: Score = Score(1000000000);
-    const WIN_MAX_DISTANCE: Score = Score(Self::IMMEDIATE_WIN.0 - u8::MAX as i32);
+    const WIN_MAX_DISTANCE: Score = Score(Self::IMMEDIATE_WIN.0 - u8::MAX as Eval);
 
     pub fn next(self) -> Self {
         Self((self.0 + 1).min(Self::IMMEDIATE_WIN.0))
@@ -60,15 +61,15 @@ impl Score {
         Self((self.0 - 1).max(-Self::IMMEDIATE_WIN.0))
     }
 
-    pub fn to_relative(self, move_number: u8) -> Self {
+    pub fn to_relative(self, move_number: MoveNumber) -> Self {
         ScoreExpanded::from(self).to_relative(move_number).into()
     }
 
-    pub fn to_absolute(self, move_number: u8) -> Self {
+    pub fn to_absolute(self, move_number: MoveNumber) -> Self {
         ScoreExpanded::from(self).to_absolute(move_number).into()
     }
 
-    pub fn offset(self, offset: i32) -> Self {
+    pub fn offset(self, offset: Eval) -> Self {
         ScoreExpanded::from(self).offset(offset).into()
     }
 }
@@ -96,8 +97,8 @@ impl From<Score> for ScoreExpanded {
 impl From<ScoreExpanded> for Score {
     fn from(score: ScoreExpanded) -> Self {
         match score {
-            ScoreExpanded::Win(distance) => Score(Score::IMMEDIATE_WIN.0 - i32::from(distance)),
-            ScoreExpanded::Loss(distance) => Score(-Score::IMMEDIATE_WIN.0 + i32::from(distance)),
+            ScoreExpanded::Win(distance) => Score(Score::IMMEDIATE_WIN.0 - Eval::from(distance)),
+            ScoreExpanded::Loss(distance) => Score(-Score::IMMEDIATE_WIN.0 + Eval::from(distance)),
             ScoreExpanded::Eval(eval) => Score(eval.clamp(
                 -Score::WIN_MAX_DISTANCE.0 + 1,
                 Score::WIN_MAX_DISTANCE.0 - 1,

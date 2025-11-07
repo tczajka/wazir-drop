@@ -1,4 +1,7 @@
-use crate::{enums::EnumMap, Color, Features, InvalidMove, Move, Position, RegularMove, SetupMove};
+use crate::{
+    constants::Eval, enums::EnumMap, Color, Features, InvalidMove, Move, Position, RegularMove,
+    SetupMove,
+};
 
 pub trait Evaluator {
     type Accumulator: Clone;
@@ -8,7 +11,7 @@ pub trait Evaluator {
     fn new_accumulator(&self) -> Self::Accumulator;
     fn add_feature(&self, accumulator: &mut Self::Accumulator, feature: usize);
     fn remove_feature(&self, accumulator: &mut Self::Accumulator, feature: usize);
-    fn evaluate(&self, accumulators: &EnumMap<Color, Self::Accumulator>, to_move: Color) -> i32;
+    fn evaluate(&self, accumulators: &EnumMap<Color, Self::Accumulator>, to_move: Color) -> Eval;
 }
 
 #[derive(Debug, Clone)]
@@ -77,7 +80,7 @@ impl<'a, E: Evaluator> EvaluatedPosition<'a, E> {
         })
     }
 
-    pub fn evaluate(&self) -> i32 {
+    pub fn evaluate(&self) -> Eval {
         self.evaluator
             .evaluate(&self.accumulators, self.position.to_move())
     }

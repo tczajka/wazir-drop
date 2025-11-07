@@ -1,18 +1,25 @@
 use std::time::Duration;
 
-pub const MAX_MOVES_IN_GAME: u8 = 102;
 pub const DEFAULT_TIME_LIMIT: Duration = Duration::from_secs(30);
 pub const TIME_MARGIN: Duration = Duration::from_millis(200);
 pub const MAX_VARIATION_LENGTH: usize = 100;
-pub const MAX_SEARCH_DEPTH: u16 = 100;
 pub const CHECK_TIMEOUT_NODES: u64 = 256;
+
+pub type MoveNumber = u8;
+pub const MOVE_NUMBER_DRAW: MoveNumber = 102;
+
+pub type Depth = i16;
+pub const MAX_SEARCH_DEPTH: Depth = 100;
+pub const INFINITE_DEPTH: Depth = i16::MAX;
+
+pub type Eval = i32;
 
 #[derive(Debug, Clone)]
 pub struct Hyperparameters {
     pub ttable_size: usize,
     pub pvtable_size: usize,
     pub time_alloc_decay_moves: f64,
-    pub min_ttable_depth: u16,
+    pub min_ttable_depth: Depth,
 }
 
 impl Default for Hyperparameters {

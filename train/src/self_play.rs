@@ -13,7 +13,8 @@ use std::{
 use threadpool::ThreadPool;
 use wazir_drop::{
     DefaultEvaluator, Features, Outcome, Position, Score, ScoreExpanded, Search, Stage,
-    TopVariation, WPSFeatures, constants::Hyperparameters,
+    TopVariation, WPSFeatures,
+    constants::{Depth, Eval, Hyperparameters},
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -25,10 +26,10 @@ pub struct Config {
     batch_size: u64,
     ttable_size_mb: usize,
     pvtable_size_mb: usize,
-    depth: u16,
-    extra_depth: u16,
-    temperature: i32,
-    temperature_cutoff: i32,
+    depth: Depth,
+    extra_depth: Depth,
+    temperature: f64,
+    temperature_cutoff: Eval,
     features: FeaturesConfig,
 }
 
@@ -37,8 +38,8 @@ pub struct Sample {
     /// [to move, other]
     pub features: [Vec<u32>; 2],
     /// Value from deeper search.
-    // i32::MAX is win, -i32::MAX is loss
-    pub deep_value: i32,
+    // Eval::MAX is win, -Eval::MAX is loss
+    pub deep_value: Eval,
     /// +1 = win, -1 = loss
     pub game_points: i32,
 }
@@ -201,9 +202,9 @@ fn play_game<F: Features, W: serde_cbor::ser::Write>(
                 .collect()
         });
         let deep_value = match entry.deep_score.into() {
-            ScoreExpanded::Win(_) => i32::MAX,
+            ScoreExpanded::Win(_) => Eval::MAX,
             ScoreExpanded::Eval(eval) => eval,
-            ScoreExpanded::Loss(_) => -i32::MAX,
+            ScoreExpanded::Loss(_) => -Eval::MAX,
         };
         let game_points = outcome.points(to_move);
         let sample = Sample {
@@ -229,7 +230,7 @@ fn calc_deep_score(
     position: &Position,
     pv: &TopVariation,
     search: &mut Search<DefaultEvaluator>,
-    extra_depth: u16,
+    extra_depth: Depth,
     prev_pv_position_hash: &mut u64,
 ) -> Result<(Position, Score), DeepScoreImpossible> {
     if !matches!(pv.score.into(), ScoreExpanded::Eval(_)) {
@@ -257,7 +258,7 @@ fn calc_deep_score(
 fn select_variation<'a>(
     variations: &'a [TopVariation],
     rng: &mut StdRng,
-    temperature: i32,
+    temperature: f64,
 ) -> &'a TopVariation {
     let ScoreExpanded::Eval(top_eval) = variations[0].score.into() else {
         return &variations[0];
@@ -268,7 +269,7 @@ fn select_variation<'a>(
                 return 0.0;
             };
             let rel = eval - top_eval;
-            let log_prob = rel as f64 / temperature as f64;
+            let log_prob = rel as f64 / temperature;
             log_prob.exp()
         })
         .unwrap()
