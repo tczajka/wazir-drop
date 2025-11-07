@@ -91,8 +91,8 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             }
         }
 
-        // Wazir capture?
-        if let Some(mov) = movegen::wazir_captures(position).next() {
+        // Capture Wazir?
+        if let Some(mov) = movegen::captures_of_wazir(position).next() {
             return SearchResult {
                 score: ScoreExpanded::Win(position.move_number() + 1).into(),
                 pv: LongVariation::empty().add_front(mov),
@@ -443,11 +443,20 @@ impl<E: Evaluator> SearchInstance<'_, E> {
     ) -> Vec<TopVariation> {
         assert_eq!(position.stage(), Stage::Regular);
         assert!(max_eval_diff >= 0);
+
+        let mut variations: Vec<TopVariation> = Vec::new();
+
+        if let Some(mov) = movegen::captures_of_wazir(position).next() {
+            variations.push(TopVariation {
+                variation: LongVariation::empty().add_front(mov),
+                score: ScoreExpanded::Win(position.move_number() + 1).into(),
+            });
+            return variations;
+        }
+
         self.ttable.new_epoch();
         self.pvtable.new_epoch();
         let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
-
-        let mut variations: Vec<TopVariation> = Vec::new();
 
         for mov in movegen::regular_moves(eposition.position()) {
             let epos2 = eposition.make_regular_move(mov).unwrap();

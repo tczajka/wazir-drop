@@ -170,7 +170,7 @@ pub fn pseudomoves<'a>(position: &'a Position) -> impl Iterator<Item = Move> + '
 /// Generate all regular pseudomoves.
 /// Includes non-escapes and suicides.
 pub fn regular_pseudomoves<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
-    captures(position)
+    pseudocaptures(position)
         .chain(pseudojumps(position))
         .chain(drops(position))
 }
@@ -195,52 +195,62 @@ pub fn regular_moves_not_in_check<'a>(
 }
 
 /// Generate all captures
-/// If in check, includes non-escapes.
-pub fn captures<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
+/// Includes non-escapes and suicides.
+pub fn pseudocaptures<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
+    Piece::all().flat_map(move |piece| pseudocaptures_by_piece(position, piece))
+}
+
+fn pseudocaptures_by_piece<'a>(
+    position: &'a Position,
+    piece: Piece,
+) -> impl Iterator<Item = RegularMove> + 'a {
     assert!(position.stage() == Stage::Regular);
     let me = position.to_move();
     let opp = me.opposite();
     let opp_mask = position.occupied_by(opp);
-    Piece::all().flat_map(move |piece| {
-        let colored_piece = piece.with_color(me);
-        position
-            .occupied_by_piece(colored_piece)
-            .into_iter()
-            .flat_map(move |from| {
-                (move_bitboard(piece, from) & opp_mask)
-                    .into_iter()
-                    .map(move |to| RegularMove {
-                        colored_piece,
-                        from: Some(from),
-                        captured: Some(position.square(to).unwrap().piece()),
-                        to,
-                    })
-            })
-    })
+    let colored_piece = piece.with_color(me);
+    position
+        .occupied_by_piece(colored_piece)
+        .into_iter()
+        .flat_map(move |from| {
+            (move_bitboard(piece, from) & opp_mask)
+                .into_iter()
+                .map(move |to| RegularMove {
+                    colored_piece,
+                    from: Some(from),
+                    captured: Some(position.square(to).unwrap().piece()),
+                    to,
+                })
+        })
 }
 
 /// Generate all pseudojumps (not captures).
 /// Includes non-escapes and suicides.
 pub fn pseudojumps<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
+    Piece::all().flat_map(move |piece| pseudojumps_by_piece(position, piece))
+}
+
+fn pseudojumps_by_piece<'a>(
+    position: &'a Position,
+    piece: Piece,
+) -> impl Iterator<Item = RegularMove> + 'a {
     assert!(position.stage() == Stage::Regular);
     let me = position.to_move();
     let empty = position.empty_squares();
-    Piece::all().flat_map(move |piece| {
-        let colored_piece = piece.with_color(me);
-        position
-            .occupied_by_piece(colored_piece)
-            .into_iter()
-            .flat_map(move |from| {
-                (move_bitboard(piece, from) & empty)
-                    .into_iter()
-                    .map(move |to| RegularMove {
-                        colored_piece,
-                        from: Some(from),
-                        captured: None,
-                        to,
-                    })
-            })
-    })
+    let colored_piece = piece.with_color(me);
+    position
+        .occupied_by_piece(colored_piece)
+        .into_iter()
+        .flat_map(move |from| {
+            (move_bitboard(piece, from) & empty)
+                .into_iter()
+                .map(move |to| RegularMove {
+                    colored_piece,
+                    from: Some(from),
+                    captured: None,
+                    to,
+                })
+        })
 }
 
 /// Piece drops.
@@ -285,40 +295,57 @@ pub fn in_check(position: &Position, color: Color) -> bool {
 }
 
 // Generates all captures of the wazir, i.e. final moves of the game.
-pub fn wazir_captures<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
+pub fn captures_of_wazir<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
     assert!(position.stage() == Stage::Regular);
-    let to_move = position.to_move();
+    let me = position.to_move();
+    let opp = me.opposite();
     let wazir_square = position
-        .occupied_by_piece(Piece::Wazir.with_color(to_move.opposite()))
+        .occupied_by_piece(Piece::Wazir.with_color(opp))
         .first()
         .unwrap();
+    pseudocaptures_of_square(position, wazir_square)
+}
+
+// Generate all captures of a piece on a square.
+fn pseudocaptures_of_square<'a>(
+    position: &'a Position,
+    to: Square,
+) -> impl Iterator<Item = RegularMove> + 'a {
+    assert!(position.stage() == Stage::Regular);
+    let me = position.to_move();
+    let opp = me.opposite();
+    let captured = position.square(to).unwrap();
+    assert_eq!(captured.color(), opp);
+    let captured = captured.piece();
     Piece::all().flat_map(move |piece| {
-        let colored_piece = piece.with_color(to_move);
-        let from_bitboard =
-            move_bitboard(piece, wazir_square) & position.occupied_by_piece(colored_piece);
+        let colored_piece = piece.with_color(me);
+        let from_bitboard = move_bitboard(piece, to) & position.occupied_by_piece(colored_piece);
         from_bitboard.into_iter().map(move |from| RegularMove {
             colored_piece,
             from: Some(from),
-            captured: Some(Piece::Wazir),
-            to: wazir_square,
+            captured: Some(captured),
+            to,
         })
     })
 }
 
 // Must be in check. Generates all moves that escape the check.
 pub fn check_evasions<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
-    check_evasion_captures(position).chain(check_evasion_jumps(position))
+    check_evasions_capture_attacker(position)
+        .chain(captures_by_wazir(position))
+        .chain(jumps_by_wazir(position))
 }
 
-// Must be in check. Generates all captures that escape the check.
-pub fn check_evasion_captures<'a>(
+// Must be in check.
+// Generates all captures that capture the checking piece.
+pub fn check_evasions_capture_attacker<'a>(
     position: &'a Position,
 ) -> impl Iterator<Item = RegularMove> + 'a {
     assert!(position.stage() == Stage::Regular);
-    let to_move = position.to_move();
-    let opp = to_move.opposite();
+    let me = position.to_move();
+    let opp = me.opposite();
     let wazir_square = position
-        .occupied_by_piece(Piece::Wazir.with_color(to_move))
+        .occupied_by_piece(Piece::Wazir.with_color(me))
         .first()
         .unwrap();
     let checked_by = attacked_by(position, wazir_square, opp);
@@ -328,48 +355,37 @@ pub fn check_evasion_captures<'a>(
         // checked by multiple pieces
         only_checked_by = None;
     }
-    only_checked_by.into_iter().flat_map(move |to| {
-        let attacker_piece = position.square(to).unwrap().piece();
-        Piece::all().flat_map(move |defender_piece| {
-            let colored_piece = defender_piece.with_color(to_move);
-            let defender_squares =
-                move_bitboard(defender_piece, to) & position.occupied_by_piece(colored_piece);
-            defender_squares.into_iter().map(move |from| RegularMove {
-                colored_piece: defender_piece.with_color(to_move),
-                from: Some(from),
-                captured: Some(attacker_piece),
-                to,
-            })
-        })
-    })
+    // It's OK to use pseudocaptures here because there is only one attacker.
+    // Wazir-wazir capture is fine.
+    only_checked_by
+        .into_iter()
+        .flat_map(move |to| pseudocaptures_of_square(position, to))
 }
 
-// Must be in check. Generates all Wazir jumps that escape the check.
-pub fn check_evasion_jumps<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
-    assert!(position.stage() == Stage::Regular);
-    let me = position.to_move();
-    let opp = me.opposite();
-    let empty = position.empty_squares();
-    let wazir = Piece::Wazir.with_color(me);
-    let wazir_square = position.occupied_by_piece(wazir).first().unwrap();
-    let destinations = move_bitboard(Piece::Wazir, wazir_square) & empty;
-    destinations
-        .into_iter()
-        .filter(move |&to| !is_attacked_by(position, to, opp))
-        .map(move |to| RegularMove {
-            colored_piece: wazir,
-            from: Some(wazir_square),
-            captured: None,
-            to,
-        })
+// Must not be in check. Generates all captures that are not suicides.
+pub fn captures<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
+    Piece::all_non_wazir()
+        .flat_map(move |piece| pseudocaptures_by_piece(position, piece))
+        .chain(captures_by_wazir(position))
+}
+
+pub fn captures_by_wazir<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
+    let opp = position.to_move().opposite();
+    pseudocaptures_by_piece(position, Piece::Wazir)
+        .filter(move |mov| !is_attacked_by(position, mov.to, opp))
 }
 
 // Must not be in check.
 // Generates jumps that are not suicides.
 pub fn jumps<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
-    let me = position.to_move();
-    let opp = me.opposite();
-    pseudojumps(position).filter(move |mov| {
-        mov.colored_piece.piece() != Piece::Wazir || !is_attacked_by(position, mov.to, opp)
-    })
+    Piece::all_non_wazir()
+        .flat_map(move |piece| pseudojumps_by_piece(position, piece))
+        .chain(jumps_by_wazir(position))
+}
+
+// Generates all Wazir jumps that are not suicides.
+pub fn jumps_by_wazir<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
+    let opp = position.to_move().opposite();
+    pseudojumps_by_piece(position, Piece::Wazir)
+        .filter(move |mov| !is_attacked_by(position, mov.to, opp))
 }

@@ -2,9 +2,9 @@ use std::str::FromStr;
 
 use wazir_drop::{
     movegen::{
-        attacked_by, captures, check_evasion_captures, check_evasion_jumps, drops, in_check, jumps,
-        move_bitboard, move_from_short_move, pseudojumps, setup_moves, validate_from_to,
-        wazir_captures,
+        attacked_by, captures_of_wazir, check_evasions_capture_attacker, drops, in_check, jumps,
+        move_bitboard, move_from_short_move, pseudocaptures, pseudojumps, setup_moves,
+        validate_from_to,
     },
     Color, Piece, Position, RegularMove, ShortMove, Square,
 };
@@ -197,7 +197,9 @@ add.w..a
     )
     .unwrap();
 
-    let moves: Vec<String> = captures(&position).map(|mov| mov.to_string()).collect();
+    let moves: Vec<String> = pseudocaptures(&position)
+        .map(|mov| mov.to_string())
+        .collect();
     assert_eq!(&moves, &["Ac5xae7", "Nf7xah8", "Wa2xfb2"]);
 }
 
@@ -337,14 +339,14 @@ add....a
     )
     .unwrap();
 
-    let moves: Vec<String> = wazir_captures(&position)
+    let moves: Vec<String> = captures_of_wazir(&position)
         .map(|mov| mov.to_string())
         .collect();
     assert_eq!(&moves, &["Ab4xwd6", "Ab8xwd6", "Db6xwd6", "Nf7xwd6"]);
 }
 
 #[test]
-fn test_check_evasion_captures() {
+fn test_check_evasion_capture_attacker() {
     let position = Position::from_str(
         "\
 regular
@@ -362,7 +364,7 @@ addw...a
     )
     .unwrap();
 
-    let moves: Vec<String> = check_evasion_captures(&position)
+    let moves: Vec<String> = check_evasions_capture_attacker(&position)
         .map(|mov| mov.to_string())
         .collect();
     assert_eq!(&moves, &["Ad5xfb3", "Db5xfb3"]);
@@ -385,33 +387,8 @@ a.dw...a
     )
     .unwrap();
 
-    let moves: Vec<RegularMove> = check_evasion_captures(&position).collect();
+    let moves: Vec<RegularMove> = check_evasions_capture_attacker(&position).collect();
     assert!(moves.is_empty());
-}
-
-#[test]
-fn test_check_evasion_jumps() {
-    let position = Position::from_str(
-        "\
-regular
-4
-Af
-FW.A.D.D
-AFfAD.DA
-..A...A.
-....A.A.
-...a..ad
-..d..nN.
-a.a...a.
-addw...a
-",
-    )
-    .unwrap();
-
-    let moves: Vec<String> = check_evasion_jumps(&position)
-        .map(|mov| mov.to_string())
-        .collect();
-    assert_eq!(&moves, &["Wa2-a3"]);
 }
 
 #[test]
