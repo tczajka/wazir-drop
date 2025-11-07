@@ -167,7 +167,7 @@ pub fn pseudomoves(position: &Position) -> impl Iterator<Item = Move> + '_ {
     }
 }
 
-/// Generate all regularpseudomoves.
+/// Generate all regular pseudomoves.
 /// Includes non-escapes and suicides.
 pub fn regular_pseudomoves(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
     captures(position)
@@ -241,4 +241,22 @@ pub fn drops(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
                 to,
             })
         })
+}
+
+pub fn attacked_by(position: &Position, square: Square, color: Color) -> Bitboard {
+    let mut res = Bitboard::EMPTY;
+    for piece in Piece::all() {
+        res |= move_bitboard(piece, square) & position.occupied_by_piece(piece.with_color(color));
+    }
+    res
+}
+
+pub fn in_check(position: &Position, color: Color) -> bool {
+    let Some(wazir_square) = position
+        .occupied_by_piece(Piece::Wazir.with_color(color))
+        .first()
+    else {
+        return false;
+    };
+    !attacked_by(position, wazir_square, color.opposite()).is_empty()
 }

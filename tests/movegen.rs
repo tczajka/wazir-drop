@@ -2,8 +2,8 @@ use std::str::FromStr;
 
 use wazir_drop::{
     movegen::{
-        captures, drops, move_bitboard, move_from_short_move, pseudojumps, setup_moves,
-        validate_from_to,
+        attacked_by, captures, drops, in_check, move_bitboard, move_from_short_move, pseudojumps,
+        setup_moves, validate_from_to,
     },
     Color, Piece, Position, ShortMove, Square,
 };
@@ -258,4 +258,61 @@ add.w..a
             "A@h7",
         ]
     );
+}
+
+#[test]
+fn test_attacked_by() {
+    let position = Position::from_str(
+        "\
+regular
+4
+Af
+FW.A.D.D
+AfFA.DDA
+..A.A.A.
+......A.
+...a..ad
+..d..nN.
+a.a...a.
+add.w..a
+",
+    )
+    .unwrap();
+
+    assert_eq!(
+        attacked_by(&position, Square::D6, Color::Red).to_string(),
+        "\
+........
+...x.x.x
+........
+........
+........
+......x.
+........
+........
+"
+    );
+}
+
+#[test]
+fn test_in_check() {
+    let position = Position::from_str(
+        "\
+regular
+4
+Af
+FW.A.D.D
+fAFA.DDA
+..A.A.A.
+......A.
+...a..ad
+..d..nN.
+a.a...a.
+add.w..a
+",
+    )
+    .unwrap();
+
+    assert!(in_check(&position, Color::Red));
+    assert!(!in_check(&position, Color::Blue));
 }
