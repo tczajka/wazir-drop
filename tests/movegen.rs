@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use wazir_drop::{
     movegen::{
-        attacked_by, captures, check_evasion_captures, check_evasion_jumps, drops, in_check,
+        attacked_by, captures, check_evasion_captures, check_evasion_jumps, drops, in_check, jumps,
         move_bitboard, move_from_short_move, pseudojumps, setup_moves, validate_from_to,
         wazir_captures,
     },
@@ -412,4 +412,33 @@ addw...a
         .map(|mov| mov.to_string())
         .collect();
     assert_eq!(&moves, &["Wa2-a3"]);
+}
+
+#[test]
+fn test_jumps() {
+    let position = Position::from_str(
+        "\
+regular
+4
+AAAAAAAAddFf
+.W...DD.
+.fF.....
+......A.
+........
+...a..ad
+..d..nN.
+a.a...a.
+add.w..a
+",
+    )
+    .unwrap();
+
+    let moves: Vec<String> = jumps(&position).map(|mov| mov.to_string()).collect();
+    assert_eq!(
+        &moves,
+        &[
+            "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Da7-a5", "Fb3-a4", "Fb3-c2",
+            "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-g5", "Nf7-h6"
+        ]
+    );
 }

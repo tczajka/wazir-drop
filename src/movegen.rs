@@ -175,6 +175,14 @@ pub fn regular_pseudomoves<'a>(position: &'a Position) -> impl Iterator<Item = R
         .chain(drops(position))
 }
 
+/// Generate all moves.
+/// Must not be in check. Does not include suicides.
+pub fn regular_moves<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
+    captures(position)
+        .chain(jumps(position))
+        .chain(drops(position))
+}
+
 /// Generate all captures
 /// If in check, includes non-escapes.
 pub fn captures<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
@@ -251,6 +259,10 @@ pub fn attacked_by(position: &Position, square: Square, color: Color) -> Bitboar
     res
 }
 
+pub fn is_attacked_by(position: &Position, square: Square, color: Color) -> bool {
+    !attacked_by(position, square, color).is_empty()
+}
+
 pub fn in_check(position: &Position, color: Color) -> bool {
     let Some(wazir_square) = position
         .occupied_by_piece(Piece::Wazir.with_color(color))
@@ -258,7 +270,7 @@ pub fn in_check(position: &Position, color: Color) -> bool {
     else {
         return false;
     };
-    !attacked_by(position, wazir_square, color.opposite()).is_empty()
+    is_attacked_by(position, wazir_square, color.opposite())
 }
 
 // Generates all captures of the wazir, i.e. final moves of the game.
@@ -332,11 +344,21 @@ pub fn check_evasion_jumps<'a>(position: &'a Position) -> impl Iterator<Item = R
     let destinations = move_bitboard(Piece::Wazir, wazir_square) & empty;
     destinations
         .into_iter()
-        .filter(move |&to| attacked_by(position, to, opp).is_empty())
+        .filter(move |&to| !is_attacked_by(position, to, opp))
         .map(move |to| RegularMove {
             colored_piece: wazir,
             from: Some(wazir_square),
             captured: None,
             to,
         })
+}
+
+// Must not be in check.
+// Generates jumps that are not suicides.
+pub fn jumps<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
+    let me = position.to_move();
+    let opp = me.opposite();
+    pseudojumps(position).filter(move |mov| {
+        mov.colored_piece.piece() != Piece::Wazir || !is_attacked_by(position, mov.to, opp)
+    })
 }
