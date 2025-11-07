@@ -315,3 +315,23 @@ pub fn check_evasion_captures<'a>(
         })
     })
 }
+
+// Must be in check. Generates all Wazir jumps that escape the check.
+pub fn check_evasion_jumps<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
+    assert!(position.stage() == Stage::Regular);
+    let me = position.to_move();
+    let opp = me.opposite();
+    let empty = position.empty_squares();
+    let wazir = Piece::Wazir.with_color(me);
+    let wazir_square = position.occupied_by_piece(wazir).first().unwrap();
+    let destinations = move_bitboard(Piece::Wazir, wazir_square) & empty;
+    destinations
+        .into_iter()
+        .filter(move |&to| attacked_by(position, to, opp).is_empty())
+        .map(move |to| RegularMove {
+            colored_piece: wazir,
+            from: Some(wazir_square),
+            captured: None,
+            to,
+        })
+}
