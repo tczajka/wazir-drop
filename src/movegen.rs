@@ -159,7 +159,7 @@ impl Iterator for SetupMoveIterator {
     }
 }
 
-pub fn pseudomoves(position: &Position) -> impl Iterator<Item = Move> + '_ {
+pub fn pseudomoves<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     match position.stage() {
         Stage::Setup => Either::Left(setup_moves(position.to_move()).map(Move::Setup)),
         Stage::Regular => Either::Right(regular_pseudomoves(position).map(Move::Regular)),
@@ -169,7 +169,7 @@ pub fn pseudomoves(position: &Position) -> impl Iterator<Item = Move> + '_ {
 
 /// Generate all regular pseudomoves.
 /// Includes non-escapes and suicides.
-pub fn regular_pseudomoves(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
+pub fn regular_pseudomoves<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
     captures(position)
         .chain(pseudojumps(position))
         .chain(drops(position))
@@ -177,7 +177,7 @@ pub fn regular_pseudomoves(position: &Position) -> impl Iterator<Item = RegularM
 
 /// Generate all captures
 /// If in check, includes non-escapes.
-pub fn captures(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
+pub fn captures<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
     assert!(position.stage() == Stage::Regular);
     let me = position.to_move();
     let opp = me.opposite();
@@ -202,7 +202,7 @@ pub fn captures(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
 
 /// Generate all pseudojumps (not captures).
 /// Includes non-escapes and suicides.
-pub fn pseudojumps(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
+pub fn pseudojumps<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
     assert!(position.stage() == Stage::Regular);
     let me = position.to_move();
     let empty = position.empty_squares();
@@ -226,7 +226,7 @@ pub fn pseudojumps(position: &Position) -> impl Iterator<Item = RegularMove> + '
 
 /// Piece drops.
 /// If in check, these are non-escapes.
-pub fn drops(position: &Position) -> impl Iterator<Item = RegularMove> + '_ {
+pub fn drops<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
     assert!(position.stage() == Stage::Regular);
     let me = position.to_move();
     let empty = position.empty_squares();
@@ -259,4 +259,25 @@ pub fn in_check(position: &Position, color: Color) -> bool {
         return false;
     };
     !attacked_by(position, wazir_square, color.opposite()).is_empty()
+}
+
+// Generates all captures of the wazir, i.e. final moves of the game.
+pub fn wazir_captures<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
+    assert!(position.stage() == Stage::Regular);
+    let to_move = position.to_move();
+    let wazir_square = position
+        .occupied_by_piece(Piece::Wazir.with_color(to_move.opposite()))
+        .first()
+        .unwrap();
+    Piece::all().flat_map(move |piece| {
+        let colored_piece = piece.with_color(to_move);
+        let from_bitboard =
+            move_bitboard(piece, wazir_square) & position.occupied_by_piece(colored_piece);
+        from_bitboard.into_iter().map(move |from| RegularMove {
+            colored_piece,
+            from: Some(from),
+            captured: Some(Piece::Wazir),
+            to: wazir_square,
+        })
+    })
 }

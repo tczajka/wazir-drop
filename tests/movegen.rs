@@ -3,7 +3,7 @@ use std::str::FromStr;
 use wazir_drop::{
     movegen::{
         attacked_by, captures, drops, in_check, move_bitboard, move_from_short_move, pseudojumps,
-        setup_moves, validate_from_to,
+        setup_moves, validate_from_to, wazir_captures,
     },
     Color, Piece, Position, ShortMove, Square,
 };
@@ -315,4 +315,29 @@ add.w..a
 
     assert!(in_check(&position, Color::Red));
     assert!(!in_check(&position, Color::Blue));
+}
+
+#[test]
+fn test_wazir_captures() {
+    let position = Position::from_str(
+        "\
+regular
+4
+Af
+FW.A.D.D
+AfFA.DDA
+..A.A.A.
+.....wA.
+...a..ad
+..d..nN.
+a.a...a.
+add....a
+",
+    )
+    .unwrap();
+
+    let moves: Vec<String> = wazir_captures(&position)
+        .map(|mov| mov.to_string())
+        .collect();
+    assert_eq!(&moves, &["Ab4xwd6", "Ab8xwd6", "Db6xwd6", "Nf7xwd6"]);
 }
