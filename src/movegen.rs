@@ -282,6 +282,11 @@ pub fn wazir_captures<'a>(position: &'a Position) -> impl Iterator<Item = Regula
     })
 }
 
+// Must be in check. Generates all moves that escape the check.
+pub fn check_evasions<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
+    check_evasion_captures(position).chain(check_evasion_jumps(position))
+}
+
 // Must be in check. Generates all captures that escape the check.
 pub fn check_evasion_captures<'a>(
     position: &'a Position,
