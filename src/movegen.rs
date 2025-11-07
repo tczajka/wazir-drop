@@ -175,9 +175,20 @@ pub fn regular_pseudomoves<'a>(position: &'a Position) -> impl Iterator<Item = R
         .chain(drops(position))
 }
 
+/// Generate all moves except suicides.
+pub fn regular_moves<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
+    if in_check(position, position.to_move()) {
+        Either::Left(check_evasions(position))
+    } else {
+        Either::Right(regular_moves_not_in_check(position))
+    }
+}
+
 /// Generate all moves.
 /// Must not be in check. Does not include suicides.
-pub fn regular_moves<'a>(position: &'a Position) -> impl Iterator<Item = RegularMove> + 'a {
+pub fn regular_moves_not_in_check<'a>(
+    position: &'a Position,
+) -> impl Iterator<Item = RegularMove> + 'a {
     captures(position)
         .chain(jumps(position))
         .chain(drops(position))

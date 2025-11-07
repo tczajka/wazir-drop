@@ -1,6 +1,7 @@
 use crate::{
     constants::{
         Depth, Eval, Hyperparameters, CHECK_TIMEOUT_NODES, INFINITE_DEPTH, MAX_SEARCH_DEPTH,
+        MOVE_NUMBER_DRAW,
     },
     movegen,
     ttable::{TTable, TTableEntry, TTableScoreType},
@@ -90,13 +91,38 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             }
         }
 
+        // Wazir capture?
+        if let Some(mov) = movegen::wazir_captures(position).next() {
+            return SearchResult {
+                score: ScoreExpanded::Win(position.move_number() + 1).into(),
+                pv: LongVariation::empty().add_front(mov),
+                depth: INFINITE_DEPTH,
+                root_moves_considered: 1,
+                root_all_moves: 1,
+                nodes: 0,
+            };
+        }
+
         self.ttable.new_epoch();
         self.pvtable.new_epoch();
         let max_depth = max_depth.unwrap_or(MAX_SEARCH_DEPTH);
         let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
 
-        let (mut search_result, moves) = self.search_one_ply(&eposition);
-        let mut moves: Vec<RegularMove> = moves.into_iter().map(|(mov, _)| mov).collect();
+        let (mut search_result, mut moves) = self.search_one_ply(&eposition);
+        if moves.is_empty() {
+            // We are checkmated. Do any pseudomove.
+            let mov = movegen::regular_pseudomoves(eposition.position())
+                .next()
+                .expect("Stalemate");
+            return SearchResult {
+                score: ScoreExpanded::Loss(position.move_number() + 2).into(),
+                pv: LongVariation::empty().add_front(mov),
+                depth: INFINITE_DEPTH,
+                root_moves_considered: 0,
+                root_all_moves: 0,
+                nodes: 0,
+            };
+        }
 
         self.deadline = deadline;
 
@@ -174,10 +200,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
     fn search_one_ply(
         &mut self,
         eposition: &EvaluatedPosition<E>,
-    ) -> (
-        SearchResultInternal<LongVariation>,
-        Vec<(RegularMove, Score)>,
-    ) {
+    ) -> (SearchResultInternal<LongVariation>, Vec<RegularMove>) {
         let mut moves: Vec<(RegularMove, Score)> = Vec::new();
         let mut search_result = SearchResultInternal {
             score: -Score::IMMEDIATE_WIN,
@@ -185,7 +208,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             pv: LongVariation::empty(),
         };
 
-        for mov in movegen::regular_pseudomoves(eposition.position()) {
+        for mov in movegen::regular_moves(eposition.position()) {
             let epos2 = eposition.make_regular_move(mov).unwrap();
             let result = self
                 .search_alpha_beta::<LongVariation>(
@@ -205,8 +228,10 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 moves.swap(0, last);
             }
         }
-        assert!(!moves.is_empty(), "Stalemate");
-        moves[1..].sort_by_key(|&(_, score)| -score);
+        if !moves.is_empty() {
+            moves[1..].sort_by_key(|&(_, score)| -score);
+        }
+        let moves: Vec<RegularMove> = moves.into_iter().map(|(mov, _)| mov).collect();
 
         (search_result, moves)
     }
@@ -232,8 +257,24 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         }
 
         // Endgame distance pruning.
+        let earliest_win = move_number + 3; // if we deliver checkmate this move
+        let earliest_loss =
+            if movegen::in_check(eposition.position(), eposition.position().to_move()) {
+                move_number + 2 // if we are already checkmated
+            } else {
+                move_number + 4 // if we get checkmated next move
+            };
+
+        if earliest_win.min(earliest_loss) > MOVE_NUMBER_DRAW {
+            return Ok(SearchResultInternal {
+                score: ScoreExpanded::Eval(0).into(),
+                inf_depth: true,
+                pv: V::empty_truncated(),
+            });
+        }
+
         {
-            let best_win = ScoreExpanded::Win(move_number + 1).into();
+            let best_win = ScoreExpanded::Win(earliest_win).into();
             if best_win <= alpha {
                 return Ok(SearchResultInternal {
                     score: best_win,
@@ -241,7 +282,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                     pv: V::empty_truncated(),
                 });
             }
-            let worst_loss = ScoreExpanded::Loss(move_number + 2).into();
+            let worst_loss = ScoreExpanded::Loss(earliest_loss).into();
             if worst_loss >= beta {
                 return Ok(SearchResultInternal {
                     score: worst_loss,
@@ -343,13 +384,14 @@ impl<E: Evaluator> SearchInstance<'_, E> {
 
         // Transposition table move first, then all other moves.
         let moves = tt_move.into_iter().chain(
-            movegen::regular_pseudomoves(eposition.position()).filter(|&mov| Some(mov) != tt_move),
+            movegen::regular_moves(eposition.position()).filter(|&mov| Some(mov) != tt_move),
         );
 
+        // If we are checkmated, we lose in 2 moves.
         let mut result = SearchResultInternal {
-            score: -Score::IMMEDIATE_WIN,
+            score: ScoreExpanded::Loss(eposition.position().move_number() + 2).into(),
             inf_depth: true,
-            pv: V::empty(),
+            pv: V::empty_truncated(),
         };
 
         for mov in moves {
@@ -407,7 +449,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
 
         let mut variations: Vec<TopVariation> = Vec::new();
 
-        for mov in movegen::regular_pseudomoves(eposition.position()) {
+        for mov in movegen::regular_moves(eposition.position()) {
             let epos2 = eposition.make_regular_move(mov).unwrap();
             let result = self
                 .search_alpha_beta::<LongVariation>(
@@ -422,6 +464,17 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 variation: result.pv.add_front(mov),
                 score,
             });
+        }
+        if variations.is_empty() {
+            // We are checkmated. Do any pseudomove.
+            let mov = movegen::regular_pseudomoves(eposition.position())
+                .next()
+                .expect("Stalemate");
+            variations.push(TopVariation {
+                variation: LongVariation::empty().add_front(mov),
+                score: ScoreExpanded::Loss(position.move_number() + 2).into(),
+            });
+            return variations;
         }
 
         variations.sort_by_key(|v| -v.score);
