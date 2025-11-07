@@ -29,6 +29,7 @@ mod search;
 mod square;
 mod symmetry;
 mod ttable;
+mod variation;
 mod wps_features;
 mod zobrist;
 
@@ -49,9 +50,13 @@ pub use piece::{ColoredPiece, Piece};
 pub use player::{Player, PlayerFactory};
 pub use position::{Outcome, Position, Stage};
 pub use score::{Score, ScoreExpanded};
-pub use search::{Search, TopVariation, Variation};
+pub use search::{Search, TopVariation};
 pub use square::{Coord, Direction, Square};
 pub use symmetry::{NormalizedSquare, Symmetry};
+pub use variation::{
+    EmptyVariation, ExtendableVariation, LongVariation, NonEmptyVariation, OneMoveVariation,
+    Variation,
+};
 pub use wps_features::WPSFeatures;
 
 pub type DefaultEvaluator = LinearEvaluator<WPSFeatures>;
