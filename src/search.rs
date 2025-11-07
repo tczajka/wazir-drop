@@ -89,6 +89,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         }
 
         self.ttable.new_epoch();
+        self.pvtable.new_epoch();
         let max_depth = max_depth.unwrap_or(MAX_SEARCH_DEPTH);
         let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
 
@@ -395,6 +396,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         assert_eq!(position.stage(), Stage::Regular);
         assert!(max_eval_diff >= 0);
         self.ttable.new_epoch();
+        self.pvtable.new_epoch();
         let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
 
         let mut variations: Vec<TopVariation> = Vec::new();

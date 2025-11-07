@@ -24,6 +24,7 @@ pub struct Config {
     num_games: u64,
     batch_size: u64,
     ttable_size_mb: usize,
+    pvtable_size_mb: usize,
     depth: u16,
     extra_depth: u16,
     temperature: i32,
@@ -127,6 +128,7 @@ fn play_game<F: Features, W: serde_cbor::ser::Write>(
 
     let hyperparameters = Hyperparameters {
         ttable_size: config.ttable_size_mb << 20,
+        pvtable_size: config.pvtable_size_mb << 20,
         ..Hyperparameters::default()
     };
 

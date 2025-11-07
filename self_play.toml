@@ -6,6 +6,7 @@ num_cpus = 30
 num_games = 100000
 batch_size = 10000
 ttable_size_mb = 16
+pvtable_size_mb = 1
 depth = 3
 extra_depth = 3
 temperature = 10
