@@ -63,8 +63,7 @@ fn run_with_model<M: EvalModel>(
 
     for epoch in 0..config.epochs {
         let mut num_examples = 0;
-        let mut total_value_loss: f64 = 0.0;
-        let mut total_outcome_loss: f64 = 0.0;
+        let mut total_loss: f64 = 0.0;
         let start_time = Instant::now();
         let mut last_log_time = start_time;
 
@@ -75,12 +74,11 @@ fn run_with_model<M: EvalModel>(
             {
                 let elapsed_time = start_time.elapsed().as_secs_f64();
                 log::info!(
-                    "Epoch {epoch} / {num_epochs} examples {num_examples} time {elapsed_time:.2}s examples/s {examples_per_second:.0}\n  \
-                    value loss {value_loss:.3} outcome loss {outcome_loss:.3}",
+                    "Epoch {epoch} / {num_epochs} examples {num_examples} time {elapsed_time:.2}s \
+                    examples/s {examples_per_second:.0} loss {loss:.3}",
                     num_epochs = config.epochs,
-                    value_loss = total_value_loss / num_examples as f64,
-                    outcome_loss = total_outcome_loss / num_examples as f64,
-                    examples_per_second = num_examples as f64 / elapsed_time
+                    examples_per_second = num_examples as f64 / elapsed_time,
+                    loss = total_loss / num_examples as f64,
                 );
                 last_log_time = Instant::now();
             }
@@ -90,20 +88,9 @@ fn run_with_model<M: EvalModel>(
             let batch = batch.to_device(device);
             let values = model.forward(&batch.input);
             let win_prob = values.sigmoid();
-            let value_loss = win_prob.mse_loss(&batch.values.sigmoid(), Reduction::Mean);
-            let outcome_loss = values.binary_cross_entropy_with_logits::<Tensor>(
-                &batch.outcomes,
-                None,
-                None,
-                Reduction::Mean,
-            );
-            let loss =
-                (1.0 - config.outcome_weight) * &value_loss + config.outcome_weight * &outcome_loss;
-
+            let loss = win_prob.mse_loss(&batch.outputs, Reduction::Mean);
             num_examples += batch.size;
-            total_value_loss += batch.size as f64 * f64::try_from(&value_loss).unwrap();
-            total_outcome_loss += batch.size as f64 * f64::try_from(&outcome_loss).unwrap();
-
+            total_loss += batch.size as f64 * f64::try_from(&loss).unwrap();
             optimizer.backward_step(&loss);
         }
     }
@@ -117,9 +104,7 @@ struct Batch {
     // Features: [batch_size,2, N]
     input: Tensor,
     // [batch_size]
-    values: Tensor,
-    // [batch_size]
-    outcomes: Tensor,
+    outputs: Tensor,
 }
 
 impl Batch {
@@ -127,12 +112,16 @@ impl Batch {
         Self {
             size: self.size,
             input: self.input.to_device(device),
-            values: self.values.to_device(device),
-            outcomes: self.outcomes.to_device(device),
+            outputs: self.outputs.to_device(device),
         }
     }
 
-    fn from_samples(samples: &[Sample], num_features: usize, input_value_scale: f32) -> Self {
+    fn from_samples(
+        samples: &[Sample],
+        num_features: usize,
+        input_value_scale: f32,
+        outcome_weight: f32,
+    ) -> Self {
         let mut inputs = Vec::with_capacity(samples.len());
         let mut values = Vec::with_capacity(samples.len());
         let mut outcomes = Vec::with_capacity(samples.len());
@@ -149,11 +138,14 @@ impl Batch {
             let outcome = sample.game_points;
             outcomes.push(outcome);
         }
+        let values =
+            (1.0 / input_value_scale * Tensor::from_slice(&values).to_kind(Kind::Float)).sigmoid();
+        let outcomes = 0.5 + 0.5 * Tensor::from_slice(&outcomes).to_kind(Kind::Float);
+        let outputs = (1.0 - outcome_weight) * values + outcome_weight * outcomes;
         Self {
             size: samples.len() as i64,
             input: Tensor::stack(&inputs, 0),
-            values: 1.0 / input_value_scale * Tensor::from_slice(&values).to_kind(Kind::Float),
-            outcomes: 0.5 + 0.5 * Tensor::from_slice(&outcomes).to_kind(Kind::Float),
+            outputs,
         }
     }
 }
@@ -162,6 +154,7 @@ struct DatasetIterator<'de> {
     /// None if the whole dataset is already loaded in memory.
     deserializer: Option<StreamDeserializer<'de, IoRead<BufReader<File>>, Sample>>,
     input_value_scale: f32,
+    outcome_weight: f32,
     num_features: usize,
     chunk_size: usize,
     batch_size: usize,
@@ -177,6 +170,7 @@ impl<'de> DatasetIterator<'de> {
         Ok(Self {
             deserializer: Some(deserializer.into_iter()),
             input_value_scale: config.input_value_scale,
+            outcome_weight: config.outcome_weight,
             num_features,
             chunk_size: config.chunk_size,
             batch_size: config.batch_size,
@@ -198,6 +192,7 @@ impl<'de> DatasetIterator<'de> {
             samples,
             self.num_features,
             self.input_value_scale,
+            self.outcome_weight,
         )))
     }
 
