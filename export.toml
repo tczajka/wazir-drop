@@ -1,7 +1,7 @@
 log = "logs/export.log"
 
 [command.export]
-weights = "data/linear_wps_1.weights"
+weights = "data/linear_wps_2.weights"
 output = "data/linear_wps_weights.rs"
 features = "WPS"
 value_scale = 1000
