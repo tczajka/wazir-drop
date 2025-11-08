@@ -20,7 +20,6 @@ pub struct Hyperparameters {
     pub pvtable_size: usize,
     pub time_alloc_decay_moves: f64,
     pub min_depth_ttable: Depth,
-    pub min_depth_null_move: Depth,
     // In addition to 1 ply.
     pub reduction_null_move: Depth,
 }
@@ -32,7 +31,6 @@ impl Default for Hyperparameters {
             pvtable_size: 16 << 20,
             time_alloc_decay_moves: 20.0,
             min_depth_ttable: 2,
-            min_depth_null_move: 1,
             reduction_null_move: 1,
         }
     }

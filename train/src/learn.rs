@@ -87,8 +87,12 @@ fn run_with_model<M: EvalModel>(
             };
             let batch = batch.to_device(device);
             let values = model.forward(&batch.input);
-            let win_prob = values.sigmoid();
-            let loss = win_prob.mse_loss(&batch.outputs, Reduction::Mean);
+            let loss = values.binary_cross_entropy_with_logits::<Tensor>(
+                &batch.outputs,
+                None,
+                None,
+                Reduction::Mean,
+            );
             num_examples += batch.size;
             total_loss += batch.size as f64 * f64::try_from(&loss).unwrap();
             optimizer.backward_step(&loss);

@@ -397,13 +397,14 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             Either::Right(Either::Left(movegen::captures(eposition.position())))
         } else {
             // Null move pruning.
-            if depth >= self.hyperparameters.min_depth_null_move {
+            let null_move_depth = depth - 1 - self.hyperparameters.reduction_null_move;
+            if null_move_depth >= 0 {
                 let epos2 = eposition.make_null_move().unwrap();
                 let result2 = self.search_alpha_beta::<EmptyVariation>(
                     &epos2,
                     -beta,
                     -beta.prev(),
-                    depth - 1 - self.hyperparameters.reduction_null_move,
+                    null_move_depth,
                 )?;
                 let score = -result2.score;
                 if score >= beta {
