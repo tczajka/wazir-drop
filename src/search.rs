@@ -1,10 +1,11 @@
 use crate::{
     constants::{
         Depth, Eval, Hyperparameters, CHECK_TIMEOUT_NODES, INFINITE_DEPTH, MAX_SEARCH_DEPTH,
-        MOVE_NUMBER_DRAW,
+        MOVE_NUMBER_DRAW, NUM_KILLER_MOVES,
     },
     either::Either,
     movegen,
+    smallvec::SmallVec,
     ttable::{TTable, TTableEntry, TTableScoreType},
     variation::LongVariation,
     EmptyVariation, EvaluatedPosition, Evaluator, ExtendableVariation, NonEmptyVariation, PVTable,
@@ -17,6 +18,7 @@ pub struct Search<E> {
     evaluator: Arc<E>,
     ttable: TTable,
     pvtable: PVTable,
+    killer_moves: Vec<[Option<RegularMove>; NUM_KILLER_MOVES]>,
 }
 
 impl<E: Evaluator> Search<E> {
@@ -26,6 +28,7 @@ impl<E: Evaluator> Search<E> {
             evaluator: Arc::clone(evaluator),
             ttable: TTable::new(hyperparameters.ttable_size),
             pvtable: PVTable::new(hyperparameters.pvtable_size),
+            killer_moves: vec![[None; NUM_KILLER_MOVES]; MOVE_NUMBER_DRAW as usize],
         }
     }
 
@@ -55,6 +58,7 @@ impl<E: Evaluator> Search<E> {
             evaluator: &self.evaluator,
             ttable: &mut self.ttable,
             pvtable: &mut self.pvtable,
+            killer_moves: &mut self.killer_moves,
             deadline: None,
             nodes: 0,
         }
@@ -66,6 +70,7 @@ struct SearchInstance<'a, E: Evaluator> {
     evaluator: &'a E,
     ttable: &'a mut TTable,
     pvtable: &'a mut PVTable,
+    killer_moves: &'a mut [[Option<RegularMove>; NUM_KILLER_MOVES]],
     deadline: Option<Instant>,
     nodes: u64,
 }
@@ -333,6 +338,18 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         let mov = result.pv.first();
         let pv = result.pv.truncate();
 
+        // Store killer move.
+        if result.score >= beta {
+            if let Some(mov) = mov {
+                let killer_moves = &mut self.killer_moves[(move_number) as usize];
+                let index = (0..NUM_KILLER_MOVES - 1)
+                    .find(|&index| killer_moves[index] == Some(mov))
+                    .unwrap_or(NUM_KILLER_MOVES - 1);
+                killer_moves[index] = Some(mov);
+                killer_moves[0..=index].rotate_right(1);
+            }
+        }
+
         if depth >= self.hyperparameters.min_depth_ttable {
             let score_type = if result.score >= beta {
                 TTableScoreType::LowerBound
@@ -374,15 +391,38 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         depth: Depth,
         tt_move: Option<RegularMove>,
     ) -> Result<SearchResultInternal<V>, Timeout> {
+        let position = eposition.position();
+
         // Worst case: if we are checkmated, we lose in 2 moves.
         let mut result = SearchResultInternal {
-            score: ScoreExpanded::Loss(eposition.position().move_number() + 2).into(),
+            score: ScoreExpanded::Loss(position.move_number() + 2).into(),
             inf_depth: true,
             pv: V::empty_truncated(),
         };
 
-        let moves = if movegen::in_check(eposition.position(), eposition.position().to_move()) {
-            Either::Left(movegen::check_evasions(eposition.position()))
+        struct MoveCandidate {
+            mov: RegularMove,
+            is_out_of_order: bool,
+        }
+
+        impl MoveCandidate {
+            fn new(mov: RegularMove) -> Self {
+                Self {
+                    mov,
+                    is_out_of_order: false,
+                }
+            }
+
+            fn out_of_order(mov: RegularMove) -> Self {
+                Self {
+                    mov,
+                    is_out_of_order: true,
+                }
+            }
+        }
+
+        let moves = if movegen::in_check(position, position.to_move()) {
+            Either::Left(movegen::check_evasions(position).map(MoveCandidate::new))
         } else if depth <= 0 {
             // Quiescence search.
             // Stand pat.
@@ -394,7 +434,9 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             if result.score >= beta {
                 return Ok(result);
             }
-            Either::Right(Either::Left(movegen::captures(eposition.position())))
+            Either::Right(Either::Left(
+                movegen::captures(eposition.position()).map(MoveCandidate::new),
+            ))
         } else {
             // Null move pruning.
             let null_move_depth = depth - 1 - self.hyperparameters.reduction_null_move;
@@ -417,22 +459,53 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 }
             }
 
-            Either::Right(Either::Right(movegen::regular_moves_not_in_check(
-                eposition.position(),
-            )))
+            // Captures, killers, jumps, drops.
+            let killers = self.killer_moves[(position.move_number()) as usize]
+                .into_iter()
+                .filter_map(|mov| mov.map(MoveCandidate::out_of_order));
+
+            Either::Right(Either::Right(
+                movegen::captures(position)
+                    .map(MoveCandidate::new)
+                    .chain(killers)
+                    .chain(
+                        movegen::jumps(position)
+                            .chain(movegen::drops(position))
+                            .map(MoveCandidate::new),
+                    ),
+            ))
         };
 
         // Transposition table move first, then all other moves.
         let moves = tt_move
             .into_iter()
-            .chain(moves.filter(|&mov| Some(mov) != tt_move));
+            .map(MoveCandidate::out_of_order)
+            .chain(moves);
 
-        for mov in moves {
+        let mut out_of_order_moves = SmallVec::<RegularMove, { 1 + NUM_KILLER_MOVES }>::new();
+
+        for MoveCandidate {
+            mov,
+            is_out_of_order,
+        } in moves
+        {
+            if out_of_order_moves.contains(&mov) {
+                continue;
+            }
+
             let Ok(epos2) = eposition.make_regular_move(mov) else {
                 // Illegal move. Could be a hash collision in the transposition table
                 // or invalid killer move.
                 continue;
             };
+
+            if is_out_of_order {
+                if movegen::in_check(epos2.position(), position.to_move()) {
+                    // Skip suicide move.
+                    continue;
+                }
+                out_of_order_moves.push(mov);
+            }
 
             let alpha2 = alpha.max(result.score);
 

@@ -6,6 +6,7 @@ pub const MAX_VARIATION_LENGTH: usize = 100;
 pub const CHECK_TIMEOUT_NODES: u64 = 256;
 
 pub type MoveNumber = u8;
+pub const MOVE_NUMBER_AFTER_SETUP: MoveNumber = 2;
 pub const MOVE_NUMBER_DRAW: MoveNumber = 102;
 
 pub type Depth = i16;
@@ -13,6 +14,8 @@ pub const MAX_SEARCH_DEPTH: Depth = 100;
 pub const INFINITE_DEPTH: Depth = i16::MAX;
 
 pub type Eval = i32;
+
+pub const NUM_KILLER_MOVES: usize = 2;
 
 #[derive(Debug, Clone)]
 pub struct Hyperparameters {

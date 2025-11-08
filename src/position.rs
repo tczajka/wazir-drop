@@ -1,5 +1,5 @@
 use crate::{
-    constants::{MoveNumber, MOVE_NUMBER_DRAW},
+    constants::{MoveNumber, MOVE_NUMBER_AFTER_SETUP, MOVE_NUMBER_DRAW},
     enums::SimpleEnumExt,
     error::Invalid,
     impl_from_str_for_parsable, movegen,
@@ -286,7 +286,7 @@ impl Position {
                 .unwrap();
         }
         new_position.move_number += 1;
-        if usize::from(new_position.move_number) == Color::COUNT {
+        if new_position.move_number == MOVE_NUMBER_AFTER_SETUP {
             new_position.stage = Stage::Regular;
         }
         Ok(new_position)
