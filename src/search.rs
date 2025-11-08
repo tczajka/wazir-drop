@@ -338,15 +338,17 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         let mov = result.pv.first();
         let pv = result.pv.truncate();
 
-        // Store killer move.
+        // Store killer move if beta cutoff and not a capture.
         if result.score >= beta {
             if let Some(mov) = mov {
-                let killer_moves = &mut self.killer_moves[(move_number) as usize];
-                let index = (0..NUM_KILLER_MOVES - 1)
-                    .find(|&index| killer_moves[index] == Some(mov))
-                    .unwrap_or(NUM_KILLER_MOVES - 1);
-                killer_moves[index] = Some(mov);
-                killer_moves[0..=index].rotate_right(1);
+                if mov.captured.is_none() {
+                    let killer_moves = &mut self.killer_moves[(move_number) as usize];
+                    let index = (0..NUM_KILLER_MOVES - 1)
+                        .find(|&index| killer_moves[index] == Some(mov))
+                        .unwrap_or(NUM_KILLER_MOVES - 1);
+                    killer_moves[index] = Some(mov);
+                    killer_moves[0..=index].rotate_right(1);
+                }
             }
         }
 
