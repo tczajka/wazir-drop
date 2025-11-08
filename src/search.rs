@@ -3,6 +3,7 @@ use crate::{
         Depth, Eval, Hyperparameters, CHECK_TIMEOUT_NODES, INFINITE_DEPTH, MAX_SEARCH_DEPTH,
         MOVE_NUMBER_DRAW,
     },
+    either::Either,
     movegen,
     ttable::{TTable, TTableEntry, TTableScoreType},
     variation::LongVariation,
@@ -373,26 +374,38 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         depth: Depth,
         tt_move: Option<RegularMove>,
     ) -> Result<SearchResultInternal<V>, Timeout> {
-        // Leaf node.
-        if depth <= 0 {
-            return Ok(SearchResultInternal {
-                score: ScoreExpanded::Eval(eposition.evaluate()).into(),
-                inf_depth: false,
-                pv: V::empty(),
-            });
-        }
-
-        // Transposition table move first, then all other moves.
-        let moves = tt_move.into_iter().chain(
-            movegen::regular_moves(eposition.position()).filter(|&mov| Some(mov) != tt_move),
-        );
-
-        // If we are checkmated, we lose in 2 moves.
+        // Worse case: if we are checkmated, we lose in 2 moves.
         let mut result = SearchResultInternal {
             score: ScoreExpanded::Loss(eposition.position().move_number() + 2).into(),
             inf_depth: true,
             pv: V::empty_truncated(),
         };
+
+        // Quiescence search.
+        let moves = if depth <= 0 {
+            // Quiescence search.
+            if movegen::in_check(eposition.position(), eposition.position().to_move()) {
+                Either::Left(Either::Left(movegen::check_evasions(eposition.position())))
+            } else {
+                // Stand pat.
+                result = SearchResultInternal {
+                    score: ScoreExpanded::Eval(eposition.evaluate()).into(),
+                    inf_depth: false,
+                    pv: V::empty(),
+                };
+                if result.score >= beta {
+                    return Ok(result);
+                }
+                Either::Left(Either::Right(movegen::captures(eposition.position())))
+            }
+        } else {
+            Either::Right(movegen::regular_moves(eposition.position()))
+        };
+
+        // Transposition table move first, then all other moves.
+        let moves = tt_move
+            .into_iter()
+            .chain(moves.filter(|&mov| Some(mov) != tt_move));
 
         for mov in moves {
             let Ok(epos2) = eposition.make_regular_move(mov) else {
