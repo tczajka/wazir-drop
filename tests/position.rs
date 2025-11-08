@@ -440,3 +440,61 @@ add.wf.a
 "
     );
 }
+
+#[test]
+fn test_make_null_move() {
+    let position = Position::from_str(
+        "\
+regular
+100
+AFf
+.W.A.D.D
+AaFA.DDA
+n.A.A.A.
+......A.
+...a.a.d
+..d...N.
+a.a...f.
+add.w..a
+",
+    )
+    .unwrap();
+
+    let position2 = position.make_null_move().unwrap();
+    assert_eq!(
+        position2.to_string(),
+        "\
+regular
+101
+AFf
+.W.A.D.D
+AaFA.DDA
+n.A.A.A.
+......A.
+...a.a.d
+..d...N.
+a.a...f.
+add.w..a
+"
+    );
+
+    let position3 = position2.make_null_move().unwrap();
+    assert_eq!(
+        position3.to_string(),
+        "\
+end draw
+102
+AFf
+.W.A.D.D
+AaFA.DDA
+n.A.A.A.
+......A.
+...a.a.d
+..d...N.
+a.a...f.
+add.w..a
+"
+    );
+
+    assert!(position3.make_null_move().is_err());
+}

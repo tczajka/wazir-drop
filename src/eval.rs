@@ -80,6 +80,15 @@ impl<'a, E: Evaluator> EvaluatedPosition<'a, E> {
         })
     }
 
+    pub fn make_null_move(&self) -> Result<Self, InvalidMove> {
+        let position = self.position.make_null_move()?;
+        Ok(Self {
+            evaluator: self.evaluator,
+            position,
+            accumulators: self.accumulators.clone(),
+        })
+    }
+
     pub fn evaluate(&self) -> Eval {
         self.evaluator
             .evaluate(&self.accumulators, self.position.to_move())

@@ -296,7 +296,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         let mut tt_move = None;
 
         // Transposition table lookup.
-        if depth >= self.hyperparameters.min_ttable_depth {
+        if depth >= self.hyperparameters.min_depth_ttable {
             if let Some(ttentry) = self.ttable.get(eposition.position().hash()) {
                 // Transposition table cutoff.
                 if ttentry.depth >= depth {
@@ -333,7 +333,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         let mov = result.pv.first();
         let pv = result.pv.truncate();
 
-        if depth >= self.hyperparameters.min_ttable_depth {
+        if depth >= self.hyperparameters.min_depth_ttable {
             let score_type = if result.score >= beta {
                 TTableScoreType::LowerBound
             } else if result.score <= alpha {
@@ -374,32 +374,51 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         depth: Depth,
         tt_move: Option<RegularMove>,
     ) -> Result<SearchResultInternal<V>, Timeout> {
-        // Worse case: if we are checkmated, we lose in 2 moves.
+        // Worst case: if we are checkmated, we lose in 2 moves.
         let mut result = SearchResultInternal {
             score: ScoreExpanded::Loss(eposition.position().move_number() + 2).into(),
             inf_depth: true,
             pv: V::empty_truncated(),
         };
 
-        // Quiescence search.
-        let moves = if depth <= 0 {
+        let moves = if movegen::in_check(eposition.position(), eposition.position().to_move()) {
+            Either::Left(movegen::check_evasions(eposition.position()))
+        } else if depth <= 0 {
             // Quiescence search.
-            if movegen::in_check(eposition.position(), eposition.position().to_move()) {
-                Either::Left(Either::Left(movegen::check_evasions(eposition.position())))
-            } else {
-                // Stand pat.
-                result = SearchResultInternal {
-                    score: ScoreExpanded::Eval(eposition.evaluate()).into(),
-                    inf_depth: false,
-                    pv: V::empty(),
-                };
-                if result.score >= beta {
+            // Stand pat.
+            result = SearchResultInternal {
+                score: ScoreExpanded::Eval(eposition.evaluate()).into(),
+                inf_depth: false,
+                pv: V::empty(),
+            };
+            if result.score >= beta {
+                return Ok(result);
+            }
+            Either::Right(Either::Left(movegen::captures(eposition.position())))
+        } else {
+            // Null move pruning.
+            if depth >= self.hyperparameters.min_depth_null_move {
+                let epos2 = eposition.make_null_move().unwrap();
+                let result2 = self.search_alpha_beta::<EmptyVariation>(
+                    &epos2,
+                    -beta,
+                    -beta.prev(),
+                    depth - 1 - self.hyperparameters.reduction_null_move,
+                )?;
+                let score = -result2.score;
+                if score >= beta {
+                    result = SearchResultInternal {
+                        score: beta,
+                        inf_depth: false,
+                        pv: V::empty_truncated(),
+                    };
                     return Ok(result);
                 }
-                Either::Left(Either::Right(movegen::captures(eposition.position())))
             }
-        } else {
-            Either::Right(movegen::regular_moves(eposition.position()))
+
+            Either::Right(Either::Right(movegen::regular_moves_not_in_check(
+                eposition.position(),
+            )))
         };
 
         // Transposition table move first, then all other moves.

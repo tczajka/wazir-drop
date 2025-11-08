@@ -337,6 +337,18 @@ impl Position {
         }
         Ok(new_position)
     }
+
+    pub fn make_null_move(&self) -> Result<Position, InvalidMove> {
+        if self.stage != Stage::Regular {
+            return Err(InvalidMove);
+        }
+        let mut new_position = self.clone();
+        new_position.move_number += 1;
+        if new_position.move_number() == MOVE_NUMBER_DRAW {
+            new_position.stage = Stage::End(Outcome::Draw);
+        }
+        Ok(new_position)
+    }
 }
 
 impl_from_str_for_parsable!(Position);
