@@ -1,14 +1,18 @@
 use std::{error::Error, path::Path};
-use tch::{TchError, nn};
+use tch::{TchError, Tensor, nn};
 use wazir_drop::Features;
 
-/// Input: [batch_size, 2, features.count()]
-/// Output: [batch_size]: logit of winning
-pub trait EvalModel: nn::Module {
+pub trait EvalModel {
     type Features: Features;
     type Config;
 
     fn new(features: Self::Features, vs: nn::Path, config: &Self::Config) -> Self;
+
+    /// features: [num features in a batch]
+    /// offsets: [batch_size, 2] -> indices into features
+    /// output: [batch_size] -> logit of winning
+    fn forward(&self, features: &Tensor, offsets: &Tensor) -> Tensor;
+
     fn optimizer(&self, vs: &nn::VarStore) -> Result<nn::Optimizer, TchError>;
 }
 

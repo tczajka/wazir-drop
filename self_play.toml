@@ -3,7 +3,7 @@ log = "logs/self_play.log"
 [command.self_play]
 output = "data/self_play.cbor"
 num_cpus = 30
-num_games = 5000000
+num_games = 100000 # 5000000
 batch_size = 10000
 ttable_size_mb = 16
 pvtable_size_mb = 2

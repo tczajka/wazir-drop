@@ -8,7 +8,7 @@ use std::{
     path::Path,
 };
 use tch::{
-    TchError, Tensor,
+    IndexOp, TchError, Tensor,
     nn::{self, OptimizerConfig},
 };
 use wazir_drop::{
@@ -19,7 +19,6 @@ use wazir_drop::{
 #[serde(deny_unknown_fields)]
 pub struct Config {
     learning_rate: f64,
-    weight_decay: f64,
 }
 
 #[derive(Debug)]
@@ -30,8 +29,6 @@ pub struct LinearModel<F: Features> {
     weights: Tensor,
     // []
     to_move: Tensor,
-    // Always [1.0, -1.0]
-    side_weights: Tensor,
 }
 
 impl<F: Features> EvalModel for LinearModel<F> {
@@ -39,47 +36,43 @@ impl<F: Features> EvalModel for LinearModel<F> {
     type Config = Config;
 
     fn new(features: F, vs: nn::Path, config: &Config) -> Self {
-        let weights =
-            (&vs / "weights").var("weight", &[features.count() as i64], nn::Init::Const(0.0));
-        let to_move = (&vs / "to_move").var("weight", &[], nn::Init::Const(0.0));
-        let side_weights = Tensor::from_slice(&[1.0f32, -1.0f32]).to_device(vs.device());
+        let weights = vs.var("weights", &[features.count() as i64], nn::Init::Const(0.0));
+        let to_move = vs.var("to_move", &[], nn::Init::Const(0.0));
 
         Self {
             _features: features,
             config: config.clone(),
             weights,
             to_move,
-            side_weights,
         }
     }
 
-    fn optimizer(&self, vs: &nn::VarStore) -> Result<nn::Optimizer, TchError> {
-        let adamw = nn::AdamW {
-            wd: self.config.weight_decay,
-            ..Default::default()
-        };
-        adamw.build(vs, self.config.learning_rate)
+    fn forward(&self, features: &Tensor, offsets: &Tensor) -> Tensor {
+        let (embedding, _, _, _) = Tensor::embedding_bag::<&Tensor>(
+            &self.weights.unsqueeze(1),
+            features,
+            &offsets.reshape([-1]),
+            false, /* scale_grad_by_freq */
+            0,     /* mode = sum */
+            false, /* sparse */
+            None,  /* per_sample_weights */
+            false, /* include_last_offset */
+        );
+        // embedding: [batch_size * 2, 1]
+        let embedding = embedding.reshape([-1, 2]);
+        // embedding: [batch_size, 2]
+        embedding.i((.., 0)) - embedding.i((.., 1)) + &self.to_move
     }
-}
 
-impl<F: Features> nn::Module for LinearModel<F> {
-    fn forward(&self, xs: &Tensor) -> Tensor {
-        // xs: [batch_size, 2, features.count()]
-        let weights = self
-            .weights
-            .unsqueeze(1)
-            .expand([xs.size()[0], -1, -1], false);
-        // weights: [batch_size, features.count(), 1]
-        let res = xs.bmm(&weights).squeeze_dim(2);
-        // res: [batch_size, 2]
-        res.matmul(&self.side_weights) + &self.to_move
+    fn optimizer(&self, vs: &nn::VarStore) -> Result<nn::Optimizer, TchError> {
+        nn::Adam::default().build(vs, self.config.learning_rate)
     }
 }
 
 impl Export for LinearModel<PSFeatures> {
     fn export(&self, output: &Path, value_scale: f32) -> Result<(), Box<dyn Error>> {
         let _guard = tch::no_grad_guard();
-        let max_abs = self.weights.max().max_other(&self.to_move.abs().max());
+        let max_abs = self.weights.abs().max().max_other(&self.to_move.abs());
         let max_abs = f32::try_from(max_abs).unwrap();
         println!("max |weight| = {max_abs:.6}");
         let mut f = BufWriter::new(File::create(output)?);

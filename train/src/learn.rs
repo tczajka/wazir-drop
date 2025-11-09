@@ -2,7 +2,6 @@ use crate::{
     linear::{self, LinearModel},
     model::EvalModel,
     self_play::{FeaturesConfig, Sample},
-    util::sparse_1d_tensor,
 };
 use extra::PSFeatures;
 use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
@@ -67,7 +66,7 @@ fn run_with_model<M: EvalModel>(
         let start_time = Instant::now();
         let mut last_log_time = start_time;
 
-        let mut dataset_iterator = DatasetIterator::new(config, features.count())?;
+        let mut dataset_iterator = DatasetIterator::new(config)?;
         loop {
             let batch = dataset_iterator.next_batch()?;
             if batch.is_none() || last_log_time.elapsed().as_secs_f32() >= config.log_period_seconds
@@ -86,7 +85,7 @@ fn run_with_model<M: EvalModel>(
                 break;
             };
             let batch = batch.to_device(device);
-            let values = model.forward(&batch.input);
+            let values = model.forward(&batch.features, &batch.offsets);
             let loss = values.binary_cross_entropy_with_logits::<Tensor>(
                 &batch.outputs,
                 None,
@@ -104,10 +103,12 @@ fn run_with_model<M: EvalModel>(
 
 /// A batch of data.
 struct Batch {
-    size: i64,
-    // Features: [batch_size,2, N]
-    input: Tensor,
-    // [batch_size]
+    size: usize,
+    // Features: [num features in a batch]
+    features: Tensor,
+    // Offsets: [batch_size, 2] -> indices into features
+    offsets: Tensor,
+    // [batch_size] -> win probability
     outputs: Tensor,
 }
 
@@ -115,40 +116,42 @@ impl Batch {
     fn to_device(&self, device: Device) -> Self {
         Self {
             size: self.size,
-            input: self.input.to_device(device),
+            features: self.features.to_device(device),
+            offsets: self.offsets.to_device(device),
             outputs: self.outputs.to_device(device),
         }
     }
 
-    fn from_samples(
-        samples: &[Sample],
-        num_features: usize,
-        input_value_scale: f32,
-        outcome_weight: f32,
-    ) -> Self {
-        let mut inputs = Vec::with_capacity(samples.len());
+    fn from_samples(samples: &[Sample], input_value_scale: f32, outcome_weight: f32) -> Self {
+        let mut features = Vec::new();
+        let mut offsets = Vec::with_capacity(samples.len() * 2);
         let mut values = Vec::with_capacity(samples.len());
         let mut outcomes = Vec::with_capacity(samples.len());
         for sample in samples {
-            let feature_tensors: [Tensor; 2] = sample.features.each_ref().map(|features| {
-                sparse_1d_tensor(
-                    features.iter().map(|&feature| (feature as usize, 1)),
-                    num_features,
-                )
-            });
-            inputs.push(Tensor::stack(&feature_tensors, 0));
-            let value = sample.deep_value;
-            values.push(value);
-            let outcome = sample.game_points;
-            outcomes.push(outcome);
+            for f in &sample.features {
+                offsets.push(features.len() as i32);
+                features.extend(f.iter().map(|&f| f as i32));
+            }
+            values.push(sample.deep_value);
+            outcomes.push(sample.game_points);
         }
-        let values =
-            (1.0 / input_value_scale * Tensor::from_slice(&values).to_kind(Kind::Float)).sigmoid();
-        let outcomes = 0.5 + 0.5 * Tensor::from_slice(&outcomes).to_kind(Kind::Float);
+        let features = Tensor::from_slice(&features).to_kind(Kind::Int64);
+        let offsets = Tensor::from_slice(&offsets)
+            .reshape([-1, 2])
+            .to_kind(Kind::Int64);
+        let values = (1.0 / input_value_scale * Tensor::from_slice(&values).to_kind(Kind::Float))
+            .sigmoid()
+            .to_kind(Kind::Float);
+        let outcomes = 0.5
+            + 0.5
+                * Tensor::from_slice(&outcomes)
+                    .to_kind(Kind::Float)
+                    .to_kind(Kind::Float);
         let outputs = (1.0 - outcome_weight) * values + outcome_weight * outcomes;
         Self {
-            size: samples.len() as i64,
-            input: Tensor::stack(&inputs, 0),
+            size: samples.len(),
+            features,
+            offsets,
             outputs,
         }
     }
@@ -159,7 +162,6 @@ struct DatasetIterator<'de> {
     deserializer: Option<StreamDeserializer<'de, IoRead<BufReader<File>>, Sample>>,
     input_value_scale: f32,
     outcome_weight: f32,
-    num_features: usize,
     chunk_size: usize,
     batch_size: usize,
     rng: StdRng,
@@ -168,14 +170,13 @@ struct DatasetIterator<'de> {
 }
 
 impl<'de> DatasetIterator<'de> {
-    fn new(config: &Config, num_features: usize) -> Result<Self, Box<dyn Error>> {
+    fn new(config: &Config) -> Result<Self, Box<dyn Error>> {
         let input = BufReader::new(File::open(&config.self_play_data)?);
         let deserializer = Deserializer::from_reader(input);
         Ok(Self {
             deserializer: Some(deserializer.into_iter()),
             input_value_scale: config.input_value_scale,
             outcome_weight: config.outcome_weight,
-            num_features,
             chunk_size: config.chunk_size,
             batch_size: config.batch_size,
             rng: StdRng::from_os_rng(),
@@ -194,7 +195,6 @@ impl<'de> DatasetIterator<'de> {
         self.current_chunk_index = next_chunk_index;
         Ok(Some(Batch::from_samples(
             samples,
-            self.num_features,
             self.input_value_scale,
             self.outcome_weight,
         )))

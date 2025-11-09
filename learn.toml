@@ -1,9 +1,9 @@
 log = "logs/learn.log"
 
 [command.learn]
-self_play_data = "data/self_play_wps_2.cbor"
+self_play_data = "data/self_play.cbor"
 # load_weights = "data/linear_wps_0.weights"
-save_weights = "data/linear_wps_2.weights"
+save_weights = "data/linear_wps_test.weights"
 input_value_scale = 1000
 features = "WPS"
 epochs = 2
@@ -14,4 +14,3 @@ log_period_seconds = 60
 
 [command.learn.model.linear]
 learning_rate = 1e-3
-weight_decay = 1e-5
