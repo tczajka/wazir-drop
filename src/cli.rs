@@ -1,12 +1,11 @@
 use crate::{
-    Color, Move, PlayerFactory, Position, ShortMove,
     clock::{Stopwatch, Timer},
     constants::DEFAULT_TIME_LIMIT,
     impl_from_str_for_parsable,
     log::{self, Level},
     movegen,
     parser::{self, Parser, ParserExt},
-    platform,
+    platform, Color, Move, PlayerFactory, Position, ShortMove,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -171,8 +170,8 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
                     opp_time = opp_stopwatch.get();
                 }
                 log::info!(
-                    "{move_number}. opp {mov} {t} ms",
-                    move_number = position.move_number() + 1,
+                    "{ply}. opp {mov} {t} ms",
+                    ply = position.ply() + 1,
                     t = opp_time.as_millis()
                 );
 
@@ -204,8 +203,8 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
             .map_err(|_| CliError::InvalidPlayerMove(mov))?;
         timer.stop();
         log::info!(
-            "{move_number}. move {mov} {t} ms",
-            move_number = position.move_number(),
+            "{ply}. move {mov} {t} ms",
+            ply = position.ply(),
             t = timer.get().as_millis()
         );
 

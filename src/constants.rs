@@ -5,9 +5,9 @@ pub const TIME_MARGIN: Duration = Duration::from_millis(200);
 pub const MAX_VARIATION_LENGTH: usize = 100;
 pub const CHECK_TIMEOUT_NODES: u64 = 256;
 
-pub type MoveNumber = u8;
-pub const MOVE_NUMBER_AFTER_SETUP: MoveNumber = 2;
-pub const MOVE_NUMBER_DRAW: MoveNumber = 102;
+pub type Ply = u8;
+pub const PLY_AFTER_SETUP: Ply = 2;
+pub const PLY_DRAW: Ply = 102;
 
 pub type Depth = i16;
 pub const MAX_SEARCH_DEPTH: Depth = 100;

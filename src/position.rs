@@ -1,5 +1,5 @@
 use crate::{
-    constants::{MoveNumber, MOVE_NUMBER_AFTER_SETUP, MOVE_NUMBER_DRAW},
+    constants::{Ply, PLY_AFTER_SETUP, PLY_DRAW},
     enums::SimpleEnumExt,
     error::Invalid,
     impl_from_str_for_parsable, movegen,
@@ -43,10 +43,10 @@ impl Outcome {
         }
     }
 
-    pub fn to_score(self, move_number: MoveNumber) -> Score {
+    pub fn to_score(self, ply: Ply) -> Score {
         match self {
             Self::Draw => ScoreExpanded::Eval(0),
-            _ => ScoreExpanded::Loss(move_number),
+            _ => ScoreExpanded::Loss(ply),
         }
         .into()
     }
@@ -97,7 +97,7 @@ impl Display for Stage {
 #[derive(Debug, Clone)]
 pub struct Position {
     stage: Stage,
-    move_number: MoveNumber,
+    ply: Ply,
     board: Board,
     captured: Captured,
 }
@@ -106,7 +106,7 @@ impl Position {
     pub fn initial() -> Self {
         Self {
             stage: Stage::Setup,
-            move_number: 0,
+            ply: 0,
             board: Board::empty(),
             captured: Captured::new(),
         }
@@ -116,12 +116,12 @@ impl Position {
         self.stage
     }
 
-    pub fn move_number(&self) -> MoveNumber {
-        self.move_number
+    pub fn ply(&self) -> Ply {
+        self.ply
     }
 
     pub fn to_move(&self) -> Color {
-        Color::from_index(usize::from(self.move_number()) % Color::COUNT)
+        Color::from_index(usize::from(self.ply()) % Color::COUNT)
     }
 
     pub fn square(&self, square: Square) -> Option<ColoredPiece> {
@@ -163,18 +163,18 @@ impl Position {
             .and(Captured::parser())
             .then_ignore(parser::endl())
             .and(Board::parser())
-            .try_map(|(((stage, move_number), captured), board)| {
-                Self::from_parts(stage, move_number, board, captured).map_err(|_| ParseError)
+            .try_map(|(((stage, ply), captured), board)| {
+                Self::from_parts(stage, ply, board, captured).map_err(|_| ParseError)
             })
     }
 
     fn from_parts(
         stage: Stage,
-        move_number: MoveNumber,
+        ply: Ply,
         board: Board,
         captured: Captured,
     ) -> Result<Position, Invalid> {
-        let to_move = Color::from_index(usize::from(move_number) % Color::COUNT);
+        let to_move = Color::from_index(usize::from(ply) % Color::COUNT);
 
         // Verify total piece count.
         if stage != Stage::Setup {
@@ -194,22 +194,22 @@ impl Position {
         // Verify move number.
         match stage {
             Stage::Setup => {
-                if usize::from(move_number) >= Color::COUNT {
+                if usize::from(ply) >= Color::COUNT {
                     return Err(Invalid);
                 }
             }
             Stage::Regular => {
-                if !(Color::COUNT as MoveNumber..MOVE_NUMBER_DRAW).contains(&move_number) {
+                if !(Color::COUNT as Ply..PLY_DRAW).contains(&ply) {
                     return Err(Invalid);
                 }
             }
             Stage::End(Outcome::Draw) => {
-                if move_number != MOVE_NUMBER_DRAW {
+                if ply != PLY_DRAW {
                     return Err(Invalid);
                 }
             }
             Stage::End(outcome) => {
-                if !(Color::COUNT as MoveNumber..=MOVE_NUMBER_DRAW).contains(&move_number)
+                if !(Color::COUNT as Ply..=PLY_DRAW).contains(&ply)
                     || outcome != Outcome::win(to_move.opposite())
                 {
                     return Err(Invalid);
@@ -257,7 +257,7 @@ impl Position {
         }
         Ok(Position {
             stage,
-            move_number,
+            ply,
             board,
             captured,
         })
@@ -285,8 +285,8 @@ impl Position {
                 .place_piece(square, piece.with_color(me))
                 .unwrap();
         }
-        new_position.move_number += 1;
-        if new_position.move_number == MOVE_NUMBER_AFTER_SETUP {
+        new_position.ply += 1;
+        if new_position.ply == PLY_AFTER_SETUP {
             new_position.stage = Stage::Regular;
         }
         Ok(new_position)
@@ -331,8 +331,8 @@ impl Position {
             .board
             .place_piece(mov.to, mov.colored_piece)
             .map_err(|_| InvalidMove)?;
-        new_position.move_number += 1;
-        if new_position.move_number() == MOVE_NUMBER_DRAW && new_position.stage == Stage::Regular {
+        new_position.ply += 1;
+        if new_position.ply() == PLY_DRAW && new_position.stage == Stage::Regular {
             new_position.stage = Stage::End(Outcome::Draw);
         }
         Ok(new_position)
@@ -343,8 +343,8 @@ impl Position {
             return Err(InvalidMove);
         }
         let mut new_position = self.clone();
-        new_position.move_number += 1;
-        if new_position.move_number() == MOVE_NUMBER_DRAW {
+        new_position.ply += 1;
+        if new_position.ply() == PLY_DRAW {
             new_position.stage = Stage::End(Outcome::Draw);
         }
         Ok(new_position)
@@ -356,7 +356,7 @@ impl_from_str_for_parsable!(Position);
 impl Display for Position {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "{}", self.stage)?;
-        writeln!(f, "{}", self.move_number())?;
+        writeln!(f, "{}", self.ply())?;
         writeln!(f, "{}", self.captured)?;
         write!(f, "{}", self.board)?;
         Ok(())

@@ -1,7 +1,7 @@
 use crate::{
     constants::{
         Depth, Eval, Hyperparameters, CHECK_TIMEOUT_NODES, INFINITE_DEPTH, MAX_SEARCH_DEPTH,
-        MOVE_NUMBER_DRAW, NUM_KILLER_MOVES,
+        NUM_KILLER_MOVES, PLY_DRAW,
     },
     either::Either,
     movegen,
@@ -28,7 +28,7 @@ impl<E: Evaluator> Search<E> {
             evaluator: Arc::clone(evaluator),
             ttable: TTable::new(hyperparameters.ttable_size),
             pvtable: PVTable::new(hyperparameters.pvtable_size),
-            killer_moves: vec![[None; NUM_KILLER_MOVES]; MOVE_NUMBER_DRAW as usize],
+            killer_moves: vec![[None; NUM_KILLER_MOVES]; PLY_DRAW as usize],
         }
     }
 
@@ -87,7 +87,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             Stage::Regular => {}
             Stage::End(outcome) => {
                 return SearchResult {
-                    score: outcome.to_score(position.move_number()),
+                    score: outcome.to_score(position.ply()),
                     pv: LongVariation::empty(),
                     depth: INFINITE_DEPTH,
                     root_moves_considered: 0,
@@ -100,7 +100,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         // Capture Wazir?
         if let Some(mov) = movegen::captures_of_wazir(position).next() {
             return SearchResult {
-                score: ScoreExpanded::Win(position.move_number() + 1).into(),
+                score: ScoreExpanded::Win(position.ply() + 1).into(),
                 pv: LongVariation::empty().add_front(mov),
                 depth: INFINITE_DEPTH,
                 root_moves_considered: 1,
@@ -121,7 +121,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 .next()
                 .expect("Stalemate");
             return SearchResult {
-                score: ScoreExpanded::Loss(position.move_number() + 2).into(),
+                score: ScoreExpanded::Loss(position.ply() + 2).into(),
                 pv: LongVariation::empty().add_front(mov),
                 depth: INFINITE_DEPTH,
                 root_moves_considered: 0,
@@ -148,8 +148,8 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 let epos2 = eposition.make_regular_move(moves[0]).unwrap();
                 let result = self.search_alpha_beta::<LongVariation>(
                     &epos2,
-                    -Score::IMMEDIATE_WIN,
-                    Score::IMMEDIATE_WIN,
+                    -Score::INFINITE,
+                    Score::INFINITE,
                     depth,
                 )?;
                 search_result.pv = result.pv.add_front(moves[0]);
@@ -175,7 +175,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                         // Full window search.
                         let result = self.search_alpha_beta::<LongVariation>(
                             &epos2,
-                            -Score::IMMEDIATE_WIN,
+                            -Score::INFINITE,
                             -search_result.score,
                             depth - 1,
                         )?;
@@ -209,7 +209,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
     ) -> (SearchResultInternal<LongVariation>, Vec<RegularMove>) {
         let mut moves: Vec<(RegularMove, Score)> = Vec::new();
         let mut search_result = SearchResultInternal {
-            score: -Score::IMMEDIATE_WIN,
+            score: -Score::INFINITE,
             inf_depth: true,
             pv: LongVariation::empty(),
         };
@@ -217,12 +217,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         for mov in movegen::regular_moves(eposition.position()) {
             let epos2 = eposition.make_regular_move(mov).unwrap();
             let result = self
-                .search_alpha_beta::<LongVariation>(
-                    &epos2,
-                    -Score::IMMEDIATE_WIN,
-                    Score::IMMEDIATE_WIN,
-                    0,
-                )
+                .search_alpha_beta::<LongVariation>(&epos2, -Score::INFINITE, Score::INFINITE, 0)
                 .unwrap();
             search_result.inf_depth &= result.inf_depth;
             let score = -result.score;
@@ -251,27 +246,27 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         depth: Depth,
     ) -> Result<SearchResultInternal<V>, Timeout> {
         self.new_node()?;
-        let move_number = eposition.position().move_number();
+        let ply = eposition.position().ply();
 
         // Check whether game ended.
         if let Stage::End(outcome) = eposition.position().stage() {
             return Ok(SearchResultInternal {
-                score: outcome.to_score(move_number),
+                score: outcome.to_score(ply),
                 inf_depth: true,
                 pv: V::empty(),
             });
         }
 
         // Endgame distance pruning.
-        let earliest_win = move_number + 3; // if we deliver checkmate this move
+        let earliest_win = ply + 3; // if we deliver checkmate this move
         let earliest_loss =
             if movegen::in_check(eposition.position(), eposition.position().to_move()) {
-                move_number + 2 // if we are already checkmated
+                ply + 2 // if we are already checkmated
             } else {
-                move_number + 4 // if we get checkmated next move
+                ply + 4 // if we get checkmated next move
             };
 
-        if earliest_win.min(earliest_loss) > MOVE_NUMBER_DRAW {
+        if earliest_win.min(earliest_loss) > PLY_DRAW {
             return Ok(SearchResultInternal {
                 score: ScoreExpanded::Eval(0).into(),
                 inf_depth: true,
@@ -305,7 +300,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             if let Some(ttentry) = self.ttable.get(eposition.position().hash()) {
                 // Transposition table cutoff.
                 if ttentry.depth >= depth {
-                    let score = ttentry.score.to_absolute(move_number);
+                    let score = ttentry.score.to_absolute(ply);
                     let mut pv = V::empty_truncated();
                     let cutoff = match ttentry.score_type {
                         TTableScoreType::None => false,
@@ -342,7 +337,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         if result.score >= beta {
             if let Some(mov) = mov {
                 if mov.captured.is_none() {
-                    let killer_moves = &mut self.killer_moves[(move_number) as usize];
+                    let killer_moves = &mut self.killer_moves[(ply) as usize];
                     let index = (0..NUM_KILLER_MOVES - 1)
                         .find(|&index| killer_moves[index] == Some(mov))
                         .unwrap_or(NUM_KILLER_MOVES - 1);
@@ -372,7 +367,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                     },
                     mov,
                     score_type,
-                    score: result.score.to_relative(move_number),
+                    score: result.score.to_relative(ply),
                 },
             );
         }
@@ -397,7 +392,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
 
         // Worst case: if we are checkmated, we lose in 2 moves.
         let mut result = SearchResultInternal {
-            score: ScoreExpanded::Loss(position.move_number() + 2).into(),
+            score: ScoreExpanded::Loss(position.ply() + 2).into(),
             inf_depth: true,
             pv: V::empty_truncated(),
         };
@@ -462,7 +457,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             }
 
             // Captures, killers, jumps, drops.
-            let killers = self.killer_moves[(position.move_number()) as usize]
+            let killers = self.killer_moves[(position.ply()) as usize]
                 .into_iter()
                 .filter_map(|mov| mov.map(MoveCandidate::out_of_order));
 
@@ -557,7 +552,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         if let Some(mov) = movegen::captures_of_wazir(position).next() {
             variations.push(TopVariation {
                 variation: LongVariation::empty().add_front(mov),
-                score: ScoreExpanded::Win(position.move_number() + 1).into(),
+                score: ScoreExpanded::Win(position.ply() + 1).into(),
             });
             return variations;
         }
@@ -569,12 +564,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         for mov in movegen::regular_moves(eposition.position()) {
             let epos2 = eposition.make_regular_move(mov).unwrap();
             let result = self
-                .search_alpha_beta::<LongVariation>(
-                    &epos2,
-                    -Score::IMMEDIATE_WIN,
-                    Score::IMMEDIATE_WIN,
-                    0,
-                )
+                .search_alpha_beta::<LongVariation>(&epos2, -Score::INFINITE, Score::INFINITE, 0)
                 .unwrap();
             let score = -result.score;
             variations.push(TopVariation {
@@ -589,7 +579,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 .expect("Stalemate");
             variations.push(TopVariation {
                 variation: LongVariation::empty().add_front(mov),
-                score: ScoreExpanded::Loss(position.move_number() + 2).into(),
+                score: ScoreExpanded::Loss(position.ply() + 2).into(),
             });
             return variations;
         }
@@ -602,8 +592,8 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             let result = self
                 .search_alpha_beta::<LongVariation>(
                     &epos2,
-                    -Score::IMMEDIATE_WIN,
-                    Score::IMMEDIATE_WIN,
+                    -Score::INFINITE,
+                    Score::INFINITE,
                     depth - 1,
                 )
                 .unwrap();
@@ -630,7 +620,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                     let result = self
                         .search_alpha_beta::<LongVariation>(
                             &epos2,
-                            -Score::IMMEDIATE_WIN,
+                            -Score::INFINITE,
                             -threshold.prev(),
                             depth - 1,
                         )

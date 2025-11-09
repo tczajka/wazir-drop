@@ -36,7 +36,7 @@ impl Player for MainPlayer {
                         root {root_moves_considered}/{root_all_moves} \
                         nodes {nodes} knps {knps:.0} pv {pv}",
                     depth = result.depth,
-                    score = result.score.to_relative(position.move_number()),
+                    score = result.score.to_relative(position.ply()),
                     root_moves_considered = result.root_moves_considered,
                     root_all_moves = result.root_all_moves,
                     nodes = result.nodes,
