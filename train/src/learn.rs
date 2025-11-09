@@ -52,7 +52,7 @@ fn run_with_model<M: EvalModel>(
     model_config: &M::Config,
 ) -> Result<(), Box<dyn Error>> {
     let device = Device::cuda_if_available();
-    log::info!("Using device: {device:?}");
+    log::info!("Learning using device: {device:?}");
     let mut vs = nn::VarStore::new(device);
     let model = M::new(features, vs.root(), model_config);
     if let Some(load_parameters) = &config.load_weights {
@@ -61,7 +61,7 @@ fn run_with_model<M: EvalModel>(
     let mut optimizer = model.optimizer(&vs)?;
 
     for epoch in 0..config.epochs {
-        let mut num_examples = 0;
+        let mut num_samples = 0;
         let mut total_loss: f64 = 0.0;
         let start_time = Instant::now();
         let mut last_log_time = start_time;
@@ -73,11 +73,11 @@ fn run_with_model<M: EvalModel>(
             {
                 let elapsed_time = start_time.elapsed().as_secs_f64();
                 log::info!(
-                    "Epoch {epoch} / {num_epochs} examples {num_examples} time {elapsed_time:.2}s \
-                    examples/s {examples_per_second:.0} loss {loss:.6}",
+                    "Epoch={epoch} / {num_epochs} samples={num_samples} time={elapsed_time:.2}s \
+                    samples/s={samples_per_second:.0} loss={loss:.6}",
                     num_epochs = config.epochs,
-                    examples_per_second = num_examples as f64 / elapsed_time,
-                    loss = total_loss / num_examples as f64,
+                    samples_per_second = num_samples as f64 / elapsed_time,
+                    loss = total_loss / num_samples as f64,
                 );
                 last_log_time = Instant::now();
             }
@@ -92,7 +92,7 @@ fn run_with_model<M: EvalModel>(
                 None,
                 Reduction::Mean,
             );
-            num_examples += batch.size;
+            num_samples += batch.size;
             total_loss += batch.size as f64 * f64::try_from(&loss).unwrap();
             optimizer.backward_step(&loss);
         }

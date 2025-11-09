@@ -1,0 +1,40 @@
+log = "logs/train.log"
+
+[[command]]
+[command.self_play]
+output = "data/self_play.cbor"
+num_cpus = 30
+num_games = 100000 # 5000000
+batch_size = 10000
+ttable_size_mb = 16
+pvtable_size_mb = 2
+depth = 3
+extra_depth = 3
+temperature = 30
+temperature_cutoff = 90
+features = "WPS"
+
+[[command]]
+[command.learn]
+self_play_data = "data/self_play.cbor"
+# load_weights = "data/linear_wps_0.weights"
+save_weights = "data/linear_wps_test.weights"
+input_value_scale = 1000
+features = "WPS"
+epochs = 2
+chunk_size = 4194304
+batch_size = 8192
+outcome_weight = 1
+log_period_seconds = 60
+[command.learn.model.linear]
+learning_rate = 1e-3
+
+[[command]]
+[command.export]
+weights = "data/linear_wps_test.weights"
+output = "data/linear_wps_weights.rs"
+features = "WPS"
+value_scale = 1000
+[command.export.model.linear]
+# doesn't matter
+learning_rate = 0

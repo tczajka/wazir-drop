@@ -41,5 +41,6 @@ pub fn run_with_model<M: EvalModel + Export>(
     let model = M::new(features, vs.root(), model_config);
     vs.load(&config.weights)?;
     model.export(&config.output, config.value_scale)?;
+    log::info!("Exported model to {}", config.output.display());
     Ok(())
 }

@@ -24,7 +24,7 @@ struct Args {
 #[serde(deny_unknown_fields)]
 struct Config {
     log: PathBuf,
-    command: Command,
+    command: Vec<Command>,
 }
 
 #[derive(Deserialize)]
@@ -63,10 +63,12 @@ fn run() -> Result<(), Box<dyn Error>> {
         ),
     ])?;
 
-    match &config.command {
-        Command::SelfPlay(config) => self_play::run(config)?,
-        Command::Learn(config) => learn::run(config)?,
-        Command::Export(config) => export::run(config)?,
+    for command in &config.command {
+        match command {
+            Command::SelfPlay(config) => self_play::run(config)?,
+            Command::Learn(config) => learn::run(config)?,
+            Command::Export(config) => export::run(config)?,
+        }
     }
 
     Ok(())
