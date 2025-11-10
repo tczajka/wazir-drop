@@ -1,4 +1,4 @@
-use crate::{constants::Depth, RegularMove, Score};
+use crate::{constants::Depth, Move, Score};
 use std::{cmp::Reverse, mem};
 
 pub struct TTable {
@@ -63,7 +63,7 @@ impl TTable {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct TTableEntry {
     pub depth: Depth,
-    pub mov: Option<RegularMove>,
+    pub mov: Option<Move>,
     pub score_type: TTableScoreType,
     pub score: Score,
 }
@@ -98,7 +98,7 @@ struct PhysicalEntry {
     hash: u32,
     epoch: u8,
     depth: Depth,
-    mov: Option<RegularMove>,
+    mov: Option<Move>,
     score_type: TTableScoreType,
     score: Score,
 }

@@ -46,7 +46,7 @@ pub use eval::{EvaluatedPosition, Evaluator};
 pub use features::Features;
 pub use linear_eval::LinearEvaluator;
 pub use main_player::MainPlayerFactory;
-pub use moves::{InvalidMove, Move, RegularMove, SetupMove, ShortMove, ShortMoveFrom};
+pub use moves::{InvalidMove, AnyMove, Move, SetupMove, ShortMove, ShortMoveFrom};
 pub use piece::{ColoredPiece, Piece};
 pub use player::{Player, PlayerFactory};
 pub use position::{Outcome, Position, Stage};

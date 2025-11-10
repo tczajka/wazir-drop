@@ -23,7 +23,7 @@ fn test_evaluator<E: Evaluator>(evaluator: &E, rng: &mut StdRng) {
         let mut position = EvaluatedPosition::new(evaluator, Position::initial());
         while !matches!(position.position().stage(), Stage::End(_)) {
             let mov = moverand::random_move(position.position(), rng);
-            position = position.make_move(mov).unwrap();
+            position = position.make_any_move(mov).unwrap();
             let value = position.evaluate();
             let fresh_value =
                 EvaluatedPosition::new(evaluator, position.position().clone()).evaluate();

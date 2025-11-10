@@ -9,7 +9,7 @@ use crate::{
     ttable::{TTable, TTableEntry, TTableScoreType},
     variation::LongVariation,
     EmptyVariation, EvaluatedPosition, Evaluator, ExtendableVariation, NonEmptyVariation, PVTable,
-    Position, RegularMove, Score, ScoreExpanded, Stage, Variation,
+    Position, Move, Score, ScoreExpanded, Stage, Variation,
 };
 use std::{sync::Arc, time::Instant};
 
@@ -18,7 +18,7 @@ pub struct Search<E> {
     evaluator: Arc<E>,
     ttable: TTable,
     pvtable: PVTable,
-    killer_moves: Vec<[Option<RegularMove>; NUM_KILLER_MOVES]>,
+    killer_moves: Vec<[Option<Move>; NUM_KILLER_MOVES]>,
 }
 
 impl<E: Evaluator> Search<E> {
@@ -70,7 +70,7 @@ struct SearchInstance<'a, E: Evaluator> {
     evaluator: &'a E,
     ttable: &'a mut TTable,
     pvtable: &'a mut PVTable,
-    killer_moves: &'a mut [[Option<RegularMove>; NUM_KILLER_MOVES]],
+    killer_moves: &'a mut [[Option<Move>; NUM_KILLER_MOVES]],
     deadline: Option<Instant>,
     nodes: u64,
 }
@@ -117,7 +117,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         let (mut search_result, mut moves) = self.search_one_ply(&eposition);
         if moves.is_empty() {
             // We are checkmated. Do any pseudomove.
-            let mov = movegen::regular_pseudomoves(eposition.position())
+            let mov = movegen::pseudomoves(eposition.position())
                 .next()
                 .expect("Stalemate");
             return SearchResult {
@@ -145,7 +145,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 if depth >= max_depth {
                     return Ok(());
                 }
-                let epos2 = eposition.make_regular_move(moves[0]).unwrap();
+                let epos2 = eposition.make_move(moves[0]).unwrap();
                 let result = self.search_alpha_beta::<LongVariation>(
                     &epos2,
                     -Score::INFINITE,
@@ -160,7 +160,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
 
                 while root_moves_considered < moves.len() {
                     let mov = moves[root_moves_considered];
-                    let epos2 = eposition.make_regular_move(mov).unwrap();
+                    let epos2 = eposition.make_move(mov).unwrap();
 
                     // PVS: Try null window first.
                     let result = self.search_alpha_beta::<EmptyVariation>(
@@ -206,16 +206,16 @@ impl<E: Evaluator> SearchInstance<'_, E> {
     fn search_one_ply(
         &mut self,
         eposition: &EvaluatedPosition<E>,
-    ) -> (SearchResultInternal<LongVariation>, Vec<RegularMove>) {
-        let mut moves: Vec<(RegularMove, Score)> = Vec::new();
+    ) -> (SearchResultInternal<LongVariation>, Vec<Move>) {
+        let mut moves: Vec<(Move, Score)> = Vec::new();
         let mut search_result = SearchResultInternal {
             score: -Score::INFINITE,
             inf_depth: true,
             pv: LongVariation::empty(),
         };
 
-        for mov in movegen::regular_moves(eposition.position()) {
-            let epos2 = eposition.make_regular_move(mov).unwrap();
+        for mov in movegen::moves(eposition.position()) {
+            let epos2 = eposition.make_move(mov).unwrap();
             let result = self
                 .search_alpha_beta::<LongVariation>(&epos2, -Score::INFINITE, Score::INFINITE, 0)
                 .unwrap();
@@ -232,7 +232,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         if !moves.is_empty() {
             moves[1..].sort_by_key(|&(_, score)| -score);
         }
-        let moves: Vec<RegularMove> = moves.into_iter().map(|(mov, _)| mov).collect();
+        let moves: Vec<Move> = moves.into_iter().map(|(mov, _)| mov).collect();
 
         (search_result, moves)
     }
@@ -386,7 +386,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         alpha: Score,
         beta: Score,
         depth: Depth,
-        tt_move: Option<RegularMove>,
+        tt_move: Option<Move>,
     ) -> Result<SearchResultInternal<V>, Timeout> {
         let position = eposition.position();
 
@@ -398,19 +398,19 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         };
 
         struct MoveCandidate {
-            mov: RegularMove,
+            mov: Move,
             is_out_of_order: bool,
         }
 
         impl MoveCandidate {
-            fn new(mov: RegularMove) -> Self {
+            fn new(mov: Move) -> Self {
                 Self {
                     mov,
                     is_out_of_order: false,
                 }
             }
 
-            fn out_of_order(mov: RegularMove) -> Self {
+            fn out_of_order(mov: Move) -> Self {
                 Self {
                     mov,
                     is_out_of_order: true,
@@ -479,7 +479,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             .map(MoveCandidate::out_of_order)
             .chain(moves);
 
-        let mut out_of_order_moves = SmallVec::<RegularMove, { 1 + NUM_KILLER_MOVES }>::new();
+        let mut out_of_order_moves = SmallVec::<Move, { 1 + NUM_KILLER_MOVES }>::new();
 
         for MoveCandidate {
             mov,
@@ -490,7 +490,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                 continue;
             }
 
-            let Ok(epos2) = eposition.make_regular_move(mov) else {
+            let Ok(epos2) = eposition.make_move(mov) else {
                 // Illegal move. Could be a hash collision in the transposition table
                 // or invalid killer move.
                 continue;
@@ -561,8 +561,8 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         self.pvtable.new_epoch();
         let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
 
-        for mov in movegen::regular_moves(eposition.position()) {
-            let epos2 = eposition.make_regular_move(mov).unwrap();
+        for mov in movegen::moves(eposition.position()) {
+            let epos2 = eposition.make_move(mov).unwrap();
             let result = self
                 .search_alpha_beta::<LongVariation>(&epos2, -Score::INFINITE, Score::INFINITE, 0)
                 .unwrap();
@@ -574,7 +574,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         }
         if variations.is_empty() {
             // We are checkmated. Do any pseudomove.
-            let mov = movegen::regular_pseudomoves(eposition.position())
+            let mov = movegen::pseudomoves(eposition.position())
                 .next()
                 .expect("Stalemate");
             variations.push(TopVariation {
@@ -588,7 +588,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
 
         for depth in 2..=max_depth {
             let mov = variations[0].variation.moves[0];
-            let epos2 = eposition.make_regular_move(mov).unwrap();
+            let epos2 = eposition.make_move(mov).unwrap();
             let result = self
                 .search_alpha_beta::<LongVariation>(
                     &epos2,
@@ -604,7 +604,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
 
             for move_idx in 1..variations.len() {
                 let mov = variations[move_idx].variation.first().unwrap();
-                let epos2 = eposition.make_regular_move(mov).unwrap();
+                let epos2 = eposition.make_move(mov).unwrap();
                 let threshold = variations[0].score.offset(-max_eval_diff);
                 // Null window first.
                 let result = self

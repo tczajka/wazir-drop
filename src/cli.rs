@@ -5,7 +5,7 @@ use crate::{
     log::{self, Level},
     movegen,
     parser::{self, Parser, ParserExt},
-    platform, Color, Move, PlayerFactory, Position, ShortMove,
+    platform, Color, AnyMove, PlayerFactory, Position, ShortMove,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -17,7 +17,7 @@ use std::{
 #[derive(Debug, Clone)]
 pub enum CliCommand {
     TimeLimit(Duration),
-    Opening(Vec<Move>),
+    Opening(Vec<AnyMove>),
     Start,
     OpponentMove(ShortMove),
     Quit,
@@ -29,7 +29,7 @@ impl CliCommand {
             .ignore_then(parser::u32())
             .map(|ms| CliCommand::TimeLimit(Duration::from_millis(ms.into())))
             .or(parser::exact(b"Opening")
-                .ignore_then(parser::exact(b" ").ignore_then(Move::parser()).repeat(0..))
+                .ignore_then(parser::exact(b" ").ignore_then(AnyMove::parser()).repeat(0..))
                 .map(CliCommand::Opening))
             .or(parser::exact(b"Start").map(|_| CliCommand::Start))
             .or(parser::exact(b"Quit").map(|_| CliCommand::Quit))
@@ -64,8 +64,8 @@ enum CliError {
     TimeCommandTooLate,
     OpeningCommandTooLate,
     StartCommandTooLate,
-    InvalidOpeningMove(Move),
-    InvalidPlayerMove(Move),
+    InvalidOpeningMove(AnyMove),
+    InvalidPlayerMove(AnyMove),
     InvalidOpponentMove(ShortMove),
 }
 
@@ -147,7 +147,7 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
                 for &mov in &opening {
                     log::info!("opening {mov}");
                     position = position
-                        .make_move(mov)
+                        .make_any_move(mov)
                         .map_err(|_| CliError::InvalidOpeningMove(mov))?;
                 }
             }
@@ -161,7 +161,7 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
             }
             CliCommand::OpponentMove(short_move) => {
                 timer.start();
-                let mov = movegen::move_from_short_move(&position, short_move)
+                let mov = movegen::any_move_from_short_move(&position, short_move)
                     .map_err(|_| CliError::InvalidOpponentMove(short_move))?;
 
                 let mut opp_time = Duration::ZERO;
@@ -184,7 +184,7 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
                     .as_mut()
                     .unwrap()
                     .opponent_move(&position, mov, &timer);
-                position = position.make_move(mov).unwrap();
+                position = position.make_any_move(mov).unwrap();
             }
             CliCommand::Quit => {
                 log::info!("quit");
@@ -199,7 +199,7 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
         let mov = player.make_move(&position, &timer);
         let short_move = ShortMove::from(mov);
         position = position
-            .make_move(mov)
+            .make_any_move(mov)
             .map_err(|_| CliError::InvalidPlayerMove(mov))?;
         timer.stop();
         log::info!(

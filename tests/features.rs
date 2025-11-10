@@ -35,10 +35,10 @@ fn test_features_random_games<F: Features>(features: &F) {
 
         while !matches!(position.stage(), Stage::End(_)) {
             let mov = moverand::random_move(&position, &mut rng);
-            position = position.make_move(mov).unwrap();
+            position = position.make_any_move(mov).unwrap();
             let new_vs = gen_feature_vecs(features, &position);
             for color in Color::all() {
-                if let Some((added, removed)) = features.diff(mov, &position, color) {
+                if let Some((added, removed)) = features.diff_any(mov, &position, color) {
                     for feature in added {
                         vs[color][feature] += 1;
                     }

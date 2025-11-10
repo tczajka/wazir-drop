@@ -1,7 +1,7 @@
 use std::{fmt::Debug, iter};
 use wazir_drop::{
     Color, Features, LinearEvaluator, NUM_CAPTURED_INDEXES, NormalizedSquare, Piece, Position,
-    RegularMove, SetupMove, Square, Symmetry, captured_index, enums::SimpleEnumExt,
+    Move, SetupMove, Square, Symmetry, captured_index, enums::SimpleEnumExt,
     smallvec::SmallVec,
 };
 
@@ -64,9 +64,9 @@ impl Features for PSFeatures {
         Some((added.into_iter(), iter::empty()))
     }
 
-    fn diff_regular(
+    fn diff(
         self,
-        mov: RegularMove,
+        mov: Move,
         new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)> {

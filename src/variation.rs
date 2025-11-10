@@ -1,4 +1,4 @@
-use crate::{constants::MAX_VARIATION_LENGTH, smallvec::SmallVec, PVTable, RegularMove};
+use crate::{constants::MAX_VARIATION_LENGTH, smallvec::SmallVec, PVTable, Move};
 use std::{
     fmt::{self, Display, Formatter},
     ops::Deref,
@@ -11,20 +11,20 @@ pub trait Variation: Clone {
 
 pub trait ExtendableVariation: Variation {
     type Extended: NonEmptyVariation<Truncated = Self>;
-    fn add_front(self, mov: RegularMove) -> Self::Extended;
+    fn add_front(self, mov: Move) -> Self::Extended;
     fn pvtable_get(pvtable: &mut PVTable, hash: u64) -> Option<Self>;
     fn pvtable_set(pvtable: &mut PVTable, hash: u64, variation: Self);
 }
 
 pub trait NonEmptyVariation: Variation {
     type Truncated: ExtendableVariation<Extended = Self>;
-    fn first(&self) -> Option<RegularMove>;
+    fn first(&self) -> Option<Move>;
     fn truncate(self) -> Self::Truncated;
 }
 
 #[derive(Clone)]
 pub struct LongVariation {
-    pub moves: SmallVec<RegularMove, MAX_VARIATION_LENGTH>,
+    pub moves: SmallVec<Move, MAX_VARIATION_LENGTH>,
     pub truncated: bool,
 }
 
@@ -35,7 +35,7 @@ impl Default for LongVariation {
 }
 
 impl Deref for LongVariation {
-    type Target = [RegularMove];
+    type Target = [Move];
 
     fn deref(&self) -> &Self::Target {
         &self.moves
@@ -76,7 +76,7 @@ impl Variation for LongVariation {
 impl ExtendableVariation for LongVariation {
     type Extended = Self;
 
-    fn add_front(self, mov: RegularMove) -> Self {
+    fn add_front(self, mov: Move) -> Self {
         let mut res = Self::empty();
         res.moves.push(mov);
         for &mov in self.moves.iter() {
@@ -110,7 +110,7 @@ impl NonEmptyVariation for LongVariation {
         self
     }
 
-    fn first(&self) -> Option<RegularMove> {
+    fn first(&self) -> Option<Move> {
         self.moves.first().copied()
     }
 }
@@ -130,7 +130,7 @@ impl Variation for EmptyVariation {
 impl ExtendableVariation for EmptyVariation {
     type Extended = OneMoveVariation;
 
-    fn add_front(self, mov: RegularMove) -> Self::Extended {
+    fn add_front(self, mov: Move) -> Self::Extended {
         OneMoveVariation { mov: Some(mov) }
     }
 
@@ -143,7 +143,7 @@ impl ExtendableVariation for EmptyVariation {
 
 #[derive(Debug, Copy, Clone)]
 pub struct OneMoveVariation {
-    mov: Option<RegularMove>,
+    mov: Option<Move>,
 }
 
 impl Variation for OneMoveVariation {
@@ -163,7 +163,7 @@ impl NonEmptyVariation for OneMoveVariation {
         EmptyVariation
     }
 
-    fn first(&self) -> Option<RegularMove> {
+    fn first(&self) -> Option<Move> {
         self.mov
     }
 }

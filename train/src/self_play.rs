@@ -187,7 +187,7 @@ fn play_game<F: Features, W: serde_cbor::ser::Write>(
                 let mov = select_variation(&variations, &mut rng, config.temperature)
                     .variation
                     .moves[0];
-                position = position.make_regular_move(mov).unwrap();
+                position = position.make_move(mov).unwrap();
             }
             Stage::End(o) => break o,
         }
@@ -245,7 +245,7 @@ fn calc_deep_score(
     }
     let mut pv_position = position.clone();
     for &mov in pv.variation.moves.iter() {
-        let Ok(p) = pv_position.make_regular_move(mov) else {
+        let Ok(p) = pv_position.make_move(mov) else {
             return Err(DeepScoreImpossible::InvalidPV);
         };
         pv_position = p;

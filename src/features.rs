@@ -1,4 +1,4 @@
-use crate::{either::Either, Color, Move, Position, RegularMove, SetupMove};
+use crate::{either::Either, AnyMove, Color, Move, Position, SetupMove};
 use std::fmt::Debug;
 
 pub trait Features: Debug + Copy + Send + 'static {
@@ -9,18 +9,18 @@ pub trait Features: Debug + Copy + Send + 'static {
     /// Returns (added features, removed features).
     ///
     /// If it's too complicated, returns `None`. Caller should fall back to `all_features`.
-    fn diff(
+    fn diff_any(
         self,
-        mov: Move,
+        mov: AnyMove,
         new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)> {
         match mov {
-            Move::Setup(mov) => self
+            AnyMove::Setup(mov) => self
                 .diff_setup(mov, new_position, color)
                 .map(|(added, removed)| (Either::Left(added), Either::Left(removed))),
-            Move::Regular(mov) => self
-                .diff_regular(mov, new_position, color)
+            AnyMove::Regular(mov) => self
+                .diff(mov, new_position, color)
                 .map(|(added, removed)| (Either::Right(added), Either::Right(removed))),
         }
     }
@@ -32,9 +32,9 @@ pub trait Features: Debug + Copy + Send + 'static {
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)>;
 
-    fn diff_regular(
+    fn diff(
         self,
-        mov: RegularMove,
+        mov: Move,
         new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)>;

@@ -1,5 +1,5 @@
 use crate::{
-    constants::Eval, enums::EnumMap, Color, Features, InvalidMove, Move, Position, RegularMove,
+    constants::Eval, enums::EnumMap, AnyMove, Color, Features, InvalidMove, Move, Position,
     SetupMove,
 };
 
@@ -35,10 +35,10 @@ impl<'a, E: Evaluator> EvaluatedPosition<'a, E> {
         &self.position
     }
 
-    pub fn make_move(&self, mov: Move) -> Result<Self, InvalidMove> {
+    pub fn make_any_move(&self, mov: AnyMove) -> Result<Self, InvalidMove> {
         match mov {
-            Move::Setup(mov) => self.make_setup_move(mov),
-            Move::Regular(mov) => self.make_regular_move(mov),
+            AnyMove::Setup(mov) => self.make_setup_move(mov),
+            AnyMove::Regular(mov) => self.make_move(mov),
         }
     }
 
@@ -60,17 +60,15 @@ impl<'a, E: Evaluator> EvaluatedPosition<'a, E> {
         })
     }
 
-    pub fn make_regular_move(&self, mov: RegularMove) -> Result<Self, InvalidMove> {
-        let position = self.position.make_regular_move(mov)?;
+    pub fn make_move(&self, mov: Move) -> Result<Self, InvalidMove> {
+        let position = self.position.make_move(mov)?;
         let accumulators = EnumMap::from_fn(|color| {
             update(
                 self.evaluator,
                 &self.accumulators[color],
                 &position,
                 color,
-                self.evaluator
-                    .features()
-                    .diff_regular(mov, &position, color),
+                self.evaluator.features().diff(mov, &position, color),
             )
         });
         Ok(Self {

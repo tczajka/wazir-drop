@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{Move, Outcome, Position, Stage};
+use wazir_drop::{AnyMove, Outcome, Position, Stage};
 
 #[test]
 fn test_outcome_display_round_trip() {
@@ -230,7 +230,7 @@ setup
     .unwrap();
 
     let position2 = position
-        .make_move(Move::from_str("AWNAADADAFFAADDA").unwrap())
+        .make_any_move(AnyMove::from_str("AWNAADADAFFAADDA").unwrap())
         .unwrap();
     assert_eq!(
         position2.to_string(),
@@ -250,11 +250,11 @@ AFFAADDA
     );
 
     assert!(position
-        .make_move(Move::from_str("awnaadadaffaadda").unwrap())
+        .make_any_move(AnyMove::from_str("awnaadadaffaadda").unwrap())
         .is_err());
 
     let position3 = position2
-        .make_move(Move::from_str("awnaadadaffaadda").unwrap())
+        .make_any_move(AnyMove::from_str("awnaadadaffaadda").unwrap())
         .unwrap();
     assert_eq!(
         position3.to_string(),
@@ -291,10 +291,10 @@ add.w..a
     .unwrap();
 
     assert!(position
-        .make_move(Move::from_str("AWNAADADAFFAADDA").unwrap())
+        .make_any_move(AnyMove::from_str("AWNAADADAFFAADDA").unwrap())
         .is_err());
 
-    let position2 = position.make_move(Move::from_str("A@a1").unwrap()).unwrap();
+    let position2 = position.make_any_move(AnyMove::from_str("A@a1").unwrap()).unwrap();
     assert_eq!(
         position2.to_string(),
         "\
@@ -312,13 +312,13 @@ add.w..a
 "
     );
 
-    assert!(position.make_move(Move::from_str("A@a2").unwrap()).is_err());
-    assert!(position.make_move(Move::from_str("A@b2").unwrap()).is_err());
-    assert!(position.make_move(Move::from_str("N@a1").unwrap()).is_err());
-    assert!(position.make_move(Move::from_str("f@a1").unwrap()).is_err());
+    assert!(position.make_any_move(AnyMove::from_str("A@a2").unwrap()).is_err());
+    assert!(position.make_any_move(AnyMove::from_str("A@b2").unwrap()).is_err());
+    assert!(position.make_any_move(AnyMove::from_str("N@a1").unwrap()).is_err());
+    assert!(position.make_any_move(AnyMove::from_str("f@a1").unwrap()).is_err());
 
     let position2 = position
-        .make_move(Move::from_str("Wa2-a3").unwrap())
+        .make_any_move(AnyMove::from_str("Wa2-a3").unwrap())
         .unwrap();
     assert_eq!(
         position2.to_string(),
@@ -337,14 +337,14 @@ add.w..a
 "
     );
     assert!(position
-        .make_move(Move::from_str("Wa2-c2").unwrap())
+        .make_any_move(AnyMove::from_str("Wa2-c2").unwrap())
         .is_err());
     assert!(position
-        .make_move(Move::from_str("Fb3-a4").unwrap())
+        .make_any_move(AnyMove::from_str("Fb3-a4").unwrap())
         .is_err());
 
     let position2 = position
-        .make_move(Move::from_str("Wa2xab2").unwrap())
+        .make_any_move(AnyMove::from_str("Wa2xab2").unwrap())
         .unwrap();
     assert_eq!(
         position2.to_string(),
@@ -363,7 +363,7 @@ add.w..a
 "
     );
     assert!(position
-        .make_move(Move::from_str("Wa2xnb2").unwrap())
+        .make_any_move(AnyMove::from_str("Wa2xnb2").unwrap())
         .is_err());
 
     let position = Position::from_str(
@@ -384,7 +384,7 @@ add.w..a
     .unwrap();
 
     let position2 = position
-        .make_move(Move::from_str("nc1xWa2").unwrap())
+        .make_any_move(AnyMove::from_str("nc1xWa2").unwrap())
         .unwrap();
     assert_eq!(
         position2.to_string(),
@@ -421,7 +421,7 @@ add.w..a
     .unwrap();
 
     let position2 = position
-        .make_move(Move::from_str("fg7-h6").unwrap())
+        .make_any_move(AnyMove::from_str("fg7-h6").unwrap())
         .unwrap();
     assert_eq!(
         position2.to_string(),

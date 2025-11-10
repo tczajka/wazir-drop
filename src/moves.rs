@@ -78,16 +78,16 @@ impl Display for SetupMove {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(align(4))]
-pub struct RegularMove {
+pub struct Move {
     pub colored_piece: ColoredPiece,
     pub from: Option<Square>,
     pub captured: Option<Piece>,
     pub to: Square,
 }
 
-const _: () = assert!(mem::size_of::<RegularMove>() == 4);
+const _: () = assert!(mem::size_of::<Move>() == 4);
 
-impl RegularMove {
+impl Move {
     pub fn parser() -> impl Parser<Output = Self> {
         ColoredPiece::parser()
             .and_then(move |cpiece| {
@@ -106,7 +106,7 @@ impl RegularMove {
                     .map(move |(from, captured)| (cpiece, from, captured))
             })
             .and(Square::parser())
-            .map(|((colored_piece, from, captured), to)| RegularMove {
+            .map(|((colored_piece, from, captured), to)| Move {
                 colored_piece,
                 from,
                 captured,
@@ -115,9 +115,9 @@ impl RegularMove {
     }
 }
 
-impl_from_str_for_parsable!(RegularMove);
+impl_from_str_for_parsable!(Move);
 
-impl Display for RegularMove {
+impl Display for Move {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.colored_piece)?;
         match (self.from, self.captured) {
@@ -135,38 +135,38 @@ impl Display for RegularMove {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Move {
+pub enum AnyMove {
     Setup(SetupMove),
-    Regular(RegularMove),
+    Regular(Move),
 }
 
-impl Move {
+impl AnyMove {
     pub fn parser() -> impl Parser<Output = Self> {
         SetupMove::parser()
-            .map(Move::from)
-            .or(RegularMove::parser().map(Move::from))
+            .map(AnyMove::from)
+            .or(Move::parser().map(AnyMove::from))
     }
 }
 
-impl_from_str_for_parsable!(Move);
+impl_from_str_for_parsable!(AnyMove);
 
-impl From<SetupMove> for Move {
+impl From<SetupMove> for AnyMove {
     fn from(mov: SetupMove) -> Self {
-        Move::Setup(mov)
+        AnyMove::Setup(mov)
     }
 }
 
-impl From<RegularMove> for Move {
-    fn from(mov: RegularMove) -> Self {
-        Move::Regular(mov)
+impl From<Move> for AnyMove {
+    fn from(mov: Move) -> Self {
+        AnyMove::Regular(mov)
     }
 }
 
-impl Display for Move {
+impl Display for AnyMove {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Move::Setup(mov) => write!(f, "{mov}"),
-            Move::Regular(mov) => write!(f, "{mov}"),
+            AnyMove::Setup(mov) => write!(f, "{mov}"),
+            AnyMove::Regular(mov) => write!(f, "{mov}"),
         }
     }
 }
@@ -221,11 +221,11 @@ impl Display for ShortMove {
     }
 }
 
-impl From<Move> for ShortMove {
-    fn from(mov: Move) -> Self {
+impl From<AnyMove> for ShortMove {
+    fn from(mov: AnyMove) -> Self {
         match mov {
-            Move::Setup(mov) => ShortMove::Setup(mov),
-            Move::Regular(mov) => ShortMove::Regular {
+            AnyMove::Setup(mov) => ShortMove::Setup(mov),
+            AnyMove::Regular(mov) => ShortMove::Regular {
                 from: match mov.from {
                     None => ShortMoveFrom::Piece(mov.colored_piece),
                     Some(from) => ShortMoveFrom::Square(from),

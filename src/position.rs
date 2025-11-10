@@ -4,8 +4,8 @@ use crate::{
     error::Invalid,
     impl_from_str_for_parsable, movegen,
     parser::{self, ParseError, Parser, ParserExt},
-    zobrist, Bitboard, Board, Captured, Color, ColoredPiece, InvalidMove, Move, Piece, RegularMove,
-    Score, ScoreExpanded, SetupMove, Square, Symmetry,
+    zobrist, AnyMove, Bitboard, Board, Captured, Color, ColoredPiece, InvalidMove, Piece,
+    Move, Score, ScoreExpanded, SetupMove, Square, Symmetry,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -263,10 +263,10 @@ impl Position {
         })
     }
 
-    pub fn make_move(&self, mov: Move) -> Result<Position, InvalidMove> {
+    pub fn make_any_move(&self, mov: AnyMove) -> Result<Position, InvalidMove> {
         match mov {
-            Move::Setup(mov) => self.make_setup_move(mov),
-            Move::Regular(mov) => self.make_regular_move(mov),
+            AnyMove::Setup(mov) => self.make_setup_move(mov),
+            AnyMove::Regular(mov) => self.make_move(mov),
         }
     }
 
@@ -292,7 +292,7 @@ impl Position {
         Ok(new_position)
     }
 
-    pub fn make_regular_move(&self, mov: RegularMove) -> Result<Position, InvalidMove> {
+    pub fn make_move(&self, mov: Move) -> Result<Position, InvalidMove> {
         let me = self.to_move();
         let opp = me.opposite();
         if self.stage != Stage::Regular || mov.colored_piece.color() != me {

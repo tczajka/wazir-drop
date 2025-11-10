@@ -1,6 +1,6 @@
 use crate::{
     captured_index, enums::SimpleEnumExt, linear_wps_weights, smallvec::SmallVec, Color, Features,
-    LinearEvaluator, NormalizedSquare, Piece, Position, RegularMove, SetupMove, Square, Symmetry,
+    LinearEvaluator, NormalizedSquare, Piece, Position, Move, SetupMove, Square, Symmetry,
     NUM_CAPTURED_INDEXES,
 };
 use std::iter;
@@ -111,9 +111,9 @@ impl Features for WPSFeatures {
         Some((added, iter::empty()))
     }
 
-    fn diff_regular(
+    fn diff(
         self,
-        mov: RegularMove,
+        mov: Move,
         new_position: &Position,
         color: Color,
     ) -> Option<(impl Iterator<Item = usize>, impl Iterator<Item = usize>)> {

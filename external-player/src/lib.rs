@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 use wazir_drop::{
-    CliCommand, Color, Move, Player, PlayerFactory, Position, ShortMove,
+    CliCommand, Color, AnyMove, Player, PlayerFactory, Position, ShortMove,
     clock::Timer,
     movegen,
     parser::{self, ParserExt},
@@ -24,7 +24,7 @@ impl ExternalPlayer {
         path: &Path,
         log_path: &Path,
         color: Color,
-        opening: &[Move],
+        opening: &[AnyMove],
         time_limit: Option<Duration>,
     ) -> io::Result<Self> {
         let log_file = File::create(log_path)?;
@@ -77,13 +77,13 @@ impl ExternalPlayer {
 }
 
 impl Player for ExternalPlayer {
-    fn opponent_move(&mut self, _position: &Position, mov: Move, _timer: &Timer) {
+    fn opponent_move(&mut self, _position: &Position, mov: AnyMove, _timer: &Timer) {
         self.send_command(CliCommand::OpponentMove(mov.into()));
     }
 
-    fn make_move(&mut self, position: &Position, _timer: &Timer) -> Move {
+    fn make_move(&mut self, position: &Position, _timer: &Timer) -> AnyMove {
         let short_move = self.read_move();
-        movegen::move_from_short_move(position, short_move)
+        movegen::any_move_from_short_move(position, short_move)
             .unwrap_or_else(|_| panic!("Invalid move: {short_move}"))
     }
 }
@@ -120,7 +120,7 @@ impl PlayerFactory for ExternalPlayerFactory {
         &self,
         game_id: &str,
         color: Color,
-        opening: &[Move],
+        opening: &[AnyMove],
         time_limit: std::option::Option<Duration>,
     ) -> Box<dyn Player> {
         let log_path = self

@@ -1,14 +1,14 @@
 use std::str::FromStr;
-use wazir_drop::{enums::SimpleEnumExt, Move, Piece, RegularMove, SetupMove, ShortMove};
+use wazir_drop::{enums::SimpleEnumExt, AnyMove, Move, Piece, SetupMove, ShortMove};
 
 #[test]
-fn test_opening_move_size_matches_piece_initial_count() {
+fn test_setup_move_size_matches_piece_initial_count() {
     let num_pieces = Piece::all().map(Piece::initial_count).sum();
     assert_eq!(SetupMove::SIZE, num_pieces);
 }
 
 #[test]
-fn test_opening_move_display_from_str() {
+fn test_setup_move_display_from_str() {
     let mov = SetupMove::from_str("AWNAADADAFFAADDA").unwrap();
     assert_eq!(mov.to_string(), "AWNAADADAFFAADDA");
     let mov = SetupMove::from_str("aaaaaffdaddadnwa").unwrap();
@@ -19,27 +19,27 @@ fn test_opening_move_display_from_str() {
 }
 
 #[test]
-fn test_regular_move_display_from_str() {
-    let mov = RegularMove::from_str("A@a1").unwrap();
+fn test_move_display_from_str() {
+    let mov = Move::from_str("A@a1").unwrap();
     assert_eq!(mov.to_string(), "A@a1");
-    let mov = RegularMove::from_str("Da1-a3").unwrap();
+    let mov = Move::from_str("Da1-a3").unwrap();
     assert_eq!(mov.to_string(), "Da1-a3");
-    let mov = RegularMove::from_str("Da1xna3").unwrap();
+    let mov = Move::from_str("Da1xna3").unwrap();
     assert_eq!(mov.to_string(), "Da1xna3");
 
-    assert!(RegularMove::from_str("Aa1").is_err());
-    assert!(RegularMove::from_str("Da1xNa3").is_err());
+    assert!(Move::from_str("Aa1").is_err());
+    assert!(Move::from_str("Da1xNa3").is_err());
 }
 
 #[test]
-fn test_move_to_short_move() {
-    let mov = Move::from_str("AWNAADADAFFAADDA").unwrap();
+fn test_any_move_to_short_move() {
+    let mov = AnyMove::from_str("AWNAADADAFFAADDA").unwrap();
     assert_eq!(ShortMove::from(mov).to_string(), "AWNAADADAFFAADDA");
-    let mov = Move::from_str("d@a3").unwrap();
+    let mov = AnyMove::from_str("d@a3").unwrap();
     assert_eq!(ShortMove::from(mov).to_string(), "da3");
-    let mov = Move::from_str("Da1-a3").unwrap();
+    let mov = AnyMove::from_str("Da1-a3").unwrap();
     assert_eq!(ShortMove::from(mov).to_string(), "a1a3");
-    let mov = Move::from_str("Da1xna3").unwrap();
+    let mov = AnyMove::from_str("Da1xna3").unwrap();
     assert_eq!(ShortMove::from(mov).to_string(), "a1a3");
 }
 
@@ -57,7 +57,7 @@ fn test_short_move_display_from_str() {
 }
 
 #[test]
-fn test_opening_move_validate_pieces() {
+fn test_setup_move_validate_pieces() {
     let mov = SetupMove::from_str("AWNAADADAFFAADDA").unwrap();
     assert!(mov.validate_pieces().is_ok());
     let mov = SetupMove::from_str("AWNAADADAFFAADDN").unwrap();

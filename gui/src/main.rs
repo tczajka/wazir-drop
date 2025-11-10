@@ -16,7 +16,7 @@ use std::{
     time::{Duration, Instant},
 };
 use wazir_drop::{
-    Color, ColoredPiece, Coord, DefaultEvaluator, Move, Piece, Position, Search, SetupMove,
+    AnyMove, Color, ColoredPiece, Coord, DefaultEvaluator, Piece, Position, Search, SetupMove,
     ShortMove, ShortMoveFrom, Square, Stage, Symmetry,
     constants::Hyperparameters,
     enums::{EnumMap, SimpleEnumExt},
@@ -231,7 +231,7 @@ impl WazirDropApp {
                 NextMoveState::HumanRegular { from: Some(from) } => {
                     let short_move = ShortMove::Regular { from, to: square };
                     from == ShortMoveFrom::Square(square)
-                        || movegen::move_from_short_move(&self.position, short_move).is_ok()
+                        || movegen::any_move_from_short_move(&self.position, short_move).is_ok()
                 }
                 NextMoveState::HumanSetup {
                     swap_from: Some(swap_from),
@@ -241,7 +241,7 @@ impl WazirDropApp {
             };
             let is_last_move = match self.history.last() {
                 Some(HistoryEntry {
-                    mov: Move::Regular(mov),
+                    mov: AnyMove::Regular(mov),
                     ..
                 }) => mov.from == Some(square) || mov.to == square,
                 _ => false,
@@ -307,7 +307,7 @@ impl WazirDropApp {
         };
     }
 
-    fn launch_computer_thread(&mut self, ctx: &egui::Context, result: Arc<Mutex<Option<Move>>>) {
+    fn launch_computer_thread(&mut self, ctx: &egui::Context, result: Arc<Mutex<Option<AnyMove>>>) {
         let position = self.position.clone();
         let rng = self.rng.clone();
         let search = self.search.clone();
@@ -442,7 +442,7 @@ impl WazirDropApp {
                         from: from_square,
                         to: square,
                     };
-                    if let Ok(mov) = movegen::move_from_short_move(&self.position, short_move) {
+                    if let Ok(mov) = movegen::any_move_from_short_move(&self.position, short_move) {
                         self.make_move(mov, ctx);
                     }
                 }
@@ -464,12 +464,12 @@ impl WazirDropApp {
         }
     }
 
-    fn make_move(&mut self, mov: Move, ctx: &egui::Context) {
+    fn make_move(&mut self, mov: AnyMove, ctx: &egui::Context) {
         self.history.push(HistoryEntry {
             position: self.position.clone(),
             mov,
         });
-        self.position = self.position.make_move(mov).expect("Invalid move");
+        self.position = self.position.make_any_move(mov).expect("Invalid move");
         self.start_next_move(ctx);
     }
 
@@ -539,7 +539,7 @@ impl App for WazirDropApp {
             if let NextMoveState::HumanSetup { setup, .. } = &self.next_move_state
                 && ui.button("Make setup move").clicked()
             {
-                self.make_move(Move::Setup(*setup), ctx);
+                self.make_move(AnyMove::Setup(*setup), ctx);
             }
 
             if let Stage::End(outcome) = self.position.stage() {
@@ -563,7 +563,7 @@ enum NextMoveState {
         from: Option<ShortMoveFrom>,
     },
     Computer {
-        result: Arc<Mutex<Option<Move>>>,
+        result: Arc<Mutex<Option<AnyMove>>>,
     },
     EndOfGame,
 }
@@ -571,5 +571,5 @@ enum NextMoveState {
 #[derive(Debug)]
 struct HistoryEntry {
     position: Position,
-    mov: Move,
+    mov: AnyMove,
 }

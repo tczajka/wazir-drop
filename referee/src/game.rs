@@ -1,12 +1,12 @@
 use std::time::Duration;
 use wazir_drop::{
-    Color, Move, Outcome, PlayerFactory, Position, Stage, clock::Timer,
+    Color, AnyMove, Outcome, PlayerFactory, Position, Stage, clock::Timer,
     constants::DEFAULT_TIME_LIMIT, enums::EnumMap,
 };
 
 #[derive(Debug, Clone)]
 pub struct FinishedGame {
-    pub moves: Vec<Move>,
+    pub moves: Vec<AnyMove>,
     pub outcome: Outcome,
     pub time_left: EnumMap<Color, Duration>,
 }
@@ -14,7 +14,7 @@ pub struct FinishedGame {
 pub fn run_game(
     game_id: &str,
     player_factories: EnumMap<Color, &dyn PlayerFactory>,
-    opening: &[Move],
+    opening: &[AnyMove],
     time_limit: EnumMap<Color, Option<Duration>>,
 ) -> FinishedGame {
     let mut position = Position::initial();
@@ -31,7 +31,7 @@ pub fn run_game(
     });
 
     for &mov in opening {
-        position = position.make_move(mov).expect("Invalid opening move");
+        position = position.make_any_move(mov).expect("Invalid opening move");
     }
 
     let outcome = loop {
@@ -46,7 +46,7 @@ pub fn run_game(
         timers[color].stop();
 
         moves.push(mov);
-        let new_position = position.make_move(mov).expect("Invalid move");
+        let new_position = position.make_any_move(mov).expect("Invalid move");
 
         if !matches!(new_position.stage(), Stage::End(_)) {
             timers[opp].start();

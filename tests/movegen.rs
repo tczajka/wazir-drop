@@ -3,10 +3,10 @@ use std::str::FromStr;
 use wazir_drop::{
     movegen::{
         attacked_by, captures_of_wazir, check_evasions_capture_attacker, drops, in_check, jumps,
-        move_bitboard, move_from_short_move, pseudocaptures, pseudojumps, setup_moves,
+        move_bitboard, any_move_from_short_move, pseudocaptures, pseudojumps, setup_moves,
         validate_from_to,
     },
-    Color, Piece, Position, RegularMove, ShortMove, Square,
+    Color, Piece, Position, Move, ShortMove, Square,
 };
 
 #[test]
@@ -124,14 +124,14 @@ setup
     )
     .unwrap();
     let mov =
-        move_from_short_move(&position, ShortMove::from_str("AWNAADADAFFAADDA").unwrap()).unwrap();
+        any_move_from_short_move(&position, ShortMove::from_str("AWNAADADAFFAADDA").unwrap()).unwrap();
     assert_eq!(mov.to_string(), "AWNAADADAFFAADDA");
 
     assert!(
-        move_from_short_move(&position, ShortMove::from_str("AWNAADADAFFAADDN").unwrap()).is_err()
+        any_move_from_short_move(&position, ShortMove::from_str("AWNAADADAFFAADDN").unwrap()).is_err()
     );
     assert!(
-        move_from_short_move(&position, ShortMove::from_str("awnaadadaffaadda").unwrap()).is_err()
+        any_move_from_short_move(&position, ShortMove::from_str("awnaadadaffaadda").unwrap()).is_err()
     );
 
     let position = Position::from_str(
@@ -151,20 +151,20 @@ add.w..a
     )
     .unwrap();
 
-    let mov = move_from_short_move(&position, ShortMove::from_str("Aa1").unwrap()).unwrap();
+    let mov = any_move_from_short_move(&position, ShortMove::from_str("Aa1").unwrap()).unwrap();
     assert_eq!(mov.to_string(), "A@a1");
-    let mov = move_from_short_move(&position, ShortMove::from_str("a2a3").unwrap()).unwrap();
+    let mov = any_move_from_short_move(&position, ShortMove::from_str("a2a3").unwrap()).unwrap();
     assert_eq!(mov.to_string(), "Wa2-a3");
-    let mov = move_from_short_move(&position, ShortMove::from_str("a2b2").unwrap()).unwrap();
+    let mov = any_move_from_short_move(&position, ShortMove::from_str("a2b2").unwrap()).unwrap();
     assert_eq!(mov.to_string(), "Wa2xab2");
 
     assert!(
-        move_from_short_move(&position, ShortMove::from_str("AWNAADADAFFAADDA").unwrap()).is_err()
+        any_move_from_short_move(&position, ShortMove::from_str("AWNAADADAFFAADDA").unwrap()).is_err()
     );
-    assert!(move_from_short_move(&position, ShortMove::from_str("fa1").unwrap()).is_err());
-    assert!(move_from_short_move(&position, ShortMove::from_str("a2c2").unwrap()).is_err());
-    assert!(move_from_short_move(&position, ShortMove::from_str("b3a4").unwrap()).is_err());
-    assert!(move_from_short_move(&position, ShortMove::from_str("Na1").unwrap()).is_err());
+    assert!(any_move_from_short_move(&position, ShortMove::from_str("fa1").unwrap()).is_err());
+    assert!(any_move_from_short_move(&position, ShortMove::from_str("a2c2").unwrap()).is_err());
+    assert!(any_move_from_short_move(&position, ShortMove::from_str("b3a4").unwrap()).is_err());
+    assert!(any_move_from_short_move(&position, ShortMove::from_str("Na1").unwrap()).is_err());
 }
 
 #[test]
@@ -387,7 +387,7 @@ a.dw...a
     )
     .unwrap();
 
-    let moves: Vec<RegularMove> = check_evasions_capture_attacker(&position).collect();
+    let moves: Vec<Move> = check_evasions_capture_attacker(&position).collect();
     assert!(moves.is_empty());
 }
 

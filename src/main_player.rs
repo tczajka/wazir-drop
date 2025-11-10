@@ -1,7 +1,8 @@
 use crate::{
     clock::Timer,
     constants::{Hyperparameters, TIME_MARGIN},
-    log, Color, DefaultEvaluator, Move, Player, PlayerFactory, Position, Search, SetupMove, Stage,
+    log, AnyMove, Color, DefaultEvaluator, Player, PlayerFactory, Position, Search, SetupMove,
+    Stage,
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
 
@@ -11,7 +12,7 @@ struct MainPlayer {
 }
 
 impl Player for MainPlayer {
-    fn make_move(&mut self, position: &Position, timer: &Timer) -> Move {
+    fn make_move(&mut self, position: &Position, timer: &Timer) -> AnyMove {
         match position.stage() {
             Stage::Setup => {
                 let mov = SetupMove::from_str("AAAAAAWANDDDDFFA").unwrap();
@@ -79,7 +80,7 @@ impl PlayerFactory for MainPlayerFactory {
         &self,
         _game_id: &str,
         _color: Color,
-        _opening: &[Move],
+        _opening: &[AnyMove],
         _time_limit: Option<Duration>,
     ) -> Box<dyn crate::Player> {
         Box::new(MainPlayer {
