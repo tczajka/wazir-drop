@@ -22,7 +22,6 @@ pub struct Hyperparameters {
     pub pvtable_size: usize,
     pub time_alloc_decay_moves: f64,
     pub min_depth_ttable: Depth,
-    // In addition to 1 ply.
     pub reduction_null_move: Depth,
 }
 
