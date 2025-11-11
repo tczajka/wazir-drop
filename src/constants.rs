@@ -16,6 +16,10 @@ pub type Eval = i32;
 
 pub const NUM_KILLER_MOVES: usize = 2;
 
+// 16 KB, 2 hashes: collision probability per hash is 1 / 80, total 1 / 6400
+pub const HISTORY_BLOOM_FILTER_LOG_SIZE: u32 = 14;
+pub const HISTORY_BLOOM_FILTER_NUM_HASHES: usize = 2;
+
 #[derive(Debug, Clone)]
 pub struct Hyperparameters {
     pub ttable_size: usize,

@@ -16,6 +16,7 @@ mod color;
 pub mod constants;
 mod eval;
 mod features;
+mod history;
 mod linear_eval;
 pub mod linear_wps_weights;
 mod main_player;
