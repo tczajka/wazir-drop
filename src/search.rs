@@ -1,6 +1,7 @@
 use crate::{
     constants::{
-        Depth, Hyperparameters, CHECK_TIMEOUT_NODES, MAX_SEARCH_DEPTH, NUM_KILLER_MOVES, PLY_DRAW,
+        Depth, Hyperparameters, Ply, CHECK_TIMEOUT_NODES, MAX_SEARCH_DEPTH, NUM_KILLER_MOVES,
+        PLY_DRAW,
     },
     either::Either,
     movegen,
@@ -359,6 +360,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 score: outcome.to_score(ply),
                 depth: Depth::MAX,
                 pv: V::empty(),
+                repetition_ply: Ply::MAX,
             });
         }
 
@@ -388,6 +390,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 score: best_possible,
                 depth: Depth::MAX,
                 pv: V::empty_truncated(),
+                repetition_ply: Ply::MAX,
             });
         }
 
@@ -396,6 +399,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 score: worst_possible,
                 depth: Depth::MAX,
                 pv: V::empty_truncated(),
+                repetition_ply: Ply::MAX,
             });
         }
 
@@ -407,6 +411,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     score: Score::DRAW,
                     depth: Depth::MAX,
                     pv: V::empty_truncated(),
+                    repetition_ply: ply - ago as Ply,
                 });
             }
         }
@@ -435,6 +440,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                             score,
                             depth: ttentry.depth,
                             pv,
+                            repetition_ply: Ply::MAX,
                         });
                     }
                 }
@@ -465,7 +471,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
         }
 
-        if depth >= self.hyperparameters.min_depth_ttable {
+        if depth >= self.hyperparameters.min_depth_ttable && result.repetition_ply >= ply {
             let score_type = if result.score >= beta {
                 TTableScoreType::LowerBound
             } else if result.score <= alpha {
@@ -490,6 +496,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             score: result.score,
             depth: result.depth,
             pv,
+            repetition_ply: result.repetition_ply,
         })
     }
 
@@ -510,6 +517,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             score: ScoreExpanded::Loss(position.ply() + 2).into(),
             depth: Depth::MAX,
             pv: V::empty_truncated(),
+            repetition_ply: Ply::MAX,
         };
 
         let moves = if in_check {
@@ -517,11 +525,9 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         } else if depth == 0 {
             // Quiescence search.
             // Stand pat.
-            result = SearchResultInternal {
-                score: ScoreExpanded::Eval(eposition.evaluate()).into(),
-                depth: 0,
-                pv: V::empty(),
-            };
+            result.score = ScoreExpanded::Eval(eposition.evaluate()).into();
+            result.depth = 0;
+            result.pv = V::empty();
             if result.score >= beta {
                 return Ok(result);
             }
@@ -539,14 +545,15 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     depth - self.hyperparameters.reduction_null_move,
                 )?;
                 if -result2.score >= beta {
-                    result = SearchResultInternal {
+                    return Ok(SearchResultInternal {
                         score: beta,
                         depth: result2
                             .depth
                             .saturating_add(self.hyperparameters.reduction_null_move),
                         pv: V::empty_truncated(),
-                    };
-                    return Ok(result);
+                        // Repetitions don't count accross null move.
+                        repetition_ply: Ply::MAX,
+                    });
                 }
             }
 
@@ -614,6 +621,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     score: -Score::INFINITE,
                     depth: Depth::MAX,
                     pv: EmptyVariation::empty_truncated(),
+                    repetition_ply: Ply::MAX,
                 }
             };
 
@@ -632,12 +640,16 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     }
                     if score >= beta {
                         result.depth = result2.depth.saturating_add(1);
+                        result.repetition_ply = result2.repetition_ply;
                         break;
                     }
                 }
                 result.depth = result.depth.min(result2.depth.saturating_add(1));
+                result.repetition_ply = result.repetition_ply.min(result2.repetition_ply);
             } else {
                 result.depth = result.depth.min(result_null_window.depth.saturating_add(1));
+                result.repetition_ply =
+                    result.repetition_ply.min(result_null_window.repetition_ply);
             }
         }
 
@@ -702,6 +714,8 @@ struct SearchResultInternal<V> {
     score: Score,
     depth: Depth,
     pv: V,
+    // Smallest ply when the position was repeated
+    repetition_ply: Ply,
 }
 
 #[derive(Debug)]
