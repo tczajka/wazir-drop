@@ -29,7 +29,7 @@ pub struct Hyperparameters {
 impl Default for Hyperparameters {
     fn default() -> Self {
         Self {
-            ttable_size: 1024 << 20,
+            ttable_size: 256 << 20,
             pvtable_size: 16 << 20,
             time_alloc_decay_moves: 20.0,
             min_depth_ttable: 2,
