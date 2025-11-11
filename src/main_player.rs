@@ -38,9 +38,9 @@ impl Player for MainPlayer {
                 );
                 let elapsed = time_left.saturating_sub(timer.get());
                 log::info!(
-                    "depth {depth} score {score} \
-                        root {root_moves_considered}/{root_all_moves} \
-                        nodes {nodes} knps {knps:.0} pv {pv}",
+                    "depth={depth} score={score} \
+                        root={root_moves_considered}/{root_all_moves} \
+                        nodes={nodes} knps={knps:.0} pv={pv}",
                     depth = result.depth,
                     score = result.score.to_relative(position.ply()),
                     root_moves_considered = result.root_moves_considered,

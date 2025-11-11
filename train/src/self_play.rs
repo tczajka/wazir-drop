@@ -107,15 +107,18 @@ fn run_games<F: Features, W: serde_cbor::ser::Write + Send + 'static>(
         {
             let stats = stats.lock().unwrap();
             log::info!(
-                "games={games} / {num_games} samples={samples} games/s={games_per_second:.2}\n  \
-                pv_truncated={pv_truncated} invalid_pv={invalid_pv} draws={draws_percentage:.2}%",
+                "games={games} / {num_games} draws={draws_percentage:.2}% moves/game = {moves_per_game:.2}\n \
+                entropy/move = {entropy_per_move:.6} samples={samples} games/s={games_per_second:.2}\n  \
+                pv_truncated={pv_truncated} invalid_pv={invalid_pv} ",
                 games = stats.games,
                 num_games = config.num_games,
+                draws_percentage = stats.draws as f64 / stats.games as f64 * 100.0,
+                moves_per_game = stats.moves as f64 / stats.games as f64,
+                entropy_per_move = stats.entropy / stats.moves as f64,
                 samples = stats.samples,
                 games_per_second = stats.games as f64 / start_time.elapsed().as_secs_f64(),
                 pv_truncated = stats.pv_truncated,
                 invalid_pv = stats.invalid_pv,
-                draws_percentage = stats.draws as f64 / stats.games as f64 * 100.0,
             );
         }
     }
@@ -185,7 +188,9 @@ fn play_game<F: Features, W: serde_cbor::ser::Write>(
                         stats.invalid_pv += 1;
                     }
                 }
-                let mov = select_move(&result.top_moves, &mut rng, config.temperature);
+                let (entropy, mov) = select_move(&result.top_moves, &mut rng, config.temperature);
+                stats.entropy += entropy;
+                stats.moves += 1;
                 position = position.make_move(mov).unwrap();
             }
             Stage::End(o) => break o,
@@ -264,25 +269,40 @@ fn calc_deep_score(
     Ok((pv_position, result.score))
 }
 
-fn select_move(moves: &[ScoredMove], rng: &mut StdRng, temperature: f64) -> Move {
+// Returns (entropy, move).
+fn select_move(moves: &[ScoredMove], rng: &mut StdRng, temperature: f64) -> (f64, Move) {
     let ScoreExpanded::Eval(top_eval) = moves[0].score.into() else {
-        return moves[0].mov;
+        return (0.0, moves[0].mov);
     };
-    moves
-        .choose_weighted(rng, |m| {
-            let ScoreExpanded::Eval(eval) = m.score.into() else {
-                return 0.0;
-            };
-            let rel = eval - top_eval;
-            let log_prob = rel as f64 / temperature;
-            log_prob.exp()
-        })
+    let log_weight = |m: &ScoredMove| {
+        let ScoreExpanded::Eval(eval) = m.score.into() else {
+            return f64::NEG_INFINITY;
+        };
+        let rel = eval - top_eval;
+        rel as f64 / temperature
+    };
+    let sum_weights: f64 = moves.iter().map(|m| log_weight(m).exp()).sum();
+    let log_sum_weights = sum_weights.ln();
+    let entropy = -1.0 / sum_weights
+        * moves
+            .iter()
+            .map(|m| {
+                let l = log_weight(m);
+                l.exp() * (l - log_sum_weights)
+            })
+            .sum::<f64>();
+
+    let mov = moves
+        .choose_weighted(rng, |m| log_weight(m).exp())
         .unwrap()
-        .mov
+        .mov;
+    (entropy, mov)
 }
 
 struct Stats {
     games: u64,
+    moves: u64,
+    entropy: f64,
     draws: u64,
     samples: u64,
     pv_truncated: u64,
@@ -293,6 +313,8 @@ impl Stats {
     fn new() -> Self {
         Self {
             games: 0,
+            moves: 0,
+            entropy: 0.0,
             draws: 0,
             samples: 0,
             pv_truncated: 0,
@@ -302,6 +324,8 @@ impl Stats {
 
     fn add(&mut self, stats: &Stats) {
         self.games += stats.games;
+        self.moves += stats.moves;
+        self.entropy += stats.entropy;
         self.draws += stats.draws;
         self.samples += stats.samples;
         self.pv_truncated += stats.pv_truncated;
