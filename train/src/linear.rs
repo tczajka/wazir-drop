@@ -19,6 +19,7 @@ use wazir_drop::{
 #[serde(deny_unknown_fields)]
 pub struct Config {
     learning_rate: f64,
+    max_weight: f64,
 }
 
 #[derive(Debug)]
@@ -66,6 +67,13 @@ impl<F: Features> EvalModel for LinearModel<F> {
 
     fn optimizer(&self, vs: &nn::VarStore) -> Result<nn::Optimizer, TchError> {
         nn::Adam::default().build(vs, self.config.learning_rate)
+    }
+
+    fn fixup(&mut self) {
+        let _guard = tch::no_grad_guard();
+        _ = self
+            .weights
+            .clamp_(-self.config.max_weight, self.config.max_weight);
     }
 }
 

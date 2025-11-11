@@ -54,7 +54,7 @@ fn run_with_model<M: EvalModel>(
     let device = Device::cuda_if_available();
     log::info!("Learning using device: {device:?}");
     let mut vs = nn::VarStore::new(device);
-    let model = M::new(features, vs.root(), model_config);
+    let mut model = M::new(features, vs.root(), model_config);
     if let Some(load_parameters) = &config.load_weights {
         vs.load(load_parameters)?;
     }
@@ -95,6 +95,7 @@ fn run_with_model<M: EvalModel>(
             num_samples += batch.size;
             total_loss += batch.size as f64 * f64::try_from(&loss).unwrap();
             optimizer.backward_step(&loss);
+            model.fixup();
         }
     }
     vs.save(&config.save_weights)?;

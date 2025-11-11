@@ -14,6 +14,8 @@ pub trait EvalModel {
     fn forward(&self, features: &Tensor, offsets: &Tensor) -> Tensor;
 
     fn optimizer(&self, vs: &nn::VarStore) -> Result<nn::Optimizer, TchError>;
+
+    fn fixup(&mut self);
 }
 
 pub trait Export {

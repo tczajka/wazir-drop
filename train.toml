@@ -28,6 +28,7 @@ outcome_weight = 0.2
 log_period_seconds = 60
 [command.learn.model.linear]
 learning_rate = 1e-4
+max_weight = 3
 
 [[command]]
 [command.export]
@@ -38,3 +39,4 @@ value_scale = 1000
 [command.export.model.linear]
 # doesn't matter
 learning_rate = 0
+max_weight = 0
