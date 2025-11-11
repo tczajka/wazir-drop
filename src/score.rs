@@ -1,4 +1,4 @@
-use crate::constants::{Eval, Ply};
+use crate::constants::{Eval, Ply, PLY_DRAW};
 use std::{
     fmt::{self, Display, Formatter},
     ops::Neg,
@@ -13,6 +13,7 @@ pub enum ScoreExpanded {
 
 impl ScoreExpanded {
     pub fn to_relative(self, ply: Ply) -> Self {
+        // p >= ply, but saturate to 0 just in case.
         match self {
             Self::Win(p) => Self::Win(p.saturating_sub(ply)),
             Self::Loss(p) => Self::Loss(p.saturating_sub(ply)),
@@ -22,8 +23,22 @@ impl ScoreExpanded {
 
     pub fn to_absolute(self, ply: Ply) -> Self {
         match self {
-            Self::Win(p) => Self::Win(p.saturating_add(ply)),
-            Self::Loss(p) => Self::Loss(p.saturating_add(ply)),
+            Self::Win(p) => {
+                let p2 = p + ply;
+                if p2 <= PLY_DRAW {
+                    Self::Win(p2)
+                } else {
+                    Self::Eval(0)
+                }
+            }
+            Self::Loss(p) => {
+                let p2 = p + ply;
+                if p2 <= PLY_DRAW {
+                    Self::Loss(p2)
+                } else {
+                    Self::Eval(0)
+                }
+            }
             Self::Eval(_) => self,
         }
     }
@@ -39,8 +54,8 @@ impl ScoreExpanded {
 impl Display for ScoreExpanded {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Win(distance) => write!(f, "#{}", distance),
-            Self::Loss(distance) => write!(f, "-#{}", distance),
+            Self::Win(ply) => write!(f, "#{}", ply),
+            Self::Loss(ply) => write!(f, "-#{}", ply),
             Self::Eval(eval) => write!(f, "{}", eval),
         }
     }

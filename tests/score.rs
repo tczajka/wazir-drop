@@ -13,18 +13,18 @@ fn test_score_to_absolute() {
         ScoreExpanded::Eval(17).to_absolute(3),
         ScoreExpanded::Eval(17)
     );
-    assert_eq!(ScoreExpanded::Win(0).to_absolute(3), ScoreExpanded::Win(3));
+    assert_eq!(ScoreExpanded::Win(5).to_absolute(3), ScoreExpanded::Win(8));
     assert_eq!(
         ScoreExpanded::Win(100).to_absolute(3),
-        ScoreExpanded::Win(103)
+        ScoreExpanded::Eval(0)
     );
     assert_eq!(
-        ScoreExpanded::Loss(0).to_absolute(3),
-        ScoreExpanded::Loss(3)
+        ScoreExpanded::Loss(5).to_absolute(3),
+        ScoreExpanded::Loss(8)
     );
     assert_eq!(
         ScoreExpanded::Loss(100).to_absolute(3),
-        ScoreExpanded::Loss(103)
+        ScoreExpanded::Eval(0)
     );
 }
 
