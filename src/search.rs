@@ -247,9 +247,12 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         max_depth: Depth,
         multi_move_threshold: Option<i32>,
     ) -> Result<(), Timeout> {
+        let hash = eposition.position().hash();
+        self.history.push(hash);
         while self.depth < max_depth {
             self.iterative_deepening_iteration(eposition, multi_move_threshold)?;
         }
+        self.history.pop();
         Ok(())
     }
 
@@ -259,8 +262,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         multi_move_threshold: Option<i32>,
     ) -> Result<(), Timeout> {
         let mut completed_depth;
-        let hash = eposition.position().hash();
-        self.history.push(hash);
         // First move.
         {
             let next_depth = self.depth + 1;
@@ -336,7 +337,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
             self.root_moves_considered += 1;
         }
-        self.history.pop();
         self.depth = completed_depth;
         self.sort_root_moves();
         Ok(())
