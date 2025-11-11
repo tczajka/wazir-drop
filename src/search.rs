@@ -77,7 +77,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             root_moves_considered: 0,
             root_moves_exact_score: 0,
             pv: LongVariation::empty(),
-            history: History::new(),
+            history: History::new(0),
         }
     }
 
@@ -153,7 +153,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
 
         self.ttable.new_epoch();
         self.pvtable.new_epoch();
-        self.history.clear(position.ply());
+        self.history = History::new(position.ply());
 
         let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
         self.search_shallow(&eposition);
@@ -555,6 +555,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         } else {
             // Null move pruning.
             if depth >= self.hyperparameters.reduction_null_move {
+                self.history.cut();
                 let epos2 = eposition.make_null_move().unwrap();
                 let result2 = self.search_alpha_beta::<EmptyVariation>(
                     &epos2,
@@ -562,6 +563,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     -beta.prev(),
                     depth - self.hyperparameters.reduction_null_move,
                 )?;
+                self.history.uncut();
                 if -result2.score >= beta {
                     return Ok(SearchResultInternal {
                         score: beta,

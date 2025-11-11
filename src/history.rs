@@ -6,23 +6,19 @@ use crate::constants::{
 
 pub struct History {
     root_ply: Ply,
+    cuts: Vec<usize>, // where to start searching for a repetition
     hashes: Vec<u64>,
     bloom_filter: Vec<u8>,
 }
 
 impl History {
-    pub fn new() -> Self {
+    pub fn new(root_ply: Ply) -> Self {
         Self {
-            root_ply: 0,
+            root_ply,
+            cuts: vec![0],
             hashes: Vec::with_capacity(PLY_DRAW.into()),
             bloom_filter: vec![0; 1 << HISTORY_BLOOM_FILTER_LOG_SIZE],
         }
-    }
-
-    pub fn clear(&mut self, root_ply: Ply) {
-        self.root_ply = root_ply;
-        self.hashes.clear();
-        self.bloom_filter.fill(0);
     }
 
     pub fn push(&mut self, hash: u64) {
@@ -39,16 +35,26 @@ impl History {
         }
     }
 
+    pub fn cut(&mut self) {
+        self.cuts.push(self.hashes.len());
+    }
+
+    pub fn uncut(&mut self) {
+        _ = self.cuts.pop();
+    }
+
     pub fn find(&self, hash: u64) -> Option<Ply> {
         for index in Self::indices(hash) {
             if self.bloom_filter[index] == 0 {
                 return None;
             }
         }
+        let &cut = self.cuts.last().unwrap();
         self.hashes
             .iter()
             .copied()
             .enumerate()
+            .skip(cut)
             .rev()
             .skip(1)
             .step_by(2)
