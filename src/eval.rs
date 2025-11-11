@@ -115,11 +115,11 @@ where
     match diff {
         Some((added, removed)) => {
             let mut accumulator = accumulator.clone();
-            for feature in added {
-                evaluator.add_feature(&mut accumulator, feature);
-            }
             for feature in removed {
                 evaluator.remove_feature(&mut accumulator, feature);
+            }
+            for feature in added {
+                evaluator.add_feature(&mut accumulator, feature);
             }
             accumulator
         }
