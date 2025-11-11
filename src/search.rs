@@ -57,6 +57,8 @@ struct SearchInstance<'a, E: Evaluator> {
     root_moves_considered: usize,
     root_moves_exact_score: usize,
     pv: LongVariation,
+    // Position hashes seen before.
+    history: Vec<u64>,
 }
 
 impl<'a, E: Evaluator> SearchInstance<'a, E> {
@@ -74,6 +76,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             root_moves_considered: 0,
             root_moves_exact_score: 0,
             pv: LongVariation::empty(),
+            history: Vec::with_capacity(PLY_DRAW as usize),
         }
     }
 
@@ -157,6 +160,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         self.deadline = deadline;
         // Ignore timeout.
         _ = self.iterative_deepening(&eposition, max_depth, multi_move_threshold);
+        self.history.clear();
     }
 
     fn generate_root_captures_of_wazir(&mut self, position: &Position) {
@@ -203,6 +207,8 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
 
     fn search_shallow(&mut self, eposition: &EvaluatedPosition<E>) {
         let mut completed_depth = Depth::MAX;
+        let hash = eposition.position().hash();
+        self.history.push(hash);
         for move_idx in 0..self.root_moves.len() {
             let mov = self.root_moves[move_idx].mov;
             let epos2 = eposition.make_move(mov).unwrap();
@@ -220,6 +226,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 self.pv = result.pv.add_front(mov).truncate();
             }
         }
+        _ = self.history.pop();
         self.depth = completed_depth;
         self.root_moves_considered = self.root_moves.len();
         self.root_moves_exact_score = self.root_moves.len();
@@ -251,6 +258,8 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         multi_move_threshold: Option<i32>,
     ) -> Result<(), Timeout> {
         let mut completed_depth;
+        let hash = eposition.position().hash();
+        self.history.push(hash);
         // First move.
         {
             let next_depth = self.depth + 1;
@@ -326,6 +335,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
             self.root_moves_considered += 1;
         }
+        _ = self.history.pop();
         self.depth = completed_depth;
         self.sort_root_moves();
         Ok(())
@@ -340,10 +350,11 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         depth: Depth,
     ) -> Result<SearchResultInternal<V>, Timeout> {
         self.new_node()?;
-        let ply = eposition.position().ply();
+        let position = eposition.position();
+        let ply = position.ply();
 
         // Check whether game ended.
-        if let Stage::End(outcome) = eposition.position().stage() {
+        if let Stage::End(outcome) = position.stage() {
             return Ok(SearchResultInternal {
                 score: outcome.to_score(ply),
                 depth: Depth::MAX,
@@ -360,7 +371,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             ScoreExpanded::Win(earliest_win).into()
         };
 
-        let in_check = movegen::in_check(eposition.position(), eposition.position().to_move());
+        let in_check = movegen::in_check(position, position.to_move());
         let earliest_loss = if in_check {
             ply + 2 // if we are already checkmated
         } else {
@@ -388,10 +399,22 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             });
         }
 
+        // Check for repetition.
+        let hash = position.hash();
+        for ago in (2..=self.history.len()).step_by(2) {
+            if self.history[self.history.len() - ago] == hash {
+                return Ok(SearchResultInternal {
+                    score: Score::DRAW,
+                    depth: Depth::MAX,
+                    pv: V::empty_truncated(),
+                });
+            }
+        }
+
         // Transposition table lookup.
         let mut tt_move = None;
         if depth >= self.hyperparameters.min_depth_ttable {
-            if let Some(ttentry) = self.ttable.get(eposition.position().hash()) {
+            if let Some(ttentry) = self.ttable.get(hash) {
                 // Transposition table cutoff.
                 if ttentry.depth >= depth {
                     let score = ttentry.score.to_absolute(ply);
@@ -399,9 +422,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     let cutoff = match ttentry.score_type {
                         TTableScoreType::None => false,
                         TTableScoreType::Exact => {
-                            if let Some(v) =
-                                V::pvtable_get(self.pvtable, eposition.position().hash())
-                            {
+                            if let Some(v) = V::pvtable_get(self.pvtable, hash) {
                                 pv = v;
                             }
                             true
@@ -421,10 +442,12 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
         }
 
+        self.history.push(hash);
         // Search with V::Extended so that we have a TT move.
         let result = self.search_alpha_beta_real_work::<V::Extended>(
             eposition, alpha, beta, depth, in_check, tt_move,
         )?;
+        _ = self.history.pop();
         let mov = result.pv.first();
         let pv = result.pv.truncate();
 
@@ -448,12 +471,12 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             } else if result.score <= alpha {
                 TTableScoreType::UpperBound
             } else {
-                V::pvtable_set(self.pvtable, eposition.position().hash(), pv.clone());
+                V::pvtable_set(self.pvtable, hash, pv.clone());
                 TTableScoreType::Exact
             };
 
             self.ttable.set(
-                eposition.position().hash(),
+                hash,
                 TTableEntry {
                     depth: result.depth,
                     mov,
