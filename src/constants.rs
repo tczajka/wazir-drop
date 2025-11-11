@@ -9,9 +9,8 @@ pub type Ply = u8;
 pub const PLY_AFTER_SETUP: Ply = 2;
 pub const PLY_DRAW: Ply = 102;
 
-pub type Depth = i16;
+pub type Depth = u16;
 pub const MAX_SEARCH_DEPTH: Depth = 100;
-pub const INFINITE_DEPTH: Depth = i16::MAX;
 
 pub type Eval = i32;
 
@@ -34,7 +33,7 @@ impl Default for Hyperparameters {
             pvtable_size: 16 << 20,
             time_alloc_decay_moves: 20.0,
             min_depth_ttable: 2,
-            reduction_null_move: 1,
+            reduction_null_move: 2,
         }
     }
 }

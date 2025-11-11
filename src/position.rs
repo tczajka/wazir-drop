@@ -4,8 +4,8 @@ use crate::{
     error::Invalid,
     impl_from_str_for_parsable, movegen,
     parser::{self, ParseError, Parser, ParserExt},
-    zobrist, AnyMove, Bitboard, Board, Captured, Color, ColoredPiece, InvalidMove, Piece,
-    Move, Score, ScoreExpanded, SetupMove, Square, Symmetry,
+    zobrist, AnyMove, Bitboard, Board, Captured, Color, ColoredPiece, InvalidMove, Move, Piece,
+    Score, ScoreExpanded, SetupMove, Square, Symmetry,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -45,10 +45,9 @@ impl Outcome {
 
     pub fn to_score(self, ply: Ply) -> Score {
         match self {
-            Self::Draw => ScoreExpanded::Eval(0),
-            _ => ScoreExpanded::Loss(ply),
+            Self::Draw => Score::DRAW,
+            _ => ScoreExpanded::Loss(ply).into(),
         }
-        .into()
     }
 }
 

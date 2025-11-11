@@ -1,17 +1,16 @@
 use crate::{
     constants::{
-        Depth, Eval, Hyperparameters, CHECK_TIMEOUT_NODES, INFINITE_DEPTH, MAX_SEARCH_DEPTH,
-        NUM_KILLER_MOVES, PLY_DRAW,
+        Depth, Hyperparameters, CHECK_TIMEOUT_NODES, MAX_SEARCH_DEPTH, NUM_KILLER_MOVES, PLY_DRAW,
     },
     either::Either,
     movegen,
     smallvec::SmallVec,
     ttable::{TTable, TTableEntry, TTableScoreType},
     variation::LongVariation,
-    EmptyVariation, EvaluatedPosition, Evaluator, ExtendableVariation, NonEmptyVariation, PVTable,
-    Position, Move, Score, ScoreExpanded, Stage, Variation,
+    EmptyVariation, EvaluatedPosition, Evaluator, ExtendableVariation, Move, NonEmptyVariation,
+    PVTable, Position, Score, ScoreExpanded, Stage, Variation,
 };
-use std::{sync::Arc, time::Instant};
+use std::{cmp::Reverse, sync::Arc, time::Instant};
 
 pub struct Search<E> {
     hyperparameters: Hyperparameters,
@@ -37,34 +36,14 @@ impl<E: Evaluator> Search<E> {
         position: &Position,
         max_depth: Option<Depth>,
         deadline: Option<Instant>,
+        multi_move_threshold: Option<i32>,
     ) -> SearchResult {
-        let mut instance = self.instance();
-        instance.search(position, max_depth, deadline)
-    }
-
-    pub fn search_top_variations(
-        &mut self,
-        position: &Position,
-        max_depth: Depth,
-        max_eval_diff: Eval,
-    ) -> Vec<TopVariation> {
-        let mut instance = self.instance();
-        instance.search_top_variations(position, max_depth, max_eval_diff)
-    }
-
-    fn instance(&mut self) -> SearchInstance<'_, E> {
-        SearchInstance {
-            hyperparameters: self.hyperparameters.clone(),
-            evaluator: &self.evaluator,
-            ttable: &mut self.ttable,
-            pvtable: &mut self.pvtable,
-            killer_moves: &mut self.killer_moves,
-            deadline: None,
-            nodes: 0,
-        }
+        let mut instance = SearchInstance::new(self);
+        instance.search(position, max_depth, deadline, multi_move_threshold)
     }
 }
 
+/// This doesn't work for setup positions.
 struct SearchInstance<'a, E: Evaluator> {
     hyperparameters: Hyperparameters,
     evaluator: &'a E,
@@ -73,168 +52,283 @@ struct SearchInstance<'a, E: Evaluator> {
     killer_moves: &'a mut [[Option<Move>; NUM_KILLER_MOVES]],
     deadline: Option<Instant>,
     nodes: u64,
+    root_moves: Vec<RootMove>,
+    depth: Depth,
+    root_moves_considered: usize,
+    root_moves_exact_score: usize,
+    pv: LongVariation,
 }
 
-impl<E: Evaluator> SearchInstance<'_, E> {
+impl<'a, E: Evaluator> SearchInstance<'a, E> {
+    fn new(search: &'a mut Search<E>) -> Self {
+        Self {
+            hyperparameters: search.hyperparameters.clone(),
+            evaluator: &search.evaluator,
+            ttable: &mut search.ttable,
+            pvtable: &mut search.pvtable,
+            killer_moves: &mut search.killer_moves,
+            deadline: None,
+            nodes: 0,
+            root_moves: Vec::new(),
+            depth: 0,
+            root_moves_considered: 0,
+            root_moves_exact_score: 0,
+            pv: LongVariation::empty(),
+        }
+    }
+
     fn search(
         &mut self,
         position: &Position,
         max_depth: Option<Depth>,
         deadline: Option<Instant>,
+        multi_move_threshold: Option<i32>,
     ) -> SearchResult {
-        match position.stage() {
-            Stage::Setup => panic!("search does not support setup"),
-            Stage::Regular => {}
-            Stage::End(outcome) => {
-                return SearchResult {
-                    score: outcome.to_score(position.ply()),
-                    pv: LongVariation::empty(),
-                    depth: INFINITE_DEPTH,
-                    root_moves_considered: 0,
-                    root_all_moves: 0,
-                    nodes: 0,
-                };
+        assert!(multi_move_threshold.is_none() || deadline.is_none());
+
+        let score = match position.stage() {
+            Stage::Setup => panic!("SearchInstance::search does not support setup"),
+            Stage::Regular => {
+                self.search_root(position, max_depth, deadline, multi_move_threshold);
+                self.root_moves[0].score
             }
-        }
+            Stage::End(outcome) => outcome.to_score(position.ply()),
+        };
 
-        // Capture Wazir?
-        if let Some(mov) = movegen::captures_of_wazir(position).next() {
-            return SearchResult {
-                score: ScoreExpanded::Win(position.ply() + 1).into(),
-                pv: LongVariation::empty().add_front(mov),
-                depth: INFINITE_DEPTH,
-                root_moves_considered: 1,
-                root_all_moves: 1,
-                nodes: 0,
-            };
-        }
-
-        self.ttable.new_epoch();
-        self.pvtable.new_epoch();
-        let max_depth = max_depth.unwrap_or(MAX_SEARCH_DEPTH);
-        let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
-
-        let (mut search_result, mut moves) = self.search_one_ply(&eposition);
-        if moves.is_empty() {
-            // We are checkmated. Do any pseudomove.
-            let mov = movegen::pseudomoves(eposition.position())
-                .next()
-                .expect("Stalemate");
-            return SearchResult {
-                score: ScoreExpanded::Loss(position.ply() + 2).into(),
-                pv: LongVariation::empty().add_front(mov),
-                depth: INFINITE_DEPTH,
-                root_moves_considered: 0,
-                root_all_moves: 0,
-                nodes: 0,
-            };
-        }
-
-        self.deadline = deadline;
-
-        let mut depth = 1;
-        let mut root_moves_considered = moves.len();
-
-        // iterative deepening loop
-        _ = || -> Result<(), Timeout> {
-            loop {
-                if search_result.inf_depth {
-                    depth = INFINITE_DEPTH;
-                    return Ok(());
-                }
-                if depth >= max_depth {
-                    return Ok(());
-                }
-                let epos2 = eposition.make_move(moves[0]).unwrap();
-                let result = self.search_alpha_beta::<LongVariation>(
-                    &epos2,
-                    -Score::INFINITE,
-                    Score::INFINITE,
-                    depth,
-                )?;
-                search_result.pv = result.pv.add_front(moves[0]);
-                search_result.score = -result.score;
-                search_result.inf_depth = result.inf_depth;
-                depth += 1;
-                root_moves_considered = 1;
-
-                while root_moves_considered < moves.len() {
-                    let mov = moves[root_moves_considered];
-                    let epos2 = eposition.make_move(mov).unwrap();
-
-                    // PVS: Try null window first.
-                    let result = self.search_alpha_beta::<EmptyVariation>(
-                        &epos2,
-                        -search_result.score.next(),
-                        -search_result.score,
-                        depth - 1,
-                    )?;
-                    search_result.inf_depth &= result.inf_depth;
-                    let score = -result.score;
-                    if score > search_result.score {
-                        // Full window search.
-                        let result = self.search_alpha_beta::<LongVariation>(
-                            &epos2,
-                            -Score::INFINITE,
-                            -search_result.score,
-                            depth - 1,
-                        )?;
-                        let score = -result.score;
-                        search_result.inf_depth &= result.inf_depth;
-                        if score > search_result.score {
-                            search_result.score = score;
-                            search_result.pv = result.pv.add_front(mov);
-                            moves[0..=root_moves_considered].rotate_right(1);
-                        }
-                    }
-                    root_moves_considered += 1;
-                }
+        let top_moves = match multi_move_threshold {
+            Some(multi_move_threshold) => {
+                let threshold = score.offset(-multi_move_threshold);
+                self.root_moves[..self.root_moves_exact_score]
+                    .iter()
+                    .take_while(|root_move| root_move.score >= threshold)
+                    .map(|root_move| ScoredMove {
+                        mov: root_move.mov,
+                        score: root_move.score,
+                    })
+                    .collect()
             }
-        }();
+            None => Vec::new(),
+        };
 
         SearchResult {
-            score: search_result.score,
-            pv: search_result.pv,
-            depth,
-            root_moves_considered,
-            root_all_moves: moves.len(),
+            score,
+            pv: self.pv.clone(),
+            top_moves,
+            depth: self.depth,
+            root_moves_considered: self.root_moves_considered,
+            num_root_moves: self.root_moves.len(),
             nodes: self.nodes,
         }
     }
 
-    // Returns moves sorted by score.
-    fn search_one_ply(
+    fn search_root(
         &mut self,
-        eposition: &EvaluatedPosition<E>,
-    ) -> (SearchResultInternal<LongVariation>, Vec<Move>) {
-        let mut moves: Vec<(Move, Score)> = Vec::new();
-        let mut search_result = SearchResultInternal {
-            score: -Score::INFINITE,
-            inf_depth: true,
-            pv: LongVariation::empty(),
+        position: &Position,
+        max_depth: Option<Depth>,
+        deadline: Option<Instant>,
+        multi_move_threshold: Option<i32>,
+    ) {
+        self.generate_root_captures_of_wazir(position);
+        if let Some(root_move) = self.root_moves.first() {
+            self.depth = Depth::MAX;
+            self.pv = LongVariation::empty().add_front(root_move.mov);
+            return;
+        }
+
+        self.generate_root_moves(position);
+
+        if self.root_moves.is_empty() {
+            self.generate_root_suicides(position);
+            let Some(root_move) = self.root_moves.first() else {
+                panic!("Stalemate");
+            };
+            self.depth = Depth::MAX;
+            self.pv = LongVariation::empty().add_front(root_move.mov);
+            return;
+        }
+
+        self.ttable.new_epoch();
+        self.pvtable.new_epoch();
+
+        let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
+        self.search_shallow(&eposition);
+
+        let max_depth = max_depth.unwrap_or(MAX_SEARCH_DEPTH);
+        self.deadline = deadline;
+        // Ignore timeout.
+        _ = self.iterative_deepening(&eposition, max_depth, multi_move_threshold);
+    }
+
+    fn generate_root_captures_of_wazir(&mut self, position: &Position) {
+        let score = ScoreExpanded::Win(position.ply() + 1).into();
+        for mov in movegen::captures_of_wazir(position) {
+            self.root_moves.push(RootMove {
+                mov,
+                score,
+                nodes: 0,
+            });
+        }
+        self.root_moves_considered = self.root_moves.len();
+        self.root_moves_exact_score = self.root_moves.len();
+    }
+
+    fn generate_root_moves(&mut self, position: &Position) {
+        for mov in movegen::moves(position) {
+            self.root_moves.push(RootMove {
+                mov,
+                score: -Score::INFINITE,
+                nodes: 0,
+            });
+        }
+    }
+
+    fn generate_root_suicides(&mut self, position: &Position) {
+        let loss_ply = position.ply() + 2;
+        let score = if loss_ply <= PLY_DRAW {
+            ScoreExpanded::Loss(loss_ply).into()
+        } else {
+            Score::DRAW
         };
 
-        for mov in movegen::moves(eposition.position()) {
+        for mov in movegen::pseudomoves(position) {
+            self.root_moves.push(RootMove {
+                mov,
+                score,
+                nodes: 0,
+            });
+        }
+        self.root_moves_considered = self.root_moves.len();
+        self.root_moves_exact_score = self.root_moves.len();
+    }
+
+    fn search_shallow(&mut self, eposition: &EvaluatedPosition<E>) {
+        let mut completed_depth = Depth::MAX;
+        for move_idx in 0..self.root_moves.len() {
+            let mov = self.root_moves[move_idx].mov;
             let epos2 = eposition.make_move(mov).unwrap();
+            let nodes_start = self.nodes;
             let result = self
                 .search_alpha_beta::<LongVariation>(&epos2, -Score::INFINITE, Score::INFINITE, 0)
                 .unwrap();
-            search_result.inf_depth &= result.inf_depth;
+            completed_depth = completed_depth.min(result.depth.saturating_add(1));
             let score = -result.score;
-            moves.push((mov, score));
-            if score > search_result.score {
-                search_result.score = score;
-                search_result.pv = result.pv.add_front(mov);
-                let last = moves.len() - 1;
-                moves.swap(0, last);
+            let root_move = &mut self.root_moves[move_idx];
+            root_move.nodes += self.nodes - nodes_start;
+            root_move.score = score;
+            if move_idx == 0 || score > self.root_moves[0].score {
+                self.root_moves.swap(0, move_idx);
+                self.pv = result.pv.add_front(mov).truncate();
             }
         }
-        if !moves.is_empty() {
-            moves[1..].sort_by_key(|&(_, score)| -score);
-        }
-        let moves: Vec<Move> = moves.into_iter().map(|(mov, _)| mov).collect();
+        self.depth = completed_depth;
+        self.root_moves_considered = self.root_moves.len();
+        self.root_moves_exact_score = self.root_moves.len();
+        self.sort_root_moves();
+    }
 
-        (search_result, moves)
+    fn sort_root_moves(&mut self) {
+        let (exact, other) = self.root_moves.split_at_mut(self.root_moves_exact_score);
+        let (_, exact_other) = exact.split_first_mut().unwrap();
+        exact_other.sort_by_key(|root_move| Reverse(root_move.score));
+        other.sort_by_key(|root_move| Reverse(root_move.nodes));
+    }
+
+    fn iterative_deepening(
+        &mut self,
+        eposition: &EvaluatedPosition<E>,
+        max_depth: Depth,
+        multi_move_threshold: Option<i32>,
+    ) -> Result<(), Timeout> {
+        while self.depth < max_depth {
+            self.iterative_deepening_iteration(eposition, multi_move_threshold)?;
+        }
+        Ok(())
+    }
+
+    fn iterative_deepening_iteration(
+        &mut self,
+        eposition: &EvaluatedPosition<E>,
+        multi_move_threshold: Option<i32>,
+    ) -> Result<(), Timeout> {
+        let mut completed_depth;
+        // First move.
+        {
+            let next_depth = self.depth + 1;
+            let mov = self.root_moves[0].mov;
+            let epos2 = eposition.make_move(mov).unwrap();
+            let nodes_start = self.nodes;
+            let result = self.search_alpha_beta::<LongVariation>(
+                &epos2,
+                -Score::INFINITE,
+                Score::INFINITE,
+                next_depth - 1,
+            )?;
+            self.depth = next_depth;
+            self.pv = result.pv.add_front(mov);
+            let root_move = &mut self.root_moves[0];
+            root_move.score = -result.score;
+            root_move.nodes += self.nodes - nodes_start;
+            completed_depth = result.depth.saturating_add(1);
+            self.root_moves_considered = 1;
+            self.root_moves_exact_score = 1;
+        }
+
+        // Other moves.
+        while self.root_moves_considered < self.root_moves.len() {
+            let mov = self.root_moves[self.root_moves_considered].mov;
+            let epos2 = eposition.make_move(mov).unwrap();
+
+            // PVS: Try null window first.
+            let alpha = match multi_move_threshold {
+                Some(multi_move_threshold) => self.root_moves[0]
+                    .score
+                    .offset(-multi_move_threshold)
+                    .prev(),
+                None => self.root_moves[0].score,
+            };
+            let nodes_start = self.nodes;
+            let result_null_window = self.search_alpha_beta::<EmptyVariation>(
+                &epos2,
+                -alpha.next(),
+                -alpha,
+                self.depth - 1,
+            )?;
+            let score = -result_null_window.score;
+            let root_move = &mut self.root_moves[self.root_moves_considered];
+            root_move.nodes += self.nodes - nodes_start;
+            root_move.score = score;
+
+            if score > alpha {
+                // Full window search.
+                let nodes_start = self.nodes;
+                let result = self.search_alpha_beta::<LongVariation>(
+                    &epos2,
+                    -Score::INFINITE,
+                    -alpha,
+                    self.depth - 1,
+                )?;
+                let score = -result.score;
+                let root_move = &mut self.root_moves[self.root_moves_considered];
+                root_move.nodes += self.nodes - nodes_start;
+                root_move.score = score;
+                completed_depth = completed_depth.min(result.depth.saturating_add(1));
+                if score > alpha {
+                    self.root_moves
+                        .swap(self.root_moves_exact_score, self.root_moves_considered);
+                    if score > self.root_moves[0].score {
+                        self.root_moves.swap(0, self.root_moves_exact_score);
+                        self.pv = result.pv.add_front(mov);
+                    }
+                    self.root_moves_exact_score += 1;
+                }
+            } else {
+                completed_depth = completed_depth.min(result_null_window.depth.saturating_add(1));
+            }
+            self.root_moves_considered += 1;
+        }
+        self.depth = completed_depth;
+        self.sort_root_moves();
+        Ok(())
     }
 
     /// Recursive search function.
@@ -252,50 +346,50 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         if let Stage::End(outcome) = eposition.position().stage() {
             return Ok(SearchResultInternal {
                 score: outcome.to_score(ply),
-                inf_depth: true,
+                depth: Depth::MAX,
                 pv: V::empty(),
             });
         }
 
-        // Endgame distance pruning.
-        let earliest_win = ply + 3; // if we deliver checkmate this move
-        let earliest_loss =
-            if movegen::in_check(eposition.position(), eposition.position().to_move()) {
-                ply + 2 // if we are already checkmated
-            } else {
-                ply + 4 // if we get checkmated next move
-            };
+        // Prune guaranteed draws or endgames (including lower/upper bounds)
 
-        if earliest_win.min(earliest_loss) > PLY_DRAW {
+        let earliest_win = ply + 3; // if we deliver checkmate this move
+        let best_possible = if earliest_win > PLY_DRAW {
+            Score::DRAW
+        } else {
+            ScoreExpanded::Win(earliest_win).into()
+        };
+
+        let in_check = movegen::in_check(eposition.position(), eposition.position().to_move());
+        let earliest_loss = if in_check {
+            ply + 2 // if we are already checkmated
+        } else {
+            ply + 4 // if we get checkmated next move (ignore zugzwang)
+        };
+        let worst_possible = if earliest_loss > PLY_DRAW {
+            Score::DRAW
+        } else {
+            ScoreExpanded::Loss(earliest_loss).into()
+        };
+
+        if best_possible == worst_possible || best_possible <= alpha {
             return Ok(SearchResultInternal {
-                score: ScoreExpanded::Eval(0).into(),
-                inf_depth: true,
+                score: best_possible,
+                depth: Depth::MAX,
                 pv: V::empty_truncated(),
             });
         }
 
-        {
-            let best_win = ScoreExpanded::Win(earliest_win).into();
-            if best_win <= alpha {
-                return Ok(SearchResultInternal {
-                    score: best_win,
-                    inf_depth: true,
-                    pv: V::empty_truncated(),
-                });
-            }
-            let worst_loss = ScoreExpanded::Loss(earliest_loss).into();
-            if worst_loss >= beta {
-                return Ok(SearchResultInternal {
-                    score: worst_loss,
-                    inf_depth: true,
-                    pv: V::empty_truncated(),
-                });
-            }
+        if worst_possible >= beta {
+            return Ok(SearchResultInternal {
+                score: worst_possible,
+                depth: Depth::MAX,
+                pv: V::empty_truncated(),
+            });
         }
 
-        let mut tt_move = None;
-
         // Transposition table lookup.
+        let mut tt_move = None;
         if depth >= self.hyperparameters.min_depth_ttable {
             if let Some(ttentry) = self.ttable.get(eposition.position().hash()) {
                 // Transposition table cutoff.
@@ -318,7 +412,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
                     if cutoff {
                         return Ok(SearchResultInternal {
                             score,
-                            inf_depth: ttentry.depth == INFINITE_DEPTH,
+                            depth: ttentry.depth,
                             pv,
                         });
                     }
@@ -328,8 +422,9 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         }
 
         // Search with V::Extended so that we have a TT move.
-        let result = self
-            .search_alpha_beta_real_work::<V::Extended>(eposition, alpha, beta, depth, tt_move)?;
+        let result = self.search_alpha_beta_real_work::<V::Extended>(
+            eposition, alpha, beta, depth, in_check, tt_move,
+        )?;
         let mov = result.pv.first();
         let pv = result.pv.truncate();
 
@@ -337,7 +432,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         if result.score >= beta {
             if let Some(mov) = mov {
                 if mov.captured.is_none() {
-                    let killer_moves = &mut self.killer_moves[(ply) as usize];
+                    let killer_moves = &mut self.killer_moves[ply as usize];
                     let index = (0..NUM_KILLER_MOVES - 1)
                         .find(|&index| killer_moves[index] == Some(mov))
                         .unwrap_or(NUM_KILLER_MOVES - 1);
@@ -360,11 +455,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             self.ttable.set(
                 eposition.position().hash(),
                 TTableEntry {
-                    depth: if result.inf_depth {
-                        INFINITE_DEPTH
-                    } else {
-                        depth
-                    },
+                    depth: result.depth,
                     mov,
                     score_type,
                     score: result.score.to_relative(ply),
@@ -374,7 +465,7 @@ impl<E: Evaluator> SearchInstance<'_, E> {
 
         Ok(SearchResultInternal {
             score: result.score,
-            inf_depth: result.inf_depth,
+            depth: result.depth,
             pv,
         })
     }
@@ -386,70 +477,50 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         alpha: Score,
         beta: Score,
         depth: Depth,
+        in_check: bool,
         tt_move: Option<Move>,
     ) -> Result<SearchResultInternal<V>, Timeout> {
         let position = eposition.position();
 
-        // Worst case: if we are checkmated, we lose in 2 moves.
+        // Zugzwang case: we lose in 2 ply.
         let mut result = SearchResultInternal {
             score: ScoreExpanded::Loss(position.ply() + 2).into(),
-            inf_depth: true,
+            depth: Depth::MAX,
             pv: V::empty_truncated(),
         };
 
-        struct MoveCandidate {
-            mov: Move,
-            is_out_of_order: bool,
-        }
-
-        impl MoveCandidate {
-            fn new(mov: Move) -> Self {
-                Self {
-                    mov,
-                    is_out_of_order: false,
-                }
-            }
-
-            fn out_of_order(mov: Move) -> Self {
-                Self {
-                    mov,
-                    is_out_of_order: true,
-                }
-            }
-        }
-
-        let moves = if movegen::in_check(position, position.to_move()) {
-            Either::Left(movegen::check_evasions(position).map(MoveCandidate::new))
-        } else if depth <= 0 {
+        let moves = if in_check {
+            Either::Left(movegen::check_evasions(position).map(InternalMove::new))
+        } else if depth == 0 {
             // Quiescence search.
             // Stand pat.
             result = SearchResultInternal {
                 score: ScoreExpanded::Eval(eposition.evaluate()).into(),
-                inf_depth: false,
+                depth: 0,
                 pv: V::empty(),
             };
             if result.score >= beta {
                 return Ok(result);
             }
             Either::Right(Either::Left(
-                movegen::captures(eposition.position()).map(MoveCandidate::new),
+                movegen::captures(eposition.position()).map(InternalMove::new),
             ))
         } else {
             // Null move pruning.
-            let null_move_depth = depth - 1 - self.hyperparameters.reduction_null_move;
-            if null_move_depth >= 0 {
+            if depth >= self.hyperparameters.reduction_null_move {
                 let epos2 = eposition.make_null_move().unwrap();
                 let result2 = self.search_alpha_beta::<EmptyVariation>(
                     &epos2,
                     -beta,
                     -beta.prev(),
-                    null_move_depth,
+                    depth - self.hyperparameters.reduction_null_move,
                 )?;
-                let score = -result2.score;
-                if score >= beta {
+                if -result2.score >= beta {
                     result = SearchResultInternal {
                         score: beta,
-                        inf_depth: false,
+                        depth: result2
+                            .depth
+                            .saturating_add(self.hyperparameters.reduction_null_move),
                         pv: V::empty_truncated(),
                     };
                     return Ok(result);
@@ -457,18 +528,19 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             }
 
             // Captures, killers, jumps, drops.
-            let killers = self.killer_moves[(position.ply()) as usize]
+            let killers = self.killer_moves[position.ply() as usize]
                 .into_iter()
-                .filter_map(|mov| mov.map(MoveCandidate::out_of_order));
+                .flatten()
+                .map(InternalMove::out_of_order);
 
             Either::Right(Either::Right(
                 movegen::captures(position)
-                    .map(MoveCandidate::new)
+                    .map(InternalMove::new)
                     .chain(killers)
                     .chain(
                         movegen::jumps(position)
                             .chain(movegen::drops(position))
-                            .map(MoveCandidate::new),
+                            .map(InternalMove::new),
                     ),
             ))
         };
@@ -476,12 +548,12 @@ impl<E: Evaluator> SearchInstance<'_, E> {
         // Transposition table move first, then all other moves.
         let moves = tt_move
             .into_iter()
-            .map(MoveCandidate::out_of_order)
+            .map(InternalMove::out_of_order)
             .chain(moves);
 
         let mut out_of_order_moves = SmallVec::<Move, { 1 + NUM_KILLER_MOVES }>::new();
 
-        for MoveCandidate {
+        for InternalMove {
             mov,
             is_out_of_order,
         } in moves
@@ -507,141 +579,46 @@ impl<E: Evaluator> SearchInstance<'_, E> {
             let alpha2 = alpha.max(result.score);
 
             // Try null window first.
-            let null_window_pass = beta == alpha2.next() || {
-                let result2 = self.search_alpha_beta::<EmptyVariation>(
+            let result_null_window = if beta > alpha2.next() {
+                self.search_alpha_beta::<EmptyVariation>(
                     &epos2,
                     -alpha2.next(),
                     -alpha2,
-                    depth - 1,
-                )?;
-                result.inf_depth &= result2.inf_depth;
-                -result2.score > alpha2
+                    depth.saturating_sub(1),
+                )?
+            } else {
+                SearchResultInternal::<EmptyVariation> {
+                    score: -Score::INFINITE,
+                    depth: Depth::MAX,
+                    pv: EmptyVariation::empty_truncated(),
+                }
             };
-            if null_window_pass {
-                let result2 =
-                    self.search_alpha_beta::<V::Truncated>(&epos2, -beta, -alpha2, depth - 1)?;
-                result.inf_depth &= result2.inf_depth;
+
+            if -result_null_window.score > alpha2 {
+                let result2 = self.search_alpha_beta::<V::Truncated>(
+                    &epos2,
+                    -beta,
+                    -alpha2,
+                    depth.saturating_sub(1),
+                )?;
                 let score = -result2.score;
                 if score > result.score {
                     result.score = score;
-                    if result.score > alpha {
+                    if score > alpha {
                         result.pv = result2.pv.add_front(mov);
                     }
-                    if result.score >= beta {
+                    if score >= beta {
+                        result.depth = result2.depth.saturating_add(1);
                         break;
                     }
                 }
+                result.depth = result.depth.min(result2.depth.saturating_add(1));
+            } else {
+                result.depth = result.depth.min(result_null_window.depth.saturating_add(1));
             }
         }
 
         Ok(result)
-    }
-
-    /// No deadline. Returns moves sorted by score.
-    pub fn search_top_variations(
-        &mut self,
-        position: &Position,
-        max_depth: Depth,
-        max_eval_diff: Eval,
-    ) -> Vec<TopVariation> {
-        assert_eq!(position.stage(), Stage::Regular);
-        assert!(max_eval_diff >= 0);
-
-        let mut variations: Vec<TopVariation> = Vec::new();
-
-        if let Some(mov) = movegen::captures_of_wazir(position).next() {
-            variations.push(TopVariation {
-                variation: LongVariation::empty().add_front(mov),
-                score: ScoreExpanded::Win(position.ply() + 1).into(),
-            });
-            return variations;
-        }
-
-        self.ttable.new_epoch();
-        self.pvtable.new_epoch();
-        let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
-
-        for mov in movegen::moves(eposition.position()) {
-            let epos2 = eposition.make_move(mov).unwrap();
-            let result = self
-                .search_alpha_beta::<LongVariation>(&epos2, -Score::INFINITE, Score::INFINITE, 0)
-                .unwrap();
-            let score = -result.score;
-            variations.push(TopVariation {
-                variation: result.pv.add_front(mov),
-                score,
-            });
-        }
-        if variations.is_empty() {
-            // We are checkmated. Do any pseudomove.
-            let mov = movegen::pseudomoves(eposition.position())
-                .next()
-                .expect("Stalemate");
-            variations.push(TopVariation {
-                variation: LongVariation::empty().add_front(mov),
-                score: ScoreExpanded::Loss(position.ply() + 2).into(),
-            });
-            return variations;
-        }
-
-        variations.sort_by_key(|v| -v.score);
-
-        for depth in 2..=max_depth {
-            let mov = variations[0].variation.moves[0];
-            let epos2 = eposition.make_move(mov).unwrap();
-            let result = self
-                .search_alpha_beta::<LongVariation>(
-                    &epos2,
-                    -Score::INFINITE,
-                    Score::INFINITE,
-                    depth - 1,
-                )
-                .unwrap();
-            variations[0] = TopVariation {
-                variation: result.pv.add_front(mov),
-                score: -result.score,
-            };
-
-            for move_idx in 1..variations.len() {
-                let mov = variations[move_idx].variation.first().unwrap();
-                let epos2 = eposition.make_move(mov).unwrap();
-                let threshold = variations[0].score.offset(-max_eval_diff);
-                // Null window first.
-                let result = self
-                    .search_alpha_beta::<EmptyVariation>(
-                        &epos2,
-                        -threshold,
-                        -threshold.prev(),
-                        depth - 1,
-                    )
-                    .unwrap();
-                if -result.score >= threshold {
-                    // Full window search.
-                    let result = self
-                        .search_alpha_beta::<LongVariation>(
-                            &epos2,
-                            -Score::INFINITE,
-                            -threshold.prev(),
-                            depth - 1,
-                        )
-                        .unwrap();
-                    let score = -result.score;
-                    variations[move_idx] = TopVariation {
-                        variation: result.pv.add_front(mov),
-                        score,
-                    };
-                    if score > variations[0].score {
-                        variations.swap(0, move_idx);
-                    }
-                }
-            }
-        }
-
-        let threshold = variations[0].score.offset(-max_eval_diff);
-        variations
-            .into_iter()
-            .take_while(|v| v.score >= threshold)
-            .collect()
     }
 
     fn new_node(&mut self) -> Result<(), Timeout> {
@@ -658,20 +635,49 @@ impl<E: Evaluator> SearchInstance<'_, E> {
 pub struct SearchResult {
     pub score: Score,
     pub pv: LongVariation,
+    // Only used for multi-move searches.
+    pub top_moves: Vec<ScoredMove>,
     pub depth: Depth,
     pub root_moves_considered: usize,
-    pub root_all_moves: usize,
+    pub num_root_moves: usize,
     pub nodes: u64,
 }
 
-pub struct TopVariation {
+pub struct ScoredMove {
+    pub mov: Move,
     pub score: Score,
-    pub variation: LongVariation,
+}
+
+struct RootMove {
+    mov: Move,
+    score: Score,
+    nodes: u64,
+}
+
+struct InternalMove {
+    mov: Move,
+    is_out_of_order: bool,
+}
+
+impl InternalMove {
+    fn new(mov: Move) -> Self {
+        Self {
+            mov,
+            is_out_of_order: false,
+        }
+    }
+
+    fn out_of_order(mov: Move) -> Self {
+        Self {
+            mov,
+            is_out_of_order: true,
+        }
+    }
 }
 
 struct SearchResultInternal<V> {
     score: Score,
-    inf_depth: bool,
+    depth: Depth,
     pv: V,
 }
 

@@ -12,8 +12,8 @@ use std::{
 };
 use threadpool::ThreadPool;
 use wazir_drop::{
-    DefaultEvaluator, Features, Outcome, Position, Score, ScoreExpanded, Search, Stage,
-    TopVariation, WPSFeatures,
+    DefaultEvaluator, Features, LongVariation, Move, Outcome, Position, Score, ScoreExpanded,
+    ScoredMove, Search, Stage, WPSFeatures,
     constants::{Depth, Eval, Hyperparameters},
 };
 
@@ -154,16 +154,17 @@ fn play_game<F: Features, W: serde_cbor::ser::Write>(
                 position = position.make_setup_move(mov).unwrap();
             }
             Stage::Regular => {
-                let variations = search.search_top_variations(
+                let result = search.search(
                     &position,
-                    config.depth,
-                    config.temperature_cutoff,
+                    Some(config.depth),
+                    None, /* deadline */
+                    Some(config.temperature_cutoff),
                 );
-                log::debug!("num variations: {}", variations.len());
-                assert!(!variations.is_empty());
+                assert!(!result.top_moves.is_empty());
                 match calc_deep_score(
                     &position,
-                    &variations[0],
+                    result.score,
+                    &result.pv,
                     &mut search,
                     config.extra_depth,
                     &mut prev_pv_position_hash,
@@ -184,9 +185,7 @@ fn play_game<F: Features, W: serde_cbor::ser::Write>(
                         stats.invalid_pv += 1;
                     }
                 }
-                let mov = select_variation(&variations, &mut rng, config.temperature)
-                    .variation
-                    .moves[0];
+                let mov = select_move(&result.top_moves, &mut rng, config.temperature);
                 position = position.make_move(mov).unwrap();
             }
             Stage::End(o) => break o,
@@ -232,19 +231,20 @@ enum DeepScoreImpossible {
 /// Returns the PV position and the deep score.
 fn calc_deep_score(
     position: &Position,
-    pv: &TopVariation,
+    score: Score,
+    pv: &LongVariation,
     search: &mut Search<DefaultEvaluator>,
     extra_depth: Depth,
     prev_pv_position_hash: &mut u64,
 ) -> Result<(Position, Score), DeepScoreImpossible> {
-    if !matches!(pv.score.into(), ScoreExpanded::Eval(_)) {
+    if !matches!(score.into(), ScoreExpanded::Eval(_)) {
         return Err(DeepScoreImpossible::GameDecided);
     }
-    if pv.variation.truncated {
+    if pv.truncated {
         return Err(DeepScoreImpossible::PVTruncated);
     }
     let mut pv_position = position.clone();
-    for &mov in pv.variation.moves.iter() {
+    for &mov in pv.iter() {
         let Ok(p) = pv_position.make_move(mov) else {
             return Err(DeepScoreImpossible::InvalidPV);
         };
@@ -255,21 +255,22 @@ fn calc_deep_score(
         return Err(DeepScoreImpossible::RepeatedPVPosition);
     }
     *prev_pv_position_hash = hash;
-    let result = search.search(&pv_position, Some(extra_depth), None);
+    let result = search.search(
+        &pv_position,
+        Some(extra_depth),
+        None, /* deadline */
+        None, /* multi_move_threshold */
+    );
     Ok((pv_position, result.score))
 }
 
-fn select_variation<'a>(
-    variations: &'a [TopVariation],
-    rng: &mut StdRng,
-    temperature: f64,
-) -> &'a TopVariation {
-    let ScoreExpanded::Eval(top_eval) = variations[0].score.into() else {
-        return &variations[0];
+fn select_move(moves: &[ScoredMove], rng: &mut StdRng, temperature: f64) -> Move {
+    let ScoreExpanded::Eval(top_eval) = moves[0].score.into() else {
+        return moves[0].mov;
     };
-    variations
-        .choose_weighted(rng, |v| {
-            let ScoreExpanded::Eval(eval) = v.score.into() else {
+    moves
+        .choose_weighted(rng, |m| {
+            let ScoreExpanded::Eval(eval) = m.score.into() else {
                 return 0.0;
             };
             let rel = eval - top_eval;
@@ -277,6 +278,7 @@ fn select_variation<'a>(
             log_prob.exp()
         })
         .unwrap()
+        .mov
 }
 
 struct Stats {

@@ -30,7 +30,12 @@ impl Player for MainPlayer {
                     TIME_MARGIN + (time_left.saturating_sub(TIME_MARGIN)).mul_f64(1.0 - fraction),
                 );
 
-                let result = self.search.search(position, None, Some(deadline));
+                let result = self.search.search(
+                    position,
+                    None, /* max_depth */
+                    Some(deadline),
+                    None, /* multi_move_threshold */
+                );
                 let elapsed = time_left.saturating_sub(timer.get());
                 log::info!(
                     "depth {depth} score {score} \
@@ -39,7 +44,7 @@ impl Player for MainPlayer {
                     depth = result.depth,
                     score = result.score.to_relative(position.ply()),
                     root_moves_considered = result.root_moves_considered,
-                    root_all_moves = result.root_all_moves,
+                    root_all_moves = result.num_root_moves,
                     nodes = result.nodes,
                     knps = result.nodes as f64 / elapsed.as_secs_f64() / 1000.0,
                     pv = result.pv,
