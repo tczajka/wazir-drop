@@ -108,11 +108,13 @@ impl<F: Features> EvalModel for NnueModel<F> {
         );
         // add bias
         embedding += &self.embedding_bias;
+        embedding = embedding.clamp(0.0, 1.0);
         // embedding: [batch_size * 2, embedding_size]
         let mut x = embedding.reshape([-1, 2 * self.config.embedding_size]);
         // x: [batch_size, 2 * embedding_size]
         for hidden in &self.hidden {
             x = hidden.forward(&x);
+            x = x.clamp(0.0, 1.0);
         }
         x = self.final_layer.forward(&x);
         // x: [batch_size, 1]
