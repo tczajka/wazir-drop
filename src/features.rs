@@ -3,6 +3,7 @@ use std::fmt::Debug;
 
 pub trait Features: Debug + Copy + Send + 'static {
     fn count(self) -> usize;
+    fn approximate_avg_set(self) -> f64;
 
     fn all(self, position: &Position, color: Color) -> impl Iterator<Item = usize>;
 

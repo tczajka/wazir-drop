@@ -1,7 +1,7 @@
 use std::{fmt::Debug, iter};
 use wazir_drop::{
-    Color, Features, LinearEvaluator, NUM_CAPTURED_INDEXES, NormalizedSquare, Piece, Position,
-    Move, SetupMove, Square, Symmetry, captured_index, enums::SimpleEnumExt,
+    Color, Features, LinearEvaluator, Move, NUM_CAPTURED_INDEXES, NormalizedSquare, Piece,
+    Position, SetupMove, Square, Symmetry, captured_index, enums::SimpleEnumExt,
     smallvec::SmallVec,
 };
 
@@ -31,6 +31,10 @@ impl PSFeatures {
 impl Features for PSFeatures {
     fn count(self) -> usize {
         Self::CAPTURED_OFFSET + NUM_CAPTURED_INDEXES - 2
+    }
+
+    fn approximate_avg_set(self) -> f64 {
+        SetupMove::SIZE as f64
     }
 
     fn all(self, position: &Position, color: Color) -> impl Iterator<Item = usize> {

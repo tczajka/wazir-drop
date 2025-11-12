@@ -1,6 +1,6 @@
 use crate::{
     captured_index, enums::SimpleEnumExt, linear_wps_weights, smallvec::SmallVec, Color, Features,
-    LinearEvaluator, NormalizedSquare, Piece, Position, Move, SetupMove, Square, Symmetry,
+    LinearEvaluator, Move, NormalizedSquare, Piece, Position, SetupMove, Square, Symmetry,
     NUM_CAPTURED_INDEXES,
 };
 use std::iter;
@@ -41,6 +41,10 @@ impl WPSFeatures {
 impl Features for WPSFeatures {
     fn count(self) -> usize {
         Self::COUNT
+    }
+
+    fn approximate_avg_set(self) -> f64 {
+        (Color::COUNT * SetupMove::SIZE - 1) as f64
     }
 
     fn all(self, position: &Position, color: Color) -> impl Iterator<Item = usize> {

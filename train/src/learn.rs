@@ -1,6 +1,7 @@
 use crate::{
     linear::{self, LinearModel},
     model::EvalModel,
+    nnue::{self, NnueModel},
     self_play::{FeaturesConfig, Sample},
 };
 use extra::PSFeatures;
@@ -31,6 +32,7 @@ pub struct Config {
 #[serde(rename_all = "snake_case")]
 pub enum ModelConfig {
     Linear(linear::Config),
+    Nnue(nnue::Config),
 }
 
 pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
@@ -43,6 +45,7 @@ pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
 fn run_with_features<F: Features>(features: F, config: &Config) -> Result<(), Box<dyn Error>> {
     match &config.model {
         ModelConfig::Linear(c) => run_with_model::<LinearModel<F>>(features, config, c),
+        ModelConfig::Nnue(c) => run_with_model::<NnueModel<F>>(features, config, c),
     }
 }
 

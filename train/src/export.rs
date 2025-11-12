@@ -29,6 +29,7 @@ pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
         (FeaturesConfig::WPS, ModelConfig::Linear(c)) => {
             run_with_model::<LinearModel<_>>(WPSFeatures, config, c)
         }
+        _ => panic!("Model doesn't support export"),
     }
 }
 
