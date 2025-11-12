@@ -1,42 +1,45 @@
 log = "logs/train.log"
 
-[[command]]
-[command.self_play]
-output = "data/self_play_wps_3.cbor"
-num_cpus = 30
-num_games = 5000000
-batch_size = 10000
-ttable_size_mb = 16
-pvtable_size_mb = 2
-depth = 3
-extra_depth = 3
-temperature = 30
-temperature_cutoff = 90
-features = "WPS"
+#[[command]]
+#[command.self_play]
+#output = "data/self_play_nnue.cbor"
+#num_cpus = 30
+#num_games = 50000
+#batch_size = 10000
+#ttable_size_mb = 16
+#pvtable_size_mb = 2
+#depth = 3
+#extra_depth = 3
+#temperature = 30
+#temperature_cutoff = 90
+#features = "WPS"
 
 [[command]]
 [command.learn]
-self_play_data = "data/self_play_wps_3.cbor"
+self_play_data = "data/self_play_nnue.cbor"
 # load_weights = "data/linear_wps_2.weights"
-save_weights = "data/linear_wps_3.weights"
+save_weights = "data/nnue.weights"
 input_value_scale = 1000
 features = "WPS"
 epochs = 10
 chunk_size = 4194304
 batch_size = 8192
-outcome_weight = 0.2
+outcome_weight = 1.0
 log_period_seconds = 60
-[command.learn.model.linear]
+[command.learn.model.nnue]
 learning_rate = 1e-4
-max_weight = 3
+embedding_size = 64
+hidden_sizes = [8]
+max_embedding = 1
+hidden_weight_bits = 6
 
-[[command]]
-[command.export]
-weights = "data/linear_wps_3.weights"
-output = "data/linear_wps_weights.rs"
-features = "WPS"
-value_scale = 1000
-[command.export.model.linear]
+#[[command]]
+#[command.export]
+#weights = "data/linear_wps_3.weights"
+#output = "data/linear_wps_weights.rs"
+#features = "WPS"
+#value_scale = 1000
+#[command.export.model.linear]
 # doesn't matter
-learning_rate = 0
-max_weight = 0
+#learning_rate = 0
+#max_weight = 0

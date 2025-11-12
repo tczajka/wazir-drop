@@ -20,7 +20,8 @@ pub struct Config {
 pub struct NnueModel<F: Features> {
     _features: F,
     config: Config,
-    embedding: nn::Linear,
+    embedding_weights: Tensor,
+    embedding_bias: Tensor,
     hidden: Vec<nn::Linear>,
     final_layer: nn::Linear,
     max_hidden_weight: f64,
@@ -32,19 +33,17 @@ impl<F: Features> EvalModel for NnueModel<F> {
 
     fn new(features: F, vs: nn::Path, config: &Config) -> Self {
         let limit = (2.0 / features.approximate_avg_set()).sqrt();
-        let embedding = nn::linear(
-            &vs / "embedding",
-            features.count() as i64,
-            config.embedding_size,
-            nn::LinearConfig {
-                ws_init: nn::Init::Uniform {
-                    lo: -limit,
-                    up: limit,
-                },
-                bs_init: Some(nn::Init::Const(0.0)),
-                bias: true,
+        let embedding_path = &vs / "embedding";
+        let embedding_weights = embedding_path.var(
+            "weights",
+            &[features.count() as i64, config.embedding_size],
+            nn::Init::Uniform {
+                lo: -limit,
+                up: limit,
             },
         );
+        let embedding_bias =
+            embedding_path.var("bias", &[config.embedding_size], nn::Init::Const(0.0));
 
         let mut last_size = 2 * config.embedding_size;
 
@@ -88,7 +87,8 @@ impl<F: Features> EvalModel for NnueModel<F> {
         Self {
             _features: features,
             config: config.clone(),
-            embedding,
+            embedding_weights,
+            embedding_bias,
             hidden,
             final_layer,
             max_hidden_weight,
@@ -96,8 +96,8 @@ impl<F: Features> EvalModel for NnueModel<F> {
     }
 
     fn forward(&self, features: &Tensor, offsets: &Tensor) -> Tensor {
-        let (embedding, _, _, _) = Tensor::embedding_bag::<&Tensor>(
-            &self.embedding.ws,
+        let (mut embedding, _, _, _) = Tensor::embedding_bag::<&Tensor>(
+            &self.embedding_weights,
             features,
             &offsets.reshape([-1]),
             false, /* scale_grad_by_freq */
@@ -106,16 +106,17 @@ impl<F: Features> EvalModel for NnueModel<F> {
             None,  /* per_sample_weights */
             false, /* include_last_offset */
         );
+        // add bias
+        embedding += &self.embedding_bias;
         // embedding: [batch_size * 2, embedding_size]
-        let embedding = embedding.reshape([-1, 2, self.config.embedding_size]);
-        // embedding: [batch_size, 2, embedding_size]
-        let mut x = &embedding + self.embedding.bs.as_ref().unwrap();
+        let mut x = embedding.reshape([-1, 2 * self.config.embedding_size]);
+        // x: [batch_size, 2 * embedding_size]
         for hidden in &self.hidden {
             x = hidden.forward(&x);
         }
         x = self.final_layer.forward(&x);
         // x: [batch_size, 1]
-        x.unsqueeze(1)
+        x.squeeze_dim(1)
     }
 
     fn optimizer(&self, vs: &nn::VarStore) -> Result<nn::Optimizer, TchError> {
@@ -125,8 +126,7 @@ impl<F: Features> EvalModel for NnueModel<F> {
     fn fixup(&mut self) {
         let _guard = tch::no_grad_guard();
         _ = self
-            .embedding
-            .ws
+            .embedding_weights
             .clamp_(-self.config.max_embedding, self.config.max_embedding);
 
         for hidden in &mut self.hidden {
