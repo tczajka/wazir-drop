@@ -555,7 +555,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         } else {
             // Null move pruning. Don't do two in a row.
             if depth >= self.hyperparameters.reduction_null_move
-                && self.history.last_cut() != Some(position.ply() - 1)
+                && self.history.last_cut() != Some(position.ply())
             {
                 self.history.cut();
                 let epos2 = eposition.make_null_move().unwrap();
