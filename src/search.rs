@@ -553,8 +553,10 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 movegen::captures(eposition.position()).map(InternalMove::new),
             ))
         } else {
-            // Null move pruning.
-            if depth >= self.hyperparameters.reduction_null_move {
+            // Null move pruning. Don't do two in a row.
+            if depth >= self.hyperparameters.reduction_null_move
+                && self.history.last_cut() != Some(position.ply() - 1)
+            {
                 self.history.cut();
                 let epos2 = eposition.make_null_move().unwrap();
                 let result2 = self.search_alpha_beta::<EmptyVariation>(

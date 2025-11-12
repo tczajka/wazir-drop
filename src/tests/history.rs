@@ -12,7 +12,9 @@ fn test_history() {
     assert_eq!(history.find(10), None);
     assert_eq!(history.find(3), Some(12));
     assert_eq!(history.find(1), Some(10));
+    assert_eq!(history.last_cut(), None);
     history.cut();
+    assert_eq!(history.last_cut(), Some(14));
     assert_eq!(history.find(3), None);
     history.push(3);
     history.push(5);
