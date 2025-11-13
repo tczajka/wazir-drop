@@ -1,4 +1,5 @@
 pub mod arrays;
+pub mod base128_decoder;
 pub mod clock;
 pub mod either;
 pub mod enums;
