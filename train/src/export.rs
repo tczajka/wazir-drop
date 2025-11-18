@@ -5,10 +5,9 @@ use tch::{Device, nn};
 use wazir_drop::WPSFeatures;
 
 use crate::{
-    learn::ModelConfig,
+    config::{FeaturesConfig, ModelConfig},
     linear::LinearModel,
     model::{EvalModel, Export},
-    self_play::FeaturesConfig,
 };
 
 #[derive(Debug, Deserialize)]

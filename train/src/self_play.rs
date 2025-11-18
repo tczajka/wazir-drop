@@ -16,6 +16,7 @@ use wazir_drop::{
     ScoredMove, Search, Stage, WPSFeatures,
     constants::{Depth, Eval, Hyperparameters},
 };
+use crate::{config::FeaturesConfig, data::Sample};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -31,24 +32,6 @@ pub struct Config {
     temperature: f64,
     temperature_cutoff: Eval,
     features: FeaturesConfig,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Sample {
-    /// [to move, other]
-    pub features: [Vec<u32>; 2],
-    /// Value from deeper search.
-    // Eval::MAX is win, -Eval::MAX is loss
-    pub deep_value: Eval,
-    /// +1 = win, -1 = loss
-    pub game_points: i32,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[allow(clippy::upper_case_acronyms)]
-pub enum FeaturesConfig {
-    PS,
-    WPS,
 }
 
 pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {

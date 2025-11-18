@@ -1,9 +1,12 @@
+mod config;
+mod data;
 mod export;
 mod learn;
 mod linear;
 mod model;
 mod nnue;
 mod self_play;
+mod validate;
 
 use clap::Parser;
 use log::LevelFilter;
@@ -33,6 +36,7 @@ struct Config {
 enum Command {
     SelfPlay(self_play::Config),
     Learn(learn::Config),
+    Validate(validate::Config),
     Export(export::Config),
 }
 
@@ -68,6 +72,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         match command {
             Command::SelfPlay(config) => self_play::run(config)?,
             Command::Learn(config) => learn::run(config)?,
+            Command::Validate(config) => validate::run(config)?,
             Command::Export(config) => export::run(config)?,
         }
     }
