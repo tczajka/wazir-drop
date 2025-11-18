@@ -1,15 +1,14 @@
 use crate::model::EvalModel;
 use serde::Deserialize;
 use tch::{
-    TchError, Tensor,
-    nn::{self, Module, OptimizerConfig},
+    Tensor,
+    nn::{self, Module},
 };
 use wazir_drop::Features;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
-    learning_rate: f64,
     embedding_size: i64,
     hidden_sizes: Vec<i64>,
     max_embedding: f64,
@@ -119,10 +118,6 @@ impl<F: Features> EvalModel for NnueModel<F> {
         x = self.final_layer.forward(&x);
         // x: [batch_size, 1]
         x.squeeze_dim(1)
-    }
-
-    fn optimizer(&self, vs: &nn::VarStore) -> Result<nn::Optimizer, TchError> {
-        nn::Adam::default().build(vs, self.config.learning_rate)
     }
 
     fn fixup(&mut self) {

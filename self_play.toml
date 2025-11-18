@@ -3,8 +3,8 @@ log = "logs/self_play.log"
 [[command]]
 [command.self_play]
 output = "data/self_play_nnue.cbor"
-num_cpus = 30
-num_games = 1000000
+num_cpus = 8
+num_games = 250000
 batch_size = 10000
 ttable_size_mb = 16
 pvtable_size_mb = 2

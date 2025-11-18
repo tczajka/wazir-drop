@@ -9,7 +9,7 @@ use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 use serde::Deserialize;
 use serde_cbor::{Deserializer, StreamDeserializer, de::IoRead};
 use std::{error::Error, fs::File, io::BufReader, path::PathBuf, time::Instant};
-use tch::{Device, Kind, Reduction, Tensor, nn};
+use tch::{Device, Kind, Reduction, Tensor, nn::{self, OptimizerConfig}};
 use wazir_drop::{Features, WPSFeatures};
 
 #[derive(Debug, Deserialize)]
@@ -21,6 +21,7 @@ pub struct Config {
     input_value_scale: f32,
     features: FeaturesConfig,
     model: ModelConfig,
+    learning_rate: f64,
     epochs: u32,
     chunk_size: usize,
     batch_size: usize,
@@ -61,7 +62,7 @@ fn run_with_model<M: EvalModel>(
     if let Some(load_parameters) = &config.load_weights {
         vs.load(load_parameters)?;
     }
-    let mut optimizer = model.optimizer(&vs)?;
+    let mut optimizer = nn::Adam::default().build(&vs, config.learning_rate)?;
 
     for epoch in 0..config.epochs {
         let mut num_samples = 0;

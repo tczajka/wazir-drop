@@ -1,5 +1,5 @@
 use std::{error::Error, path::Path};
-use tch::{TchError, Tensor, nn};
+use tch::{Tensor, nn};
 use wazir_drop::Features;
 
 pub trait EvalModel {
@@ -12,8 +12,6 @@ pub trait EvalModel {
     /// offsets: [batch_size, 2] -> indices into features
     /// output: [batch_size] -> logit of winning
     fn forward(&self, features: &Tensor, offsets: &Tensor) -> Tensor;
-
-    fn optimizer(&self, vs: &nn::VarStore) -> Result<nn::Optimizer, TchError>;
 
     fn fixup(&mut self);
 }

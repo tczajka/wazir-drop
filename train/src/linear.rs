@@ -8,8 +8,8 @@ use std::{
     path::Path,
 };
 use tch::{
-    IndexOp, TchError, Tensor,
-    nn::{self, OptimizerConfig},
+    IndexOp, Tensor,
+    nn,
 };
 use wazir_drop::{
     Coord, Features, NormalizedSquare, Piece, Square, WPSFeatures, enums::SimpleEnumExt,
@@ -18,7 +18,6 @@ use wazir_drop::{
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
-    learning_rate: f64,
     max_weight: f64,
 }
 
@@ -63,10 +62,6 @@ impl<F: Features> EvalModel for LinearModel<F> {
         let embedding = embedding.reshape([-1, 2]);
         // embedding: [batch_size, 2]
         embedding.i((.., 0)) - embedding.i((.., 1)) + &self.to_move
-    }
-
-    fn optimizer(&self, vs: &nn::VarStore) -> Result<nn::Optimizer, TchError> {
-        nn::Adam::default().build(vs, self.config.learning_rate)
     }
 
     fn fixup(&mut self) {
