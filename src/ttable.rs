@@ -79,18 +79,13 @@ impl From<&PhysicalEntry> for TTableEntry {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub enum TTableScoreType {
+    #[default]
     None,
     Exact,
     LowerBound,
     UpperBound,
-}
-
-impl Default for TTableScoreType {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 #[derive(Debug, Copy, Clone, Default)]
