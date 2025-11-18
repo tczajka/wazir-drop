@@ -1,15 +1,11 @@
-
-log = "logs/learn.log"
+log = "logs/validate.log"
 
 [[command]]
-type = "learn"
-save_weights = "data/nnue.weights"
-learning_rate = 1e-3
-epochs = 4
-log_period_seconds = 60
+type = "validate"
+weights = "data/nnue.weights"
 
 [command.dataset]
-file = "data/self_play_nnue.cbor"
+file = "data/self_play_test.cbor"
 features = "WPS"
 value_scale = 1000
 chunk_size = 4194304

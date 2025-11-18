@@ -32,7 +32,7 @@ struct Config {
 }
 
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "type")]
 enum Command {
     SelfPlay(self_play::Config),
     Learn(learn::Config),
