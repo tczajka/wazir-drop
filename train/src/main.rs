@@ -57,7 +57,12 @@ fn run() -> Result<(), Box<dyn Error>> {
     let config: Config = toml::from_str(&config_text)?;
     let config_dir = args.config_file.parent().unwrap();
 
-    let log_file = File::create(config_dir.join(&config.log))?;
+    let log_path = config_dir.join(&config.log);
+    if let Some(log_dir) = log_path.parent() {
+        fs::create_dir_all(log_dir)?;
+    }
+    let log_file = File::create(log_path)?;
+
     CombinedLogger::init(vec![
         WriteLogger::new(LevelFilter::Info, simplelog::Config::default(), log_file),
         TermLogger::new(
@@ -72,7 +77,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         match command {
             Command::SelfPlay(config) => self_play::run(config)?,
             Command::Learn(config) => learn::run(config)?,
-            Command::Validate(config) => validate::run(config)?,
+            Command::Validate(config) => validate::run(config_dir, config)?,
             Command::Export(config) => export::run(config)?,
         }
     }

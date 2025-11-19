@@ -1,5 +1,6 @@
-use std::{error::Error, path::PathBuf, time::Instant};
+use std::{error::Error, fs, path::{Path, PathBuf}, time::Instant};
 use extra::PSFeatures;
+use plotters::{backend::SVGBackend, chart::ChartBuilder, drawing::IntoDrawingArea, series::LineSeries, style::{BLUE, WHITE}};
 use serde::Deserialize;
 use tch::{Device, Reduction, Tensor, nn};
 use wazir_drop::{Features, WPSFeatures};
@@ -11,24 +12,26 @@ pub struct Config {
     dataset: DatasetConfig,
     weights: PathBuf,
     model: ModelConfig,
+    graph_dir: PathBuf,
 }
 
-pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
+pub fn run(config_dir: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
     match config.dataset.features {
-        FeaturesConfig::PS => run_with_features(PSFeatures, config),
-        FeaturesConfig::WPS => run_with_features(WPSFeatures, config),
+        FeaturesConfig::PS => run_with_features(PSFeatures, config_dir, config),
+        FeaturesConfig::WPS => run_with_features(WPSFeatures, config_dir, config),
     }
 }
 
-fn run_with_features<F: Features>(features: F, config: &Config) -> Result<(), Box<dyn Error>> {
+fn run_with_features<F: Features>(features: F, config_dir: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
     match &config.model {
-        ModelConfig::Linear(c) => run_with_model::<LinearModel<F>>(features, config, c),
-        ModelConfig::Nnue(c) => run_with_model::<NnueModel<F>>(features, config, c),
+        ModelConfig::Linear(c) => run_with_model::<LinearModel<F>>(features, config_dir, config, c),
+        ModelConfig::Nnue(c) => run_with_model::<NnueModel<F>>(features, config_dir, config, c),
     }
 }
 
 fn run_with_model<M: EvalModel>(
     features: M::Features,
+    config_dir: &Path,
     config: &Config,
     model_config: &M::Config,
 ) -> Result<(), Box<dyn Error>> {
@@ -61,5 +64,46 @@ fn run_with_model<M: EvalModel>(
         samples_per_second = num_samples as f64 / elapsed_time,
         loss = total_loss / num_samples as f64,
     );
+
+    let graph_dir = config_dir.join(&config.graph_dir);
+    fs::create_dir_all(&graph_dir)?;
+    plot_weights(&model, &graph_dir)?;
+
+    Ok(())
+}
+
+fn plot_weights<M: EvalModel>(model: &M, graph_dir: &Path) -> Result<(), Box<dyn Error>> {
+    let _guard = tch::no_grad_guard();
+
+    for layer in 0..model.num_layers() {
+        let weights = model.layer_weights(layer);
+        let mut weights: Vec<f64> = weights.try_into().unwrap();
+        weights.sort_by(f64::total_cmp);
+
+        let filename = graph_dir.join(format!("weights_{layer}.svg"));
+        let root = SVGBackend::new(&filename, (640, 480)).into_drawing_area();
+        root.fill(&WHITE)?;
+
+        let mut chart_context = ChartBuilder::on(&root)
+            .margin(5)
+            .set_all_label_area_size(50)
+            .build_cartesian_2d(*weights.first().unwrap()..*weights.last().unwrap(), 0.0..1.0)?;
+
+        chart_context.configure_mesh()
+            .x_labels(20)
+            .y_labels(10)
+            .draw()?;
+
+        let step_by = (weights.len()/1000).max(1);
+        _ = chart_context.draw_series(LineSeries::new(
+            (0..weights.len()).step_by(step_by).map(
+                |index| (weights[index], index as f64 / (weights.len() - 1) as f64)
+            ),
+            &BLUE
+        ))?;
+
+        root.present()?;
+    }
+
     Ok(())
 }

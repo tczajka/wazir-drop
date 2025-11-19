@@ -3,6 +3,7 @@ log = "logs/validate.log"
 [[command]]
 type = "validate"
 weights = "data/nnue.weights"
+graph_dir = "data"
 
 [command.dataset]
 file = "data/self_play_test.cbor"
