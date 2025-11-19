@@ -11,9 +11,19 @@ pub trait EvalModel {
     /// features: [num features in a batch]
     /// offsets: [batch_size, 2] -> indices into features
     /// output: [batch_size] -> logit of winning
-    fn forward(&self, features: &Tensor, offsets: &Tensor) -> Tensor;
+    fn forward(&mut self, features: &Tensor, offsets: &Tensor) -> Tensor;
 
     fn fixup(&mut self);
+
+    fn num_layers(&self) -> usize;
+
+    /// layer < num_layers
+    /// [num_weights]
+    fn layer_weights(&self, layer: usize) -> Tensor;
+
+    /// layer < num_layers - 1
+    /// [batch_size, layer_size]
+    fn activations(&self, layer: usize) -> Tensor;
 }
 
 pub trait Export {

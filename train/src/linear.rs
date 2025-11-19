@@ -47,7 +47,7 @@ impl<F: Features> EvalModel for LinearModel<F> {
         }
     }
 
-    fn forward(&self, features: &Tensor, offsets: &Tensor) -> Tensor {
+    fn forward(&mut self, features: &Tensor, offsets: &Tensor) -> Tensor {
         let (embedding, _, _, _) = Tensor::embedding_bag::<&Tensor>(
             &self.weights.unsqueeze(1),
             features,
@@ -69,6 +69,19 @@ impl<F: Features> EvalModel for LinearModel<F> {
         _ = self
             .weights
             .clamp_(-self.config.max_weight, self.config.max_weight);
+    }
+
+    fn num_layers(&self) -> usize {
+        1
+    }
+
+    fn layer_weights(&self, layer: usize) -> Tensor {
+        assert_eq!(layer, 0);
+        self.weights.shallow_clone()
+    }
+
+    fn activations(&self, _layer: usize) -> Tensor {
+        panic!("no activations in linear model");
     }
 }
 

@@ -35,7 +35,7 @@ fn run_with_model<M: EvalModel>(
     let device = Device::cuda_if_available();
     log::info!("Validating using device: {device:?}");
     let mut vs = nn::VarStore::new(device);
-    let model = M::new(features, vs.root(), model_config);
+    let mut model = M::new(features, vs.root(), model_config);
     vs.load(&config.weights)?;
 
     let mut num_samples = 0;

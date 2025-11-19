@@ -24,6 +24,7 @@ pub struct NnueModel<F: Features> {
     hidden: Vec<nn::Linear>,
     final_layer: nn::Linear,
     max_hidden_weight: f64,
+    activations: Vec<Tensor>,
 }
 
 impl<F: Features> EvalModel for NnueModel<F> {
@@ -91,10 +92,12 @@ impl<F: Features> EvalModel for NnueModel<F> {
             hidden,
             final_layer,
             max_hidden_weight,
+            activations: Vec::new(),
         }
     }
 
-    fn forward(&self, features: &Tensor, offsets: &Tensor) -> Tensor {
+    fn forward(&mut self, features: &Tensor, offsets: &Tensor) -> Tensor {
+        self.activations.clear();
         let (mut embedding, _, _, _) = Tensor::embedding_bag::<&Tensor>(
             &self.embedding_weights,
             features,
@@ -108,12 +111,15 @@ impl<F: Features> EvalModel for NnueModel<F> {
         // add bias
         embedding += &self.embedding_bias;
         embedding = embedding.clamp(0.0, 1.0);
+        self.activations.push(embedding.shallow_clone());
+
         // embedding: [batch_size * 2, embedding_size]
         let mut x = embedding.reshape([-1, 2 * self.config.embedding_size]);
         // x: [batch_size, 2 * embedding_size]
         for hidden in &self.hidden {
             x = hidden.forward(&x);
             x = x.clamp(0.0, 1.0);
+            self.activations.push(x.shallow_clone());
         }
         x = self.final_layer.forward(&x);
         // x: [batch_size, 1]
@@ -131,5 +137,25 @@ impl<F: Features> EvalModel for NnueModel<F> {
                 .ws
                 .clamp_(-self.max_hidden_weight, self.max_hidden_weight);
         }
+    }
+
+    fn num_layers(&self) -> usize {
+        1 + self.hidden.len() + 1
+    }
+
+    fn layer_weights(&self, layer: usize) -> Tensor {
+        if layer == 0 {
+            self.embedding_weights.flatten(0, -1)
+        } else if layer < 1 + self.hidden.len() {
+            self.hidden[layer - 1].ws.flatten(0, -1)
+        } else if layer == 1 + self.hidden.len()  {
+            self.final_layer.ws.flatten(0, -1)
+        } else {
+            panic!("layer out of range");
+        }
+    }
+
+    fn activations(&self, layer: usize) -> Tensor {
+        self.activations[layer].shallow_clone()
     }
 }
