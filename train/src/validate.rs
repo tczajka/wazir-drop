@@ -94,7 +94,7 @@ fn plot_weights<M: EvalModel>(model: &M, graph_dir: &Path) -> Result<(), Box<dyn
             .y_labels(10)
             .draw()?;
 
-        let step_by = (weights.len()/1000).max(1);
+        let step_by = (weights.len()/10000).max(1);
         _ = chart_context.draw_series(LineSeries::new(
             (0..weights.len()).step_by(step_by).map(
                 |index| (weights[index], index as f64 / (weights.len() - 1) as f64)
@@ -103,6 +103,7 @@ fn plot_weights<M: EvalModel>(model: &M, graph_dir: &Path) -> Result<(), Box<dyn
         ))?;
 
         root.present()?;
+        log::info!("Written chart {}", filename.display());
     }
 
     Ok(())
