@@ -3,7 +3,7 @@ use extra::PSFeatures;
 use serde::Deserialize;
 use tch::{Device, Reduction, Tensor, nn};
 use wazir_drop::{Features, WPSFeatures};
-use crate::{config::{FeaturesConfig, ModelConfig}, data::{DatasetConfig, DatasetIterator}, model::EvalModel, nnue::{self, NnueModel}};
+use crate::{config::{FeaturesConfig, ModelConfig}, data::{DatasetConfig, DatasetIterator}, linear::LinearModel, model::EvalModel, nnue::NnueModel};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -22,20 +22,20 @@ pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
 
 fn run_with_features<F: Features>(features: F, config: &Config) -> Result<(), Box<dyn Error>> {
     match &config.model {
-        ModelConfig::Nnue(c) => run_with_nnue(features, config, c),
-        ModelConfig::Linear(_) => panic!("validation with linear model is not implemented"),
+        ModelConfig::Linear(c) => run_with_model::<LinearModel<F>>(features, config, c),
+        ModelConfig::Nnue(c) => run_with_model::<NnueModel<F>>(features, config, c),
     }
 }
 
-fn run_with_nnue<F: Features>(
-    features: F,
+fn run_with_model<M: EvalModel>(
+    features: M::Features,
     config: &Config,
-    model_config: &nnue::Config,
+    model_config: &M::Config,
 ) -> Result<(), Box<dyn Error>> {
     let device = Device::cuda_if_available();
     log::info!("Validating using device: {device:?}");
     let mut vs = nn::VarStore::new(device);
-    let model = NnueModel::new(features, vs.root(), model_config);
+    let model = M::new(features, vs.root(), model_config);
     vs.load(&config.weights)?;
 
     let mut num_samples = 0;
