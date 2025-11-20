@@ -2,12 +2,11 @@ log = "logs/validate.log"
 
 [[command]]
 type = "validate"
-#weights = "data/nnue.weights"
 weights = "data/linear.weights"
 graph_dir = "data"
 
 [command.dataset]
-file = "data/self_play_test.cbor"
+file = "data/train.data"
 features = "WPS"
 value_scale = 1000
 chunk_size = 4194304
@@ -15,7 +14,6 @@ batch_size = 8192
 outcome_weight = 1.0
 
 [command.model.linear]
-max_weight = 3.0
 
 #[command.model.nnue]
 #max_embedding = 1
