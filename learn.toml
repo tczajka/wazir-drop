@@ -3,21 +3,25 @@ log = "logs/learn.log"
 
 [[command]]
 type = "learn"
-save_weights = "data/nnue.weights"
+#save_weights = "data/nnue.weights"
+save_weights = "data/linear.weights"
 learning_rate = 1e-3
-epochs = 4
+epochs = 3
 log_period_seconds = 60
 
 [command.dataset]
-file = "data/self_play_nnue.cbor"
+file = "data/self_play_train.cbor"
 features = "WPS"
 value_scale = 1000
 chunk_size = 4194304
 batch_size = 8192
 outcome_weight = 1.0
 
-[command.model.nnue]
-max_embedding = 1
-embedding_size = 128
-hidden_sizes = [8, 32]
-hidden_weight_bits = 6
+[command.model.linear]
+max_weight = 3.0
+
+#[command.model.nnue]
+#max_embedding = 1
+#embedding_size = 64
+#hidden_sizes = [16]
+#hidden_weight_bits = 6

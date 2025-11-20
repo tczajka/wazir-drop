@@ -189,7 +189,7 @@ fn play_game<F: Features, W: serde_cbor::ser::Write>(
         let f = [to_move, to_move.opposite()].map(|color| {
             features
                 .all(&entry.pv_position, color)
-                .map(|x| x as u32)
+                .map(|x| u16::try_from(x).unwrap())
                 .collect()
         });
         let deep_value = match entry.deep_score.into() {

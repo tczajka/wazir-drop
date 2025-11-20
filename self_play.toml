@@ -2,9 +2,9 @@ log = "logs/self_play.log"
 
 [[command]]
 type = "self_play"
-output = "data/self_play_test.cbor"
+output = "data/self_play_train.cbor"
 num_cpus = 8
-num_games = 100000
+num_games = 5000000
 batch_size = 10000
 ttable_size_mb = 16
 pvtable_size_mb = 2

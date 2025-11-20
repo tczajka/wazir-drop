@@ -11,7 +11,7 @@ use crate::config::FeaturesConfig;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Sample {
     /// [to move, other]
-    pub features: [Vec<u32>; 2],
+    pub features: [Vec<u16>; 2],
     /// Value from deeper search.
     // Eval::MAX is win, -Eval::MAX is loss
     pub deep_value: Eval,
@@ -59,8 +59,8 @@ impl Batch {
         let mut outcomes = Vec::with_capacity(samples.len());
         for sample in samples {
             for f in &sample.features {
-                offsets.push(features.len() as i32);
-                features.extend(f.iter().map(|&f| f as i32));
+                offsets.push(i32::try_from(features.len()).unwrap());
+                features.extend(f.iter().map(|&f| i32::from(f)));
             }
             values.push(sample.deep_value);
             outcomes.push(sample.game_points);
