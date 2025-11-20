@@ -1,0 +1,10 @@
+log = "logs/export.log"
+
+[[command]]
+type = "export"
+weights = "data/linear.weights"
+output = "data/linear_wps_weights.rs"
+features = "WPS"
+
+[command.model.linear.export]
+value_scale = 1000

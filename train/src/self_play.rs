@@ -1,11 +1,8 @@
 use extra::{PSFeatures, moverand};
 use rand::{SeedableRng, rngs::StdRng, seq::IndexedRandom};
-use serde::{Deserialize, Serialize};
-use serde_cbor::ser::{IoWrite, Serializer};
+use serde::Deserialize;
 use std::{
     error::Error,
-    fs::File,
-    io::BufWriter,
     path::PathBuf,
     sync::{Arc, Mutex},
     time::Instant,
@@ -16,7 +13,7 @@ use wazir_drop::{
     ScoredMove, Search, Stage, WPSFeatures,
     constants::{Depth, Eval, Hyperparameters},
 };
-use crate::{config::FeaturesConfig, data::Sample};
+use crate::{config::FeaturesConfig, data::{DatasetWriter, Sample}};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -35,23 +32,18 @@ pub struct Config {
 }
 
 pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
-    let output = BufWriter::new(File::create(&config.output)?);
-    let output = IoWrite::new(output);
-    let output = Serializer::new(output).packed_format();
-    let output = Arc::new(Mutex::new(output));
-
     match config.features {
-        FeaturesConfig::PS => run_games(config, PSFeatures, &output)?,
-        FeaturesConfig::WPS => run_games(config, WPSFeatures, &output)?,
+        FeaturesConfig::PS => run_games(config, PSFeatures)?,
+        FeaturesConfig::WPS => run_games(config, WPSFeatures)?,
     }
     Ok(())
 }
 
-fn run_games<F: Features, W: serde_cbor::ser::Write + Send + 'static>(
+fn run_games<F: Features>(
     config: &Config,
     features: F,
-    output: &Arc<Mutex<serde_cbor::Serializer<W>>>,
 ) -> Result<(), Box<dyn Error>> {
+    let writer = Arc::new(Mutex::new(DatasetWriter::new(&config.output)?));
     let evaluator = Arc::new(DefaultEvaluator::default());
     let thread_pool = ThreadPool::new(config.num_cpus);
     let stats = Arc::new(Mutex::new(Stats::new()));
@@ -70,11 +62,11 @@ fn run_games<F: Features, W: serde_cbor::ser::Write + Send + 'static>(
         };
         for _ in 0..cur_games {
             let config = config.clone();
-            let output = output.clone();
+            let writer = writer.clone();
             let evaluator = evaluator.clone();
             let stats = stats.clone();
             thread_pool.execute(
-                move || match play_game(&config, &output, &evaluator, features) {
+                move || match play_game(&config, &writer, &evaluator, features) {
                     Ok(s) => {
                         let mut stats = stats.lock().unwrap();
                         stats.add(&s);
@@ -108,9 +100,9 @@ fn run_games<F: Features, W: serde_cbor::ser::Write + Send + 'static>(
     Ok(())
 }
 
-fn play_game<F: Features, W: serde_cbor::ser::Write>(
+fn play_game<F: Features>(
     config: &Config,
-    output: &Mutex<serde_cbor::Serializer<W>>,
+    writer: &Mutex<DatasetWriter>,
     evaluator: &Arc<DefaultEvaluator>,
     features: F,
 ) -> Result<Stats, Box<dyn Error>> {
@@ -183,7 +175,7 @@ fn play_game<F: Features, W: serde_cbor::ser::Write>(
     if outcome == Outcome::Draw {
         stats.draws += 1;
     }
-    let mut output = output.lock().unwrap();
+    let mut writer = writer.lock().unwrap();
     for entry in entries {
         let to_move = entry.pv_position.to_move();
         let f = [to_move, to_move.opposite()].map(|color| {
@@ -203,7 +195,7 @@ fn play_game<F: Features, W: serde_cbor::ser::Write>(
             deep_value,
             game_points,
         };
-        sample.serialize(&mut *output)?;
+        writer.write(&sample)?;
     }
 
     Ok(stats)

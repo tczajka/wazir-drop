@@ -1,8 +1,7 @@
-use std::{error::Error, fs::File, io::BufReader, path::PathBuf};
+use std::{error::Error, fs::File, io::{BufReader, BufWriter}, path::{Path, PathBuf}};
 
 use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 use serde::{Deserialize, Serialize};
-use serde_cbor::{Deserializer, StreamDeserializer, de::IoRead};
 use tch::{Device, Kind, Tensor};
 use wazir_drop::constants::Eval;
 
@@ -87,9 +86,9 @@ impl Batch {
     }
 }
 
-pub struct DatasetIterator<'de> {
-    /// None if the whole dataset is already loaded in memory.
-    deserializer: Option<StreamDeserializer<'de, IoRead<BufReader<File>>, Sample>>,
+pub struct DatasetIterator {
+    reader: BufReader<File>,
+    buffer: Vec<u8>,
     input_value_scale: f32,
     outcome_weight: f32,
     chunk_size: usize,
@@ -99,12 +98,12 @@ pub struct DatasetIterator<'de> {
     current_chunk_index: usize,
 }
 
-impl<'de> DatasetIterator<'de> {
+impl DatasetIterator {
     pub fn new(config: &DatasetConfig) -> Result<Self, Box<dyn Error>> {
-        let input = BufReader::new(File::open(&config.file)?);
-        let deserializer = Deserializer::from_reader(input);
+        let reader = BufReader::new(File::open(&config.file)?);
         Ok(Self {
-            deserializer: Some(deserializer.into_iter()),
+            reader,
+            buffer: vec![0; 1 << 10],
             input_value_scale: config.value_scale,
             outcome_weight: config.outcome_weight,
             chunk_size: config.chunk_size,
@@ -116,8 +115,11 @@ impl<'de> DatasetIterator<'de> {
     }
 
     pub fn next_batch(&mut self) -> Result<Option<Batch>, Box<dyn Error>> {
-        if self.current_chunk_index == self.current_chunk.len() && !self.refill_chunk()? {
-            return Ok(None);
+        if self.current_chunk_index == self.current_chunk.len() {
+            self.refill_chunk()?;
+            if self.current_chunk_index == self.current_chunk.len() {
+                return Ok(None);
+            }
         }
         let next_chunk_index =
             (self.current_chunk_index + self.batch_size).min(self.current_chunk.len());
@@ -130,24 +132,33 @@ impl<'de> DatasetIterator<'de> {
         )))
     }
 
-    fn refill_chunk(&mut self) -> Result<bool, Box<dyn Error>> {
-        let Some(deserializer) = &mut self.deserializer else {
-            return Ok(false);
-        };
+    fn refill_chunk(&mut self) -> Result<(), Box<dyn Error>> {
         self.current_chunk.clear();
         self.current_chunk_index = 0;
         while self.current_chunk.len() < self.chunk_size {
-            let Some(result) = deserializer.next() else {
-                self.deserializer = None;
-                break;
-            };
-            let sample = result?;
-            self.current_chunk.push(sample);
-        }
-        if self.current_chunk.is_empty() {
-            return Ok(false);
+            match postcard::from_io((&mut self.reader, &mut self.buffer)) {
+                Ok((sample, _)) => self.current_chunk.push(sample),
+                Err(postcard::Error::DeserializeUnexpectedEnd) => break,
+                Err(e) => return Err(e.into()),
+            }
         }
         self.current_chunk.shuffle(&mut self.rng);
-        Ok(true)
+        Ok(())
+    }
+}
+
+pub struct DatasetWriter {
+    writer: BufWriter<File>,
+}
+
+impl DatasetWriter {
+    pub fn new(filename: &Path) -> Result<Self, Box<dyn Error>> {
+        let writer = BufWriter::new(File::create(filename)?);
+        Ok(Self { writer })
+    }
+
+    pub fn write(&mut self, sample: &Sample) -> Result<(), Box<dyn Error>> {
+        _ = postcard::to_io(sample, &mut self.writer)?;
+        Ok(())
     }
 }
