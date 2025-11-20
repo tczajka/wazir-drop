@@ -1,5 +1,4 @@
 use std::str::FromStr;
-
 use wazir_drop::{Board, Color, ColoredPiece, Square};
 
 #[test]
