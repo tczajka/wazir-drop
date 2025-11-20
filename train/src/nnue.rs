@@ -1,4 +1,4 @@
-use crate::model::EvalModel;
+use crate::{model::EvalModel};
 use serde::Deserialize;
 use tch::{
     Tensor,
@@ -11,8 +11,13 @@ use wazir_drop::Features;
 pub struct Config {
     embedding_size: i64,
     hidden_sizes: Vec<i64>,
-    max_embedding: f64,
     hidden_weight_bits: u32,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LearnConfig {
+    max_embedding: f64,
 }
 
 #[derive(Debug)]
@@ -30,6 +35,7 @@ pub struct NnueModel<F: Features> {
 impl<F: Features> EvalModel for NnueModel<F> {
     type Features = F;
     type Config = Config;
+    type LearnConfig = LearnConfig;
 
     fn new(features: F, vs: nn::Path, config: &Config) -> Self {
         let limit = (2.0 / features.approximate_avg_set()).sqrt();
@@ -126,11 +132,11 @@ impl<F: Features> EvalModel for NnueModel<F> {
         x.squeeze_dim(1)
     }
 
-    fn fixup(&mut self) {
+    fn fixup(&mut self, learn_config: &Self::LearnConfig) {
         let _guard = tch::no_grad_guard();
         _ = self
             .embedding_weights
-            .clamp_(-self.config.max_embedding, self.config.max_embedding);
+            .clamp_(-learn_config.max_embedding, learn_config.max_embedding);
 
         for hidden in &mut self.hidden {
             _ = hidden

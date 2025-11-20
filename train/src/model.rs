@@ -5,6 +5,7 @@ use wazir_drop::Features;
 pub trait EvalModel {
     type Features: Features;
     type Config;
+    type LearnConfig;
 
     fn new(features: Self::Features, vs: nn::Path, config: &Self::Config) -> Self;
 
@@ -13,7 +14,7 @@ pub trait EvalModel {
     /// output: [batch_size] -> logit of winning
     fn forward(&mut self, features: &Tensor, offsets: &Tensor) -> Tensor;
 
-    fn fixup(&mut self);
+    fn fixup(&mut self, learn_config: &Self::LearnConfig);
 
     fn num_layers(&self) -> usize;
 
@@ -27,5 +28,7 @@ pub trait EvalModel {
 }
 
 pub trait Export {
-    fn export(&self, output: &Path, value_scale: f32) -> Result<(), Box<dyn Error>>;
+    type ExportConfig;
+
+    fn export(&self, output: &Path, config: &Self::ExportConfig) -> Result<(), Box<dyn Error>>;
 }

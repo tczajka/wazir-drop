@@ -2,11 +2,11 @@ use extra::PSFeatures;
 use serde::Deserialize;
 use std::{error::Error, path::PathBuf};
 use tch::{Device, nn};
-use wazir_drop::WPSFeatures;
+use wazir_drop::{Features, WPSFeatures};
 
 use crate::{
-    config::{FeaturesConfig, ModelConfig},
-    linear::LinearModel,
+    config::FeaturesConfig,
+    linear::{self, LinearModel},
     model::{EvalModel, Export},
 };
 
@@ -17,18 +17,27 @@ pub struct Config {
     pub output: PathBuf,
     pub features: FeaturesConfig,
     pub model: ModelConfig,
-    pub value_scale: f32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ModelConfig {
+    Linear{export: linear::ExportConfig},
 }
 
 pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
-    match (&config.features, &config.model) {
-        (FeaturesConfig::PS, ModelConfig::Linear(c)) => {
-            run_with_model::<LinearModel<_>>(PSFeatures, config, c)
-        }
-        (FeaturesConfig::WPS, ModelConfig::Linear(c)) => {
-            run_with_model::<LinearModel<_>>(WPSFeatures, config, c)
-        }
-        _ => panic!("Model doesn't support export"),
+    match config.features {
+        FeaturesConfig::PS => run_with_features(PSFeatures, config),
+        FeaturesConfig::WPS => run_with_features(WPSFeatures, config),
+    }
+}
+
+pub fn run_with_features<F: Features>(features: F, config: &Config) -> Result<(), Box<dyn Error>>
+where
+    LinearModel<F>: Export<ExportConfig = linear::ExportConfig>,
+{
+    match &config.model {
+        ModelConfig::Linear{export} => run_with_model::<LinearModel<F>>(features, config, &(), export)
     }
 }
 
@@ -36,11 +45,12 @@ pub fn run_with_model<M: EvalModel + Export>(
     features: M::Features,
     config: &Config,
     model_config: &M::Config,
+    export_config: &M::ExportConfig,
 ) -> Result<(), Box<dyn Error>> {
     let mut vs = nn::VarStore::new(Device::Cpu);
     let model = M::new(features, vs.root(), model_config);
     vs.load(&config.weights)?;
-    model.export(&config.output, config.value_scale)?;
+    model.export(&config.output, export_config)?;
     log::info!("Exported model to {}", config.output.display());
     Ok(())
 }

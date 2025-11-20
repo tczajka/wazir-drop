@@ -17,14 +17,19 @@ use wazir_drop::{
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Config {
+pub struct LearnConfig {
     max_weight: f64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExportConfig {
+    value_scale: f32,
 }
 
 #[derive(Debug)]
 pub struct LinearModel<F: Features> {
     _features: F,
-    config: Config,
     // [features.count()]
     weights: Tensor,
     // []
@@ -33,15 +38,15 @@ pub struct LinearModel<F: Features> {
 
 impl<F: Features> EvalModel for LinearModel<F> {
     type Features = F;
-    type Config = Config;
+    type Config = ();
+    type LearnConfig = LearnConfig;
 
-    fn new(features: F, vs: nn::Path, config: &Config) -> Self {
+    fn new(features: F, vs: nn::Path, _config: &()) -> Self {
         let weights = vs.var("weights", &[features.count() as i64], nn::Init::Const(0.0));
         let to_move = vs.var("to_move", &[], nn::Init::Const(0.0));
 
         Self {
             _features: features,
-            config: config.clone(),
             weights,
             to_move,
         }
@@ -64,11 +69,11 @@ impl<F: Features> EvalModel for LinearModel<F> {
         embedding.i((.., 0)) - embedding.i((.., 1)) + &self.to_move
     }
 
-    fn fixup(&mut self) {
+    fn fixup(&mut self, learn_config: &Self::LearnConfig) {
         let _guard = tch::no_grad_guard();
         _ = self
             .weights
-            .clamp_(-self.config.max_weight, self.config.max_weight);
+            .clamp_(-learn_config.max_weight, learn_config.max_weight);
     }
 
     fn num_layers(&self) -> usize {
@@ -86,17 +91,19 @@ impl<F: Features> EvalModel for LinearModel<F> {
 }
 
 impl Export for LinearModel<PSFeatures> {
-    fn export(&self, output: &Path, value_scale: f32) -> Result<(), Box<dyn Error>> {
+    type ExportConfig = ExportConfig;
+
+    fn export(&self, output: &Path, export_config: &ExportConfig) -> Result<(), Box<dyn Error>> {
         let _guard = tch::no_grad_guard();
         let max_abs = self.weights.abs().max().max_other(&self.to_move.abs());
         let max_abs = f32::try_from(max_abs).unwrap();
         println!("max |weight| = {max_abs:.6}");
         let mut f = BufWriter::new(File::create(output)?);
-        let to_move = (value_scale * &self.to_move).round();
+        let to_move = (export_config.value_scale * &self.to_move).round();
         let to_move: i16 = to_move.try_into().expect("out of range");
         writeln!(f, "pub static TO_MOVE: i16 = {to_move};")?;
         writeln!(f)?;
-        let weights = (value_scale * &self.weights).round();
+        let weights = (export_config.value_scale * &self.weights).round();
         let weights: Vec<i16> = weights.try_into().expect("out of range");
         writeln!(f, "#[rustfmt::skip]")?;
         writeln!(f, "pub static FEATURES: [i16; {}] = [", weights.len())?;
@@ -128,17 +135,19 @@ impl Export for LinearModel<PSFeatures> {
 }
 
 impl Export for LinearModel<WPSFeatures> {
-    fn export(&self, output: &Path, value_scale: f32) -> Result<(), Box<dyn Error>> {
+    type ExportConfig = ExportConfig;
+
+    fn export(&self, output: &Path, export_config: &ExportConfig) -> Result<(), Box<dyn Error>> {
         let _guard = tch::no_grad_guard();
         let max_abs = self.weights.max().max_other(&self.to_move.abs().max());
         let max_abs = f32::try_from(max_abs).unwrap();
         println!("max |weight| = {max_abs:.6}");
         let mut f = BufWriter::new(File::create(output)?);
-        let to_move = (value_scale * &self.to_move).round();
+        let to_move = (export_config.value_scale * &self.to_move).round();
         let to_move: i16 = to_move.try_into().expect("out of range");
         writeln!(f, "pub static TO_MOVE: i16 = {to_move};")?;
         writeln!(f)?;
-        let weights = (value_scale * &self.weights).round();
+        let weights = (export_config.value_scale * &self.weights).round();
         let weights: Vec<i16> = weights.try_into().expect("out of range");
         writeln!(f, "#[rustfmt::skip]")?;
         writeln!(f, "pub static FEATURES: [i16; {}] = [", weights.len())?;

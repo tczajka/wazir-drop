@@ -1,5 +1,5 @@
 use crate::{
-    config::{FeaturesConfig, ModelConfig}, data::{DatasetConfig, DatasetIterator}, linear::LinearModel, model::EvalModel, nnue::NnueModel
+    config::FeaturesConfig, data::{DatasetConfig, DatasetIterator}, linear::{self, LinearModel}, model::EvalModel, nnue::{self, NnueModel}
 };
 use extra::PSFeatures;
 use serde::Deserialize;
@@ -19,6 +19,12 @@ pub struct Config {
     log_period_seconds: f32,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ModelConfig {
+    Linear{learn: linear::LearnConfig},
+    Nnue{config: nnue::Config, learn: nnue::LearnConfig},
+}
 
 pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
     match config.dataset.features {
@@ -29,8 +35,8 @@ pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
 
 fn run_with_features<F: Features>(features: F, config: &Config) -> Result<(), Box<dyn Error>> {
     match &config.model {
-        ModelConfig::Linear(c) => run_with_model::<LinearModel<F>>(features, config, c),
-        ModelConfig::Nnue(c) => run_with_model::<NnueModel<F>>(features, config, c),
+        ModelConfig::Linear{learn} => run_with_model::<LinearModel<F>>(features, config, &(), learn),
+        ModelConfig::Nnue{config: nnue_config, learn} => run_with_model::<NnueModel<F>>(features, config, nnue_config, learn),
     }
 }
 
@@ -38,6 +44,7 @@ fn run_with_model<M: EvalModel>(
     features: M::Features,
     config: &Config,
     model_config: &M::Config,
+    model_learn_config: &M::LearnConfig,
 ) -> Result<(), Box<dyn Error>> {
     let device = Device::cuda_if_available();
     log::info!("Learning using device: {device:?}");
@@ -83,7 +90,7 @@ fn run_with_model<M: EvalModel>(
             num_samples += batch.size;
             total_loss += batch.size as f64 * f64::try_from(&loss).unwrap();
             optimizer.backward_step(&loss);
-            model.fixup();
+            model.fixup(model_learn_config);
         }
     }
     vs.save(&config.save_weights)?;

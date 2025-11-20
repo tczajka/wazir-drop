@@ -4,7 +4,7 @@ use plotters::{backend::SVGBackend, chart::ChartBuilder, drawing::IntoDrawingAre
 use serde::Deserialize;
 use tch::{Device, Reduction, Tensor, nn};
 use wazir_drop::{Features, WPSFeatures};
-use crate::{config::{FeaturesConfig, ModelConfig}, data::{DatasetConfig, DatasetIterator}, linear::LinearModel, model::EvalModel, nnue::NnueModel};
+use crate::{config::FeaturesConfig, data::{DatasetConfig, DatasetIterator}, linear::LinearModel, model::EvalModel, nnue::{self, NnueModel}};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -13,6 +13,13 @@ pub struct Config {
     weights: PathBuf,
     model: ModelConfig,
     graph_dir: PathBuf,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ModelConfig {
+    Linear,
+    Nnue{config: nnue::Config},
 }
 
 pub fn run(config_dir: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
@@ -24,8 +31,8 @@ pub fn run(config_dir: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
 
 fn run_with_features<F: Features>(features: F, config_dir: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
     match &config.model {
-        ModelConfig::Linear(c) => run_with_model::<LinearModel<F>>(features, config_dir, config, c),
-        ModelConfig::Nnue(c) => run_with_model::<NnueModel<F>>(features, config_dir, config, c),
+        ModelConfig::Linear => run_with_model::<LinearModel<F>>(features, config_dir, config, &()),
+        ModelConfig::Nnue{config: nnue_config} => run_with_model::<NnueModel<F>>(features, config_dir, config, nnue_config),
     }
 }
 
