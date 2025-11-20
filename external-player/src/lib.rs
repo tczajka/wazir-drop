@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 use wazir_drop::{
-    CliCommand, Color, AnyMove, Player, PlayerFactory, Position, ShortMove,
+    AnyMove, CliCommand, Color, Player, PlayerFactory, Position, ShortMove,
     clock::Timer,
     movegen,
     parser::{self, ParserExt},

@@ -1,10 +1,9 @@
 use crate::{
-    Bitboard, Color, ColoredPiece, Coord, Square,
     enums::{EnumMap, SimpleEnumExt},
     error::Invalid,
     impl_from_str_for_parsable,
     parser::{self, Parser, ParserExt},
-    zobrist,
+    zobrist, Bitboard, Color, ColoredPiece, Coord, Square,
 };
 use std::fmt::{self, Display, Formatter};
 

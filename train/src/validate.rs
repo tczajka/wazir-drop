@@ -1,10 +1,28 @@
-use std::{error::Error, fs, path::{Path, PathBuf}, time::Instant};
+use crate::{
+    config::FeaturesConfig,
+    data::{DatasetConfig, DatasetIterator},
+    linear::LinearModel,
+    model::EvalModel,
+    nnue::{self, NnueModel},
+};
 use extra::PSFeatures;
-use plotters::{backend::SVGBackend, chart::ChartBuilder, drawing::IntoDrawingArea, element::Circle, series::LineSeries, style::{BLUE, Color, WHITE},};
+use plotters::{
+    backend::SVGBackend,
+    chart::ChartBuilder,
+    drawing::IntoDrawingArea,
+    element::Circle,
+    series::LineSeries,
+    style::{BLUE, Color, WHITE},
+};
 use serde::Deserialize;
+use std::{
+    error::Error,
+    fs,
+    path::{Path, PathBuf},
+    time::Instant,
+};
 use tch::{Device, Reduction, Tensor, nn};
 use wazir_drop::{Features, WPSFeatures};
-use crate::{config::FeaturesConfig, data::{DatasetConfig, DatasetIterator}, linear::LinearModel, model::EvalModel, nnue::{self, NnueModel}};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -19,7 +37,7 @@ pub struct Config {
 #[serde(rename_all = "snake_case")]
 pub enum ModelConfig {
     Linear,
-    Nnue{config: nnue::Config},
+    Nnue { config: nnue::Config },
 }
 
 pub fn run(config_dir: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
@@ -29,10 +47,16 @@ pub fn run(config_dir: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
     }
 }
 
-fn run_with_features<F: Features>(features: F, config_dir: &Path, config: &Config) -> Result<(), Box<dyn Error>> {
+fn run_with_features<F: Features>(
+    features: F,
+    config_dir: &Path,
+    config: &Config,
+) -> Result<(), Box<dyn Error>> {
     match &config.model {
         ModelConfig::Linear => run_with_model::<LinearModel<F>>(features, config_dir, config, &()),
-        ModelConfig::Nnue{config: nnue_config} => run_with_model::<NnueModel<F>>(features, config_dir, config, nnue_config),
+        ModelConfig::Nnue {
+            config: nnue_config,
+        } => run_with_model::<NnueModel<F>>(features, config_dir, config, nnue_config),
     }
 }
 
@@ -48,7 +72,9 @@ fn run_with_model<M: EvalModel>(
     let mut model = M::new(features, vs.root(), model_config);
     vs.load(&config.weights)?;
 
-    let mut activation_stats: Vec<ActivationStats> = (0..model.num_layers() - 1).map(|_| ActivationStats::new()).collect();
+    let mut activation_stats: Vec<ActivationStats> = (0..model.num_layers() - 1)
+        .map(|_| ActivationStats::new())
+        .collect();
 
     let mut num_samples = 0;
     let mut total_loss: f64 = 0.0;
@@ -106,19 +132,23 @@ fn plot_weights(weights: &Tensor, filename: &Path) -> Result<(), Box<dyn Error>>
         .margin(5)
         .set_all_label_area_size(50)
         .caption("Weight CDF", ("sans-serif", 40))
-        .build_cartesian_2d(*weights.first().unwrap()..*weights.last().unwrap(), 0.0..1.0)?;
+        .build_cartesian_2d(
+            *weights.first().unwrap()..*weights.last().unwrap(),
+            0.0..1.0,
+        )?;
 
-    chart_context.configure_mesh()
+    chart_context
+        .configure_mesh()
         .x_labels(20)
         .y_labels(10)
         .draw()?;
 
-    let step_by = (weights.len()/10000).max(1);
+    let step_by = (weights.len() / 10000).max(1);
     _ = chart_context.draw_series(LineSeries::new(
-        (0..weights.len()).step_by(step_by).map(
-            |index| (weights[index], index as f64 / (weights.len() - 1) as f64)
-        ),
-        &BLUE
+        (0..weights.len())
+            .step_by(step_by)
+            .map(|index| (weights[index], index as f64 / (weights.len() - 1) as f64)),
+        &BLUE,
     ))?;
 
     root.present()?;
@@ -159,20 +189,24 @@ impl ActivationStats {
 
         self.mean += &delta * (n as f64 / total_samples as f64);
         self.m2 += &m2;
-        self.m2 += &delta.pow_tensor_scalar(2) * (self.num_samples as f64 * n as f64 / total_samples as f64);
+        self.m2 += &delta.pow_tensor_scalar(2)
+            * (self.num_samples as f64 * n as f64 / total_samples as f64);
         self.num_samples = total_samples;
     }
 }
 
 fn plot_activations(act_stats: &ActivationStats, filename: &Path) -> Result<(), Box<dyn Error>> {
     let means: Vec<f64> = (&act_stats.mean).try_into().unwrap();
-    let stddevs: Vec<f64> = (&act_stats.m2 / (act_stats.num_samples - 1) as f64).sqrt().try_into().unwrap();
+    let stddevs: Vec<f64> = (&act_stats.m2 / (act_stats.num_samples - 1) as f64)
+        .sqrt()
+        .try_into()
+        .unwrap();
     let mut mean_stddev: Vec<(f64, f64)> = means.into_iter().zip(stddevs).collect();
     mean_stddev.sort_by(|(m1, _), (m2, _)| m1.total_cmp(m2));
 
     let root = SVGBackend::new(filename, (1024, 768)).into_drawing_area();
     root.fill(&WHITE)?;
-    let (upper, lower) = root.split_vertically(768/2);
+    let (upper, lower) = root.split_vertically(768 / 2);
 
     let mut chart_context = ChartBuilder::on(&upper)
         .margin(5)
@@ -180,16 +214,19 @@ fn plot_activations(act_stats: &ActivationStats, filename: &Path) -> Result<(), 
         .caption("Activations", ("sans-serif", 40))
         .build_cartesian_2d(0.0..1.0, 0.0..0.5)?;
 
-    chart_context.configure_mesh()
+    chart_context
+        .configure_mesh()
         .x_labels(20)
         .x_desc("mean")
         .y_labels(10)
         .y_desc("stddev")
         .draw()?;
 
-    _ = chart_context.draw_series(mean_stddev.iter().map(
-        |&(mean, stddev)| Circle::new((mean, stddev), 2, BLUE.filled())
-        ))?;
+    _ = chart_context.draw_series(
+        mean_stddev
+            .iter()
+            .map(|&(mean, stddev)| Circle::new((mean, stddev), 2, BLUE.filled())),
+    )?;
 
     let mut chart_context = ChartBuilder::on(&lower)
         .margin(5)
@@ -197,16 +234,18 @@ fn plot_activations(act_stats: &ActivationStats, filename: &Path) -> Result<(), 
         .caption("Mean CDF", ("sans-serif", 40))
         .build_cartesian_2d(0.0..1.0, 0.0..1.0)?;
 
-    chart_context.configure_mesh()
+    chart_context
+        .configure_mesh()
         .x_labels(20)
         .y_labels(10)
         .draw()?;
 
     _ = chart_context.draw_series(LineSeries::new(
-        mean_stddev.iter().enumerate().map(
-            |(index, &(mean, _))| (mean, index as f64 / (mean_stddev.len() - 1) as f64)
-        ),
-        &BLUE
+        mean_stddev
+            .iter()
+            .enumerate()
+            .map(|(index, &(mean, _))| (mean, index as f64 / (mean_stddev.len() - 1) as f64)),
+        &BLUE,
     ))?;
 
     root.present()?;

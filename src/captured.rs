@@ -1,10 +1,9 @@
 use crate::{
-    Color, ColoredPiece, Piece, SetupMove,
     enums::{EnumMap, SimpleEnumExt},
     error::Invalid,
     impl_from_str_for_parsable,
     parser::{ParseError, Parser, ParserExt},
-    zobrist,
+    zobrist, Color, ColoredPiece, Piece, SetupMove,
 };
 use std::fmt::{self, Display, Formatter};
 

@@ -1,3 +1,7 @@
+use crate::{
+    config::FeaturesConfig,
+    data::{DatasetWriter, Sample},
+};
 use extra::{PSFeatures, moverand};
 use rand::{SeedableRng, rngs::StdRng, seq::IndexedRandom};
 use serde::Deserialize;
@@ -13,7 +17,6 @@ use wazir_drop::{
     ScoredMove, Search, Stage, WPSFeatures,
     constants::{Depth, Eval, Hyperparameters},
 };
-use crate::{config::FeaturesConfig, data::{DatasetWriter, Sample}};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -39,10 +42,7 @@ pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn run_games<F: Features>(
-    config: &Config,
-    features: F,
-) -> Result<(), Box<dyn Error>> {
+fn run_games<F: Features>(config: &Config, features: F) -> Result<(), Box<dyn Error>> {
     let writer = Arc::new(Mutex::new(DatasetWriter::new(&config.output)?));
     let evaluator = Arc::new(DefaultEvaluator::default());
     let thread_pool = ThreadPool::new(config.num_cpus);

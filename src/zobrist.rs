@@ -1,4 +1,4 @@
-use crate::{Color, ColoredPiece, NUM_CAPTURED_INDEXES, Square, captured_index, enums::EnumMap};
+use crate::{captured_index, enums::EnumMap, Color, ColoredPiece, Square, NUM_CAPTURED_INDEXES};
 
 pub fn captured(cpiece: ColoredPiece, index: usize) -> u64 {
     CAPTURED[cpiece.color()][captured_index(cpiece.piece(), index)]

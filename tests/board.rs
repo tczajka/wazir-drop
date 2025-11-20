@@ -54,21 +54,15 @@ add.w..a
 "
     );
 
-    assert!(
-        board
-            .place_piece(Square::A1, ColoredPiece::RedWazir)
-            .is_err()
-    );
-    assert!(
-        board
-            .remove_piece(Square::A1, ColoredPiece::RedWazir)
-            .is_err()
-    );
-    assert!(
-        board
-            .remove_piece(Square::B1, ColoredPiece::RedWazir)
-            .is_err()
-    );
+    assert!(board
+        .place_piece(Square::A1, ColoredPiece::RedWazir)
+        .is_err());
+    assert!(board
+        .remove_piece(Square::A1, ColoredPiece::RedWazir)
+        .is_err());
+    assert!(board
+        .remove_piece(Square::B1, ColoredPiece::RedWazir)
+        .is_err());
 }
 
 #[test]

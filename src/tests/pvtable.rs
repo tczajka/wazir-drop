@@ -1,4 +1,4 @@
-use crate::{ExtendableVariation, LongVariation, PVTable, Move, Variation};
+use crate::{ExtendableVariation, LongVariation, Move, PVTable, Variation};
 use std::str::FromStr;
 
 #[test]

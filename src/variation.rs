@@ -1,4 +1,4 @@
-use crate::{constants::MAX_VARIATION_LENGTH, smallvec::SmallVec, PVTable, Move};
+use crate::{constants::MAX_VARIATION_LENGTH, smallvec::SmallVec, Move, PVTable};
 use std::{
     fmt::{self, Display, Formatter},
     ops::Deref,

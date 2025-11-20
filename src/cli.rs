@@ -5,7 +5,7 @@ use crate::{
     log::{self, Level},
     movegen,
     parser::{self, Parser, ParserExt},
-    platform, Color, AnyMove, PlayerFactory, Position, ShortMove,
+    platform, AnyMove, Color, PlayerFactory, Position, ShortMove,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -29,7 +29,11 @@ impl CliCommand {
             .ignore_then(parser::u32())
             .map(|ms| CliCommand::TimeLimit(Duration::from_millis(ms.into())))
             .or(parser::exact(b"Opening")
-                .ignore_then(parser::exact(b" ").ignore_then(AnyMove::parser()).repeat(0..))
+                .ignore_then(
+                    parser::exact(b" ")
+                        .ignore_then(AnyMove::parser())
+                        .repeat(0..),
+                )
                 .map(CliCommand::Opening))
             .or(parser::exact(b"Start").map(|_| CliCommand::Start))
             .or(parser::exact(b"Quit").map(|_| CliCommand::Quit))

@@ -1,4 +1,4 @@
-use crate::{model::EvalModel};
+use crate::model::EvalModel;
 use serde::Deserialize;
 use tch::{
     Tensor,
@@ -154,7 +154,7 @@ impl<F: Features> EvalModel for NnueModel<F> {
             self.embedding_weights.flatten(0, -1)
         } else if layer < 1 + self.hidden.len() {
             self.hidden[layer - 1].ws.flatten(0, -1)
-        } else if layer == 1 + self.hidden.len()  {
+        } else if layer == 1 + self.hidden.len() {
             self.final_layer.ws.flatten(0, -1)
         } else {
             panic!("layer out of range");

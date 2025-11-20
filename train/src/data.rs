@@ -1,4 +1,9 @@
-use std::{error::Error, fs::File, io::{BufReader, BufWriter}, path::{Path, PathBuf}};
+use std::{
+    error::Error,
+    fs::File,
+    io::{BufReader, BufWriter},
+    path::{Path, PathBuf},
+};
 
 use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 use serde::{Deserialize, Serialize};
@@ -17,7 +22,6 @@ pub struct Sample {
     /// +1 = win, -1 = loss
     pub game_points: i32,
 }
-
 
 /// A batch of data.
 pub struct Batch {

@@ -294,7 +294,9 @@ add.w..a
         .make_any_move(AnyMove::from_str("AWNAADADAFFAADDA").unwrap())
         .is_err());
 
-    let position2 = position.make_any_move(AnyMove::from_str("A@a1").unwrap()).unwrap();
+    let position2 = position
+        .make_any_move(AnyMove::from_str("A@a1").unwrap())
+        .unwrap();
     assert_eq!(
         position2.to_string(),
         "\
@@ -312,10 +314,18 @@ add.w..a
 "
     );
 
-    assert!(position.make_any_move(AnyMove::from_str("A@a2").unwrap()).is_err());
-    assert!(position.make_any_move(AnyMove::from_str("A@b2").unwrap()).is_err());
-    assert!(position.make_any_move(AnyMove::from_str("N@a1").unwrap()).is_err());
-    assert!(position.make_any_move(AnyMove::from_str("f@a1").unwrap()).is_err());
+    assert!(position
+        .make_any_move(AnyMove::from_str("A@a2").unwrap())
+        .is_err());
+    assert!(position
+        .make_any_move(AnyMove::from_str("A@b2").unwrap())
+        .is_err());
+    assert!(position
+        .make_any_move(AnyMove::from_str("N@a1").unwrap())
+        .is_err());
+    assert!(position
+        .make_any_move(AnyMove::from_str("f@a1").unwrap())
+        .is_err());
 
     let position2 = position
         .make_any_move(AnyMove::from_str("Wa2-a3").unwrap())

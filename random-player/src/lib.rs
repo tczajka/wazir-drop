@@ -1,7 +1,7 @@
 use extra::moverand;
 use rand::{SeedableRng, rngs::StdRng};
 use std::time::Duration;
-use wazir_drop::{Color, AnyMove, Player, PlayerFactory, Position, clock::Timer};
+use wazir_drop::{AnyMove, Color, Player, PlayerFactory, Position, clock::Timer};
 
 #[derive(Debug)]
 pub struct RandomPlayerFactory;

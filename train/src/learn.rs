@@ -1,10 +1,17 @@
 use crate::{
-    config::FeaturesConfig, data::{DatasetConfig, DatasetIterator}, linear::{self, LinearModel}, model::EvalModel, nnue::{self, NnueModel}
+    config::FeaturesConfig,
+    data::{DatasetConfig, DatasetIterator},
+    linear::{self, LinearModel},
+    model::EvalModel,
+    nnue::{self, NnueModel},
 };
 use extra::PSFeatures;
 use serde::Deserialize;
 use std::{error::Error, path::PathBuf, time::Instant};
-use tch::{Device, Reduction, Tensor, nn::{self, OptimizerConfig}};
+use tch::{
+    Device, Reduction, Tensor,
+    nn::{self, OptimizerConfig},
+};
 use wazir_drop::{Features, WPSFeatures};
 
 #[derive(Debug, Deserialize)]
@@ -22,8 +29,13 @@ pub struct Config {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModelConfig {
-    Linear{learn: linear::LearnConfig},
-    Nnue{config: nnue::Config, learn: nnue::LearnConfig},
+    Linear {
+        learn: linear::LearnConfig,
+    },
+    Nnue {
+        config: nnue::Config,
+        learn: nnue::LearnConfig,
+    },
 }
 
 pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
@@ -35,8 +47,13 @@ pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
 
 fn run_with_features<F: Features>(features: F, config: &Config) -> Result<(), Box<dyn Error>> {
     match &config.model {
-        ModelConfig::Linear{learn} => run_with_model::<LinearModel<F>>(features, config, &(), learn),
-        ModelConfig::Nnue{config: nnue_config, learn} => run_with_model::<NnueModel<F>>(features, config, nnue_config, learn),
+        ModelConfig::Linear { learn } => {
+            run_with_model::<LinearModel<F>>(features, config, &(), learn)
+        }
+        ModelConfig::Nnue {
+            config: nnue_config,
+            learn,
+        } => run_with_model::<NnueModel<F>>(features, config, nnue_config, learn),
     }
 }
 

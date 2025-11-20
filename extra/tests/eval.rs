@@ -1,5 +1,5 @@
-use extra::{moverand, PSFeatures};
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use extra::{PSFeatures, moverand};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use wazir_drop::{
     EvaluatedPosition, Evaluator, Features, LinearEvaluator, Position, Stage, WPSFeatures,
 };

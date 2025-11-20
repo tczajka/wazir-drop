@@ -2,7 +2,7 @@ use rand::{
     Rng,
     seq::{IteratorRandom, SliceRandom},
 };
-use wazir_drop::{AnyMove, Color, Position, Move, SetupMove, Stage, movegen};
+use wazir_drop::{AnyMove, Color, Move, Position, SetupMove, Stage, movegen};
 
 pub fn random_setup<RNG: Rng>(color: Color, rng: &mut RNG) -> SetupMove {
     let mut mov = movegen::setup_moves(color).next().unwrap();

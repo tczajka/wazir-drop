@@ -7,10 +7,7 @@ use std::{
     io::{BufWriter, Write},
     path::Path,
 };
-use tch::{
-    IndexOp, Tensor,
-    nn,
-};
+use tch::{IndexOp, Tensor, nn};
 use wazir_drop::{
     Coord, Features, NormalizedSquare, Piece, Square, WPSFeatures, enums::SimpleEnumExt,
 };

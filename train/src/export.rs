@@ -22,7 +22,7 @@ pub struct Config {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModelConfig {
-    Linear{export: linear::ExportConfig},
+    Linear { export: linear::ExportConfig },
 }
 
 pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
@@ -37,7 +37,9 @@ where
     LinearModel<F>: Export<ExportConfig = linear::ExportConfig>,
 {
     match &config.model {
-        ModelConfig::Linear{export} => run_with_model::<LinearModel<F>>(features, config, &(), export)
+        ModelConfig::Linear { export } => {
+            run_with_model::<LinearModel<F>>(features, config, &(), export)
+        }
     }
 }
 
