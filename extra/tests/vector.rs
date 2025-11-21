@@ -1,6 +1,6 @@
 use std::array;
 
-use extra::vector::{Vector8, Vector16, Vector32, mul_add};
+use extra::vector::{Vector8, Vector16, Vector32, dot_product, mul_add};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 #[test]
@@ -83,5 +83,23 @@ fn test_mul_add() {
     let result_vec = mul_add::<_, _, _, SHIFT>(&a_vec, &b_vec, &c_vec);
     let result: [i32; 8] = (&result_vec).into();
 
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_dot_product() {
+    let mut rng = StdRng::seed_from_u64(42);
+    let a: [i8; 32] = array::from_fn(|_| rng.random_range(-127..=127));
+    let b: [i8; 32] = array::from_fn(|_| rng.random_range(0..=127));
+    let c = 12345;
+
+    let mut expected = c;
+    for x in 0..32 {
+        expected += (a[x] as i32) * (b[x] as i32);
+    }
+
+    let a_vec: Vector8<2> = (&a).into();
+    let b_vec: Vector8<2> = (&b).into();
+    let result = dot_product(&a_vec, &b_vec, c);
     assert_eq!(result, expected);
 }

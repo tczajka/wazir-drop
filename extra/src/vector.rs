@@ -1,7 +1,8 @@
 #![cfg(all(
     target_arch = "x86_64",
     target_feature = "sse2",
-    target_feature = "ssse3"
+    target_feature = "ssse3",
+    target_feature = "sse4.1"
 ))]
 
 use std::{
@@ -25,6 +26,8 @@ use std::arch::x86_64::{
     // SSSE3
     _mm_hadd_epi32,
     _mm_maddubs_epi16,
+    // SSE4.1
+    _mm_extract_epi32,
 };
 
 pub struct Vector8<const N16: usize> {
@@ -179,5 +182,26 @@ fn mul_add_4_rows<const N16: usize, const SHIFT: i32>(
         let sums03 = _mm_hadd_epi32(sums01, sums23);
         let sum = _mm_add_epi32(sums03, c);
         _mm_srai_epi32(sum, SHIFT)
+    }
+}
+
+/// a . b + c
+/// a is signed -127..=127
+/// b is unsigned 0..=127
+pub fn dot_product<const N16: usize>(a: &Vector8<N16>, b: &Vector8<N16>, c: i32) -> i32 {
+    unsafe {
+        // sum: 4 x 32
+        let mut sum = _mm_setzero_si128();
+        for (&ax, &bx) in a.data.iter().zip(&b.data) {
+            // 16-bit dot products of 2
+            let sum2 = _mm_maddubs_epi16(bx, ax);
+            // 32-bit dot products of 4
+            let sum4 = _mm_madd_epi16(sum2, _mm_set1_epi16(1));
+            sum = _mm_add_epi32(sum, sum4);
+        }
+        // Horizontally add sum
+        let sum = _mm_hadd_epi32(sum, sum);
+        let sum = _mm_hadd_epi32(sum, sum);
+        _mm_extract_epi32(sum, 0) + c
     }
 }
