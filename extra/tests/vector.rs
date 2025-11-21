@@ -1,4 +1,7 @@
-use extra::vector::{Vector8, Vector16, Vector32};
+use std::array;
+
+use extra::vector::{Vector8, Vector16, Vector32, mul_add};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 
 #[test]
 fn test_vector8_conversion() {
@@ -55,4 +58,30 @@ fn test_vector16_sub_assign() {
     vec_diff -= &vec2;
     let diff: [i16; 16] = (&vec_diff).into();
     assert_eq!(diff, diff_expected);
+}
+
+#[test]
+fn test_mul_add() {
+    let mut rng = StdRng::seed_from_u64(42);
+    let a: [[i8; 32]; 8] = array::from_fn(|_| array::from_fn(|_| rng.random_range(-127..=127)));
+    let b: [i8; 32] = array::from_fn(|_| rng.random_range(0..=127));
+    let c: [i32; 8] = array::from_fn(|_| rng.random_range(-1_000_000..=1_000_000));
+    const SHIFT: i32 = 1;
+
+    let expected: [i32; 8] = array::from_fn(|y| {
+        let mut sum: i32 = c[y];
+        for x in 0..32 {
+            sum += (a[y][x] as i32) * (b[x] as i32);
+        }
+        sum >> SHIFT
+    });
+
+    let a_vec: [Vector8<2>; 8] = a.map(|row| (&row).into());
+    let b_vec: Vector8<2> = (&b).into();
+    let c_vec: Vector32<2> = (&c).into();
+
+    let result_vec = mul_add::<_, _, _, SHIFT>(&a_vec, &b_vec, &c_vec);
+    let result: [i32; 8] = (&result_vec).into();
+
+    assert_eq!(result, expected);
 }
