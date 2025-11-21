@@ -1,6 +1,6 @@
 use std::array;
 
-use extra::vector::{Vector8, Vector16, Vector32, dot_product, mul_add};
+use extra::vector::{Vector8, Vector16, Vector32, crelu16, crelu32, dot_product, mul_add};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 #[test]
@@ -101,5 +101,37 @@ fn test_dot_product() {
     let a_vec: Vector8<2> = (&a).into();
     let b_vec: Vector8<2> = (&b).into();
     let result = dot_product(&a_vec, &b_vec, c);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_crelu16() {
+    let a = [
+        -260, -200, -100, -50, -1, 0, 1, 2, 3, 100, 127, 128, 200, 300, 400, 500, -32768, -100,
+        -200, 13, 14, 15, 100, 0, 1, 2, 3, 4, 5, 6, 7, 8,
+    ];
+    let expected = [
+        0, 0, 0, 0, 0, 0, 1, 2, 3, 100, 127, 127, 127, 127, 127, 127, 0, 0, 0, 13, 14, 15, 100, 0,
+        1, 2, 3, 4, 5, 6, 7, 8,
+    ];
+    let a_vec: Vector16<4> = (&a).into();
+    let result_vec: Vector8<2> = crelu16(&a_vec);
+    let result: [i8; 32] = (&result_vec).into();
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_crelu32() {
+    let a = [
+        -260, -200, -100, -50, -1, 0, 1, 2, 3, 100, 127, 128, 200, 300, 400, 1000000, -1000000,
+        -100, -200, 13, 14, 15, 100, 0, 1, 2, 3, 4, 5, 6, 7, 8,
+    ];
+    let expected = [
+        0, 0, 0, 0, 0, 0, 1, 2, 3, 100, 127, 127, 127, 127, 127, 127, 0, 0, 0, 13, 14, 15, 100, 0,
+        1, 2, 3, 4, 5, 6, 7, 8,
+    ];
+    let a_vec: Vector32<8> = (&a).into();
+    let result_vec: Vector8<2> = crelu32(&a_vec);
+    let result: [i8; 32] = (&result_vec).into();
     assert_eq!(result, expected);
 }

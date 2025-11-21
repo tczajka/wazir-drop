@@ -18,6 +18,8 @@ use std::arch::x86_64::{
     _mm_add_epi32,
     _mm_loadu_si128,
     _mm_madd_epi16,
+    _mm_packs_epi16,
+    _mm_packs_epi32,
     _mm_set1_epi16,
     _mm_setzero_si128,
     _mm_srai_epi32,
@@ -28,6 +30,7 @@ use std::arch::x86_64::{
     _mm_maddubs_epi16,
     // SSE4.1
     _mm_extract_epi32,
+    _mm_max_epi8,
 };
 
 pub struct Vector8<const N16: usize> {
@@ -203,5 +206,42 @@ pub fn dot_product<const N16: usize>(a: &Vector8<N16>, b: &Vector8<N16>, c: i32)
         let sum = _mm_hadd_epi32(sum, sum);
         let sum = _mm_hadd_epi32(sum, sum);
         _mm_extract_epi32(sum, 0) + c
+    }
+}
+
+// CReLU: 16 bit -> 8 bit
+pub fn crelu16<const N8: usize, const N16: usize>(a: &Vector16<N8>) -> Vector8<N16> {
+    assert_eq!(N16 * 2, N8);
+    let data = array::from_fn(|i| crelu16_16((&a.data[i * 2..(i + 1) * 2]).try_into().unwrap()));
+    Vector8 { data }
+}
+
+// 16 x 32 -> 16 x 8
+fn crelu16_16(a: &[__m128i; 2]) -> __m128i {
+    unsafe {
+        // -128 ..= 127
+        let res = _mm_packs_epi16(a[0], a[1]);
+        // 0 ..= 127
+        _mm_max_epi8(res, _mm_setzero_si128())
+    }
+}
+
+// CReLU: 32 bit -> 8 bit
+pub fn crelu32<const N4: usize, const N16: usize>(a: &Vector32<N4>) -> Vector8<N16> {
+    assert_eq!(N16 * 4, N4);
+    let data = array::from_fn(|i| crelu16_32((&a.data[i * 4..(i + 1) * 4]).try_into().unwrap()));
+    Vector8 { data }
+}
+
+// 16 x 32 -> 16 x 8
+fn crelu16_32(a: &[__m128i; 4]) -> __m128i {
+    unsafe {
+        // 32 -> 16 bit
+        let a01 = _mm_packs_epi32(a[0], a[1]);
+        let a23 = _mm_packs_epi32(a[2], a[3]);
+        // -128 ..= 127
+        let res = _mm_packs_epi16(a01, a23);
+        // 0 ..= 127
+        _mm_max_epi8(res, _mm_setzero_si128())
     }
 }
