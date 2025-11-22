@@ -15,7 +15,6 @@ fn test_base128() {
             encoder.encode_bits(8, b);
         }
         let s = encoder.finish();
-        eprintln!("base128: {s}");
 
         let mut decoder = Base128Decoder::new(&s);
         for &byte in &bytes {
@@ -24,4 +23,32 @@ fn test_base128() {
         }
         decoder.finish();
     }
+}
+
+#[test]
+fn test_varint() {
+    let numbers = [
+        i32::MIN,
+        i32::MAX,
+        -1000000,
+        -100,
+        -5,
+        -1,
+        0,
+        1,
+        5,
+        100,
+        1000000,
+    ];
+    let mut encoder = Base128Encoder::new();
+    for &n in &numbers {
+        encoder.encode_varint(n);
+    }
+    let s = encoder.finish();
+    let mut decoder = Base128Decoder::new(&s);
+    for &n in &numbers {
+        let x = decoder.decode_varint();
+        assert_eq!(x, n);
+    }
+    decoder.finish();
 }

@@ -20,6 +20,10 @@ pub static SPECIAL_MAP: [Option<u8>; 16] = [
     None,
 ];
 
+// Varints are encoded as: sign bit, BASE_BITS, extension bit, EXTENSION_BITS, extension bit, EXTENSION_BITS, ...
+pub const VARINT_BASE_BITS: u32 = 6;
+pub const VARINT_EXTENSION_BITS: u32 = 3;
+
 pub struct Base128Decoder<'a> {
     input: Chars<'a>,
     // 0..=14
@@ -49,6 +53,22 @@ impl<'a> Base128Decoder<'a> {
         self.buffered_bits >>= n;
         self.num_buffered_bits -= n;
         res
+    }
+
+    pub fn decode_varint(&mut self) -> i32 {
+        let sign = self.decode_bits(1);
+        let mut value = self.decode_bits(VARINT_BASE_BITS);
+        let mut shift = VARINT_BASE_BITS;
+        while self.decode_bits(1) != 0 {
+            let ext = self.decode_bits(VARINT_EXTENSION_BITS);
+            value |= ext << shift;
+            shift += VARINT_EXTENSION_BITS;
+        }
+        if sign != 0 {
+            -(value as i32) - 1
+        } else {
+            value as i32
+        }
     }
 
     /// Panics if the stream is not finished properly.

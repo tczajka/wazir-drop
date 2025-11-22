@@ -1,4 +1,4 @@
-use wazir_drop::base128_decoder::SPECIAL_MAP;
+use wazir_drop::base128_decoder::{SPECIAL_MAP, VARINT_BASE_BITS, VARINT_EXTENSION_BITS};
 
 /// Encodes a sequence of bits into a valid UTF-8 encoded String.
 /// n bits get converted to n/7 bytes.
@@ -36,6 +36,26 @@ impl Base128Encoder {
             self.num_buffered_bits -= 7;
             self.push_ascii(ascii);
         }
+    }
+
+    pub fn encode_varint(&mut self, n: i32) {
+        let (sign_bit, mut val) = if n < 0 {
+            (1, (-(n + 1)) as u32)
+        } else {
+            (0, n as u32)
+        };
+        self.encode_bits(1, sign_bit);
+        self.encode_bits(VARINT_BASE_BITS, val & ((1 << VARINT_BASE_BITS) - 1));
+        val >>= VARINT_BASE_BITS;
+        while val != 0 {
+            self.encode_bits(1, 1);
+            self.encode_bits(
+                VARINT_EXTENSION_BITS,
+                val & ((1 << VARINT_EXTENSION_BITS) - 1),
+            );
+            val >>= VARINT_EXTENSION_BITS;
+        }
+        self.encode_bits(1, 0);
     }
 
     pub fn finish(mut self) -> String {
