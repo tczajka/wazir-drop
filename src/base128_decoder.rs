@@ -1,5 +1,25 @@
 use std::str::Chars;
 
+/// 2-byte, 11-bit character (special << 4) + x encodes sequence SPECIAL_MAP[special], x
+pub static SPECIAL_MAP: [Option<u8>; 16] = [
+    None,       // Can't use 0 because that would be overlong encoding.
+    None,       // Avoid 1 to skip control codes U+80..U+A0.
+    Some(0),    // NUL
+    Some(8),    // Backspace
+    Some(9),    // Tab
+    Some(10),   // LF
+    Some(11),   // VT
+    Some(12),   // FF
+    Some(13),   // CR
+    Some(27),   // ESC
+    Some(b'"'), // Quotation mark
+    None,
+    None, // Avoid 12 to skip U+61C ARABIC LETTER MARK that causes right-to-left issues.
+    None,
+    None,
+    None,
+];
+
 pub struct Base128Decoder<'a> {
     input: Chars<'a>,
     // 0..=14
@@ -45,24 +65,13 @@ impl<'a> Base128Decoder<'a> {
         let special = c >> 7;
         if special == 0 {
             (7, bits)
-        } else {
-            let special = u32::from(Self::decode_special(special));
+        } else if special < 16 {
+            let special = SPECIAL_MAP[usize::try_from(special).unwrap()];
+            let special = special.expect("Invalid special base128 code");
+            let special = u32::from(special);
             (14, special | bits << 7)
-        }
-    }
-
-    fn decode_special(special: u32) -> u8 {
-        match special {
-            2 => 0,
-            3 => 8,
-            4 => 9,
-            5 => 10,
-            6 => 11,
-            7 => 12,
-            8 => 13,
-            9 => 27,
-            10 => b'"',
-            _ => panic!("Invalid base128 character"),
+        } else {
+            panic!("Invalid base128 character");
         }
     }
 }

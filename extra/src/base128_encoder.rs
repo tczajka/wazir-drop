@@ -1,3 +1,5 @@
+use wazir_drop::base128_decoder::SPECIAL_MAP;
+
 /// Encodes a sequence of bits into a valid UTF-8 encoded String.
 /// n bits get converted to n/7 bytes.
 pub struct Base128Encoder {
@@ -64,20 +66,10 @@ impl Base128Encoder {
     }
 
     fn ascii_to_special(ascii: u8) -> Option<u32> {
-        // Special must be in 1..16.
-        // Avoid 1 to skip control codes U+80..U+A0.
-        // Avoid 12 to skip U+61C arabic letter
-        match ascii {
-            0 => Some(2),
-            8 => Some(3),     // backspace
-            9 => Some(4),     // horizontal tab
-            10 => Some(5),    // line feed
-            11 => Some(6),    // vertical tab
-            12 => Some(7),    // form feed
-            13 => Some(8),    // carriage return
-            27 => Some(9),    // escape
-            b'"' => Some(10), // quote
-            _ => None,
-        }
+        SPECIAL_MAP
+            .iter()
+            .enumerate()
+            .find(|&(_, &a)| a == Some(ascii))
+            .map(|(i, _)| i.try_into().unwrap())
     }
 }
