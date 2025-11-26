@@ -19,3 +19,4 @@ outcome_weight = 1.0
 embedding_size = 64
 hidden_sizes = []
 hidden_weight_bits = 6
+value_scale = 10000

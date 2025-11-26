@@ -12,6 +12,7 @@ pub struct Config {
     embedding_size: i64,
     hidden_sizes: Vec<i64>,
     hidden_weight_bits: u32,
+    value_scale: f64,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -29,6 +30,7 @@ pub struct NnueModel<F: Features> {
     hidden: Vec<nn::Linear>,
     final_layer: nn::Linear,
     max_hidden_weight: f64,
+    max_last_layer_weight: f64,
     activations: Vec<Tensor>,
 }
 
@@ -89,6 +91,7 @@ impl<F: Features> EvalModel for NnueModel<F> {
         );
 
         let max_hidden_weight = 127.0 / (1u32 << config.hidden_weight_bits) as f64;
+        let max_last_layer_weight = 127.0 * 127.0 / config.value_scale;
 
         Self {
             _features: features,
@@ -98,6 +101,7 @@ impl<F: Features> EvalModel for NnueModel<F> {
             hidden,
             final_layer,
             max_hidden_weight,
+            max_last_layer_weight,
             activations: Vec::new(),
         }
     }
@@ -143,6 +147,11 @@ impl<F: Features> EvalModel for NnueModel<F> {
                 .ws
                 .clamp_(-self.max_hidden_weight, self.max_hidden_weight);
         }
+
+        _ = self
+            .final_layer
+            .ws
+            .clamp_(-self.max_last_layer_weight, self.max_last_layer_weight);
     }
 
     fn num_layers(&self) -> usize {
