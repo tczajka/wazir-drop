@@ -70,8 +70,8 @@ fn test_mul_add() {
 
     let expected: [i32; 8] = array::from_fn(|y| {
         let mut sum: i32 = c[y];
-        for x in 0..32 {
-            sum += (a[y][x] as i32) * (b[x] as i32);
+        for (&ax, &bx) in a[y].iter().zip(b.iter()) {
+            sum += ax as i32 * bx as i32;
         }
         sum >> SHIFT
     });

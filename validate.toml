@@ -2,21 +2,20 @@ log = "logs/validate.log"
 
 [[command]]
 type = "validate"
-weights = "data/linear.weights"
+weights = "data/nnue.weights"
 graph_dir = "data"
 
 [command.dataset]
-file = "data/train.data"
+file = "data/test.data"
 features = "WPS"
 value_scale = 1000
 chunk_size = 4194304
 batch_size = 8192
 outcome_weight = 1.0
 
-[command.model.linear]
+# [command.model.linear]
 
-#[command.model.nnue]
-#max_embedding = 1
-#embedding_size = 64
-#hidden_sizes = [16]
-#hidden_weight_bits = 6
+[command.model.nnue.config]
+embedding_size = 64
+hidden_sizes = []
+hidden_weight_bits = 6
