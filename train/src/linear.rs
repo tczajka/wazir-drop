@@ -136,9 +136,13 @@ impl Export for LinearModel<WPSFeatures> {
 
     fn export(&self, output: &Path, export_config: &ExportConfig) -> Result<(), Box<dyn Error>> {
         let _guard = tch::no_grad_guard();
-        let max_abs = self.weights.max().max_other(&self.to_move.abs().max());
+        let max_abs = self
+            .weights
+            .abs()
+            .max()
+            .max_other(&self.to_move.abs().max());
         let max_abs = f32::try_from(max_abs).unwrap();
-        println!("max |weight| = {max_abs:.6}");
+        log::info!("max |weight| = {max_abs:.6}");
         let mut f = BufWriter::new(File::create(output)?);
         let to_move = (export_config.value_scale * &self.to_move).round();
         let to_move: i16 = to_move.try_into().expect("out of range");

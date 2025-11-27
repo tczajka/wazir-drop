@@ -8,6 +8,7 @@ use crate::{
     config::FeaturesConfig,
     linear::{self, LinearModel},
     model::{EvalModel, Export},
+    nnue::{self, NnueModel},
 };
 
 #[derive(Debug, Deserialize)]
@@ -23,6 +24,7 @@ pub struct Config {
 #[serde(rename_all = "snake_case")]
 pub enum ModelConfig {
     Linear { export: linear::ExportConfig },
+    Nnue { config: nnue::Config },
 }
 
 pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
@@ -40,6 +42,9 @@ where
         ModelConfig::Linear { export } => {
             run_with_model::<LinearModel<F>>(features, config, &(), export)
         }
+        ModelConfig::Nnue {
+            config: model_config,
+        } => run_with_model::<NnueModel<F>>(features, config, model_config, &()),
     }
 }
 

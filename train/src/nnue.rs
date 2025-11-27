@@ -1,4 +1,12 @@
-use crate::model::EvalModel;
+use std::{
+    error::Error,
+    fs::File,
+    io::{BufWriter, Write},
+    path::Path,
+};
+
+use crate::model::{EvalModel, Export};
+use extra::base128_encoder::Base128Encoder;
 use serde::Deserialize;
 use tch::{
     Tensor,
@@ -32,6 +40,18 @@ pub struct NnueModel<F: Features> {
     max_hidden_weight: f64,
     max_last_layer_weight: f64,
     activations: Vec<Tensor>,
+}
+
+impl<F: Features> NnueModel<F> {
+    fn encode_tensor(&self, encoder: &mut Base128Encoder, tensor: &Tensor, multiplier: f64) {
+        let weights = tensor.flatten(0, -1) * multiplier;
+        let max: f64 = weights.abs().max().try_into().unwrap();
+        log::info!("max scaled |weight| = {max:.1}");
+        let weights: Vec<i32> = weights.round().try_into().expect("out of range");
+        for &w in &weights {
+            encoder.encode_varint(w);
+        }
+    }
 }
 
 impl<F: Features> EvalModel for NnueModel<F> {
@@ -172,5 +192,63 @@ impl<F: Features> EvalModel for NnueModel<F> {
 
     fn activations(&self, layer: usize) -> Tensor {
         self.activations[layer].shallow_clone()
+    }
+}
+
+impl<F: Features> Export for NnueModel<F> {
+    type ExportConfig = ();
+
+    fn export(&self, output: &Path, _export_config: &()) -> Result<(), Box<dyn Error>> {
+        let _guard = tch::no_grad_guard();
+
+        let mut f = BufWriter::new(File::create(output)?);
+        writeln!(
+            f,
+            "pub const EMBEDDING_SIZE: usize = {};",
+            self.config.embedding_size
+        )?;
+        write!(f, "pub const HIDDEN_SIZES: [usize; 2] = [")?;
+        for i in 0..2 {
+            let size = self.config.hidden_sizes.get(i).copied().unwrap_or(0);
+            write!(f, "{size}")?;
+            if i < 1 {
+                write!(f, ", ")?;
+            }
+        }
+        writeln!(f, "];")?;
+        writeln!(
+            f,
+            "pub const HIDDEN_WEIGHT_BITS: u32 = {};",
+            self.config.hidden_weight_bits
+        )?;
+        let mut encoder = Base128Encoder::new();
+        self.encode_tensor(&mut encoder, &self.embedding_weights, 127.0);
+        self.encode_tensor(&mut encoder, &self.embedding_bias, 127.0);
+        let weight_multiplier = f64::from(1u32 << self.config.hidden_weight_bits);
+        for hidden in &self.hidden {
+            self.encode_tensor(&mut encoder, &hidden.ws, weight_multiplier);
+            self.encode_tensor(
+                &mut encoder,
+                hidden.bs.as_ref().unwrap(),
+                127.0 * weight_multiplier,
+            );
+        }
+        self.encode_tensor(
+            &mut encoder,
+            &self.final_layer.ws,
+            self.config.value_scale / 127.0,
+        );
+        self.encode_tensor(
+            &mut encoder,
+            self.final_layer.bs.as_ref().unwrap(),
+            self.config.value_scale,
+        );
+        let weights_str = encoder.finish();
+        writeln!(f, "pub const WEIGHTS: &str = r\"{weights_str}\";")?;
+
+        log::info!("Encoded weights in {} bytes", weights_str.len());
+        log::info!("Exported NNUE to file {}", output.display());
+
+        Ok(())
     }
 }
