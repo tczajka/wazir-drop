@@ -21,8 +21,8 @@ pub static SPECIAL_MAP: [Option<u8>; 16] = [
 ];
 
 // Varints are encoded as: sign bit, BASE_BITS, extension bit, EXTENSION_BITS, extension bit, EXTENSION_BITS, ...
-pub const VARINT_BASE_BITS: u32 = 6;
-pub const VARINT_EXTENSION_BITS: u32 = 3;
+pub const VARINT_BASE_BITS: u32 = 5;
+pub const VARINT_EXTENSION_BITS: u32 = 2;
 
 pub struct Base128Decoder<'a> {
     input: Chars<'a>,
