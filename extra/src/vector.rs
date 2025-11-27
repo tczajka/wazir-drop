@@ -33,14 +33,17 @@ use std::arch::x86_64::{
     _mm_max_epi8,
 };
 
+#[derive(Copy, Clone)]
 pub struct Vector8<const N16: usize> {
     data: [__m128i; N16],
 }
 
+#[derive(Copy, Clone)]
 pub struct Vector16<const N8: usize> {
     data: [__m128i; N8],
 }
 
+#[derive(Copy, Clone)]
 pub struct Vector32<const N4: usize> {
     data: [__m128i; N4],
 }
