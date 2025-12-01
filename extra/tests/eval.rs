@@ -1,4 +1,4 @@
-use extra::{PSFeatures, moverand};
+use extra::{PSFeatures, default_linear_ps_features, moverand};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use wazir_drop::{
     EvaluatedPosition, Evaluator, Features, LinearEvaluator, Position, Stage, WPSFeatures,
@@ -30,4 +30,10 @@ fn test_evaluator<E: Evaluator>(evaluator: &E, rng: &mut StdRng) {
             assert_eq!(value, fresh_value);
         }
     }
+}
+
+#[test]
+fn test_instantiate_evaluators() {
+    _ = LinearEvaluator::<WPSFeatures>::default();
+    _ = default_linear_ps_features();
 }
