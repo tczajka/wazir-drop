@@ -1,3 +1,4 @@
+pub const SCALE: f32 = 10000.0;
 pub const EMBEDDING_SIZE: usize = 64;
 pub const HIDDEN_SIZES: [usize; 2] = [0, 0];
 pub const HIDDEN_WEIGHT_BITS: u32 = 6;

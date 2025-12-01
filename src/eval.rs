@@ -12,6 +12,7 @@ pub trait Evaluator {
     fn add_feature(&self, accumulator: &mut Self::Accumulator, feature: usize);
     fn remove_feature(&self, accumulator: &mut Self::Accumulator, feature: usize);
     fn evaluate(&self, accumulators: &EnumMap<Color, Self::Accumulator>, to_move: Color) -> Eval;
+    fn scale(&self) -> f32;
 }
 
 #[derive(Debug, Clone)]

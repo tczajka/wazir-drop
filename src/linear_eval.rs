@@ -5,15 +5,17 @@ pub struct LinearEvaluator<F> {
     features: F,
     to_move_weight: i16,
     feature_weights: Vec<i16>,
+    scale: f32,
 }
 
 impl<F: Features> LinearEvaluator<F> {
-    pub fn new(features: F, to_move_weight: i16, feature_weights: &[i16]) -> Self {
+    pub fn new(features: F, to_move_weight: i16, feature_weights: &[i16], scale: f32) -> Self {
         assert_eq!(feature_weights.len(), features.count());
         Self {
             features,
             to_move_weight,
             feature_weights: feature_weights.to_vec(),
+            scale,
         }
     }
 }
@@ -40,5 +42,9 @@ impl<F: Features> Evaluator for LinearEvaluator<F> {
 
     fn evaluate(&self, accumulators: &EnumMap<Color, Self::Accumulator>, to_move: Color) -> Eval {
         accumulators[to_move] - accumulators[to_move.opposite()] + Eval::from(self.to_move_weight)
+    }
+
+    fn scale(&self) -> f32 {
+        self.scale
     }
 }

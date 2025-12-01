@@ -1,24 +1,20 @@
+use crate::config::FeaturesConfig;
+use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
+use serde::{Deserialize, Serialize};
 use std::{
     error::Error,
     fs::File,
     io::{BufReader, BufWriter},
     path::{Path, PathBuf},
 };
-
-use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
-use serde::{Deserialize, Serialize};
 use tch::{Device, Kind, Tensor};
-use wazir_drop::constants::Eval;
-
-use crate::config::FeaturesConfig;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Sample {
     /// [to move, other]
     pub features: [Vec<u16>; 2],
-    /// Value from deeper search.
-    // Eval::MAX is win, -Eval::MAX is loss
-    pub deep_value: Eval,
+    /// Value from deeper search, logit.
+    pub deep_value: f32,
     /// +1 = win, -1 = loss
     pub game_points: i32,
 }
@@ -39,7 +35,6 @@ pub struct Batch {
 pub struct DatasetConfig {
     file: PathBuf,
     pub features: FeaturesConfig,
-    value_scale: f32,
     chunk_size: usize,
     batch_size: usize,
     outcome_weight: f32,
@@ -55,7 +50,7 @@ impl Batch {
         }
     }
 
-    fn from_samples(samples: &[Sample], input_value_scale: f32, outcome_weight: f32) -> Self {
+    fn from_samples(samples: &[Sample], outcome_weight: f32) -> Self {
         let mut features = Vec::new();
         let mut offsets = Vec::with_capacity(samples.len() * 2);
         let mut values = Vec::with_capacity(samples.len());
@@ -72,9 +67,7 @@ impl Batch {
         let offsets = Tensor::from_slice(&offsets)
             .reshape([-1, 2])
             .to_kind(Kind::Int64);
-        let values = (1.0 / input_value_scale * Tensor::from_slice(&values).to_kind(Kind::Float))
-            .sigmoid()
-            .to_kind(Kind::Float);
+        let values = Tensor::from_slice(&values).sigmoid();
         let outcomes = 0.5
             + 0.5
                 * Tensor::from_slice(&outcomes)
@@ -93,7 +86,6 @@ impl Batch {
 pub struct DatasetIterator {
     reader: BufReader<File>,
     buffer: Vec<u8>,
-    input_value_scale: f32,
     outcome_weight: f32,
     chunk_size: usize,
     batch_size: usize,
@@ -108,7 +100,6 @@ impl DatasetIterator {
         Ok(Self {
             reader,
             buffer: vec![0; 1 << 10],
-            input_value_scale: config.value_scale,
             outcome_weight: config.outcome_weight,
             chunk_size: config.chunk_size,
             batch_size: config.batch_size,
@@ -129,11 +120,7 @@ impl DatasetIterator {
             (self.current_chunk_index + self.batch_size).min(self.current_chunk.len());
         let samples = &self.current_chunk[self.current_chunk_index..next_chunk_index];
         self.current_chunk_index = next_chunk_index;
-        Ok(Some(Batch::from_samples(
-            samples,
-            self.input_value_scale,
-            self.outcome_weight,
-        )))
+        Ok(Some(Batch::from_samples(samples, self.outcome_weight)))
     }
 
     fn refill_chunk(&mut self) -> Result<(), Box<dyn Error>> {

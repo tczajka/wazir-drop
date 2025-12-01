@@ -8,7 +8,6 @@ graph_dir = "data"
 [command.dataset]
 file = "data/test.data"
 features = "WPS"
-value_scale = 1000
 chunk_size = 4194304
 batch_size = 8192
 outcome_weight = 1.0

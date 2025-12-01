@@ -1,7 +1,17 @@
-use crate::{nnue_wps_weights::EMBEDDING_SIZE, vector::Vector16};
+use crate::{
+    nnue_wps_weights::{self, EMBEDDING_SIZE},
+    vector::Vector16,
+};
 use wazir_drop::{Color, Evaluator, WPSFeatures, constants::Eval, enums::EnumMap};
 
-type EmbeddingVector = Vector16<{ EMBEDDING_SIZE / 8 }>;
+const fn exact_div(a: usize, b: usize) -> usize {
+    if a % b != 0 {
+        panic!("exact_div");
+    }
+    a / b
+}
+
+type EmbeddingVector = Vector16<{ exact_div(EMBEDDING_SIZE, 8) }>;
 
 pub struct Nnue {
     embedding_weights: Vec<EmbeddingVector>,
@@ -42,5 +52,9 @@ impl Evaluator for Nnue {
 
     fn evaluate(&self, accumulators: &EnumMap<Color, Self::Accumulator>, to_move: Color) -> Eval {
         todo!()
+    }
+
+    fn scale(&self) -> f32 {
+        nnue_wps_weights::SCALE
     }
 }

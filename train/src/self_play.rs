@@ -13,8 +13,8 @@ use std::{
 };
 use threadpool::ThreadPool;
 use wazir_drop::{
-    DefaultEvaluator, Features, LongVariation, Move, Outcome, Position, Score, ScoreExpanded,
-    ScoredMove, Search, Stage, WPSFeatures,
+    DefaultEvaluator, Evaluator, Features, LongVariation, Move, Outcome, Position, Score,
+    ScoreExpanded, ScoredMove, Search, Stage, WPSFeatures,
     constants::{Depth, Eval, Hyperparameters},
 };
 
@@ -185,9 +185,9 @@ fn play_game<F: Features>(
                 .collect()
         });
         let deep_value = match entry.deep_score.into() {
-            ScoreExpanded::Win(_) => Eval::MAX,
-            ScoreExpanded::Eval(eval) => eval,
-            ScoreExpanded::Loss(_) => -Eval::MAX,
+            ScoreExpanded::Win(_) => f32::INFINITY,
+            ScoreExpanded::Eval(eval) => eval as f32 / evaluator.scale(),
+            ScoreExpanded::Loss(_) => -f32::INFINITY,
         };
         let game_points = outcome.points(to_move);
         let sample = Sample {

@@ -98,6 +98,11 @@ impl Export for LinearModel<PSFeatures> {
         let mut f = BufWriter::new(File::create(output)?);
         let to_move = (export_config.value_scale * &self.to_move).round();
         let to_move: i16 = to_move.try_into().expect("out of range");
+        writeln!(
+            f,
+            "pub static SCALE: f32 = {scale:.1};",
+            scale = export_config.value_scale
+        )?;
         writeln!(f, "pub static TO_MOVE: i16 = {to_move};")?;
         writeln!(f)?;
         let weights = (export_config.value_scale * &self.weights).round();
@@ -146,6 +151,11 @@ impl Export for LinearModel<WPSFeatures> {
         let mut f = BufWriter::new(File::create(output)?);
         let to_move = (export_config.value_scale * &self.to_move).round();
         let to_move: i16 = to_move.try_into().expect("out of range");
+        writeln!(
+            f,
+            "pub static SCALE: f32 = {scale:.1};",
+            scale = export_config.value_scale
+        )?;
         writeln!(f, "pub static TO_MOVE: i16 = {to_move};")?;
         writeln!(f)?;
         let weights = (export_config.value_scale * &self.weights).round();

@@ -187,6 +187,7 @@ impl Default for LinearEvaluator<WPSFeatures> {
             WPSFeatures,
             linear_wps_weights::TO_MOVE,
             &linear_wps_weights::FEATURES,
+            linear_wps_weights::SCALE,
         )
     }
 }

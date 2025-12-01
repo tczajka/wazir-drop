@@ -113,5 +113,6 @@ pub fn default_linear_ps_features() -> LinearEvaluator<PSFeatures> {
         PSFeatures,
         linear_ps_weights::TO_MOVE,
         &linear_ps_weights::FEATURES,
+        linear_ps_weights::SCALE,
     )
 }

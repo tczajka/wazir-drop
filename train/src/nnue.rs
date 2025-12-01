@@ -204,6 +204,11 @@ impl<F: Features> Export for NnueModel<F> {
         let mut f = BufWriter::new(File::create(output)?);
         writeln!(
             f,
+            "pub const SCALE: f32 = {scale:.1};",
+            scale = self.config.value_scale
+        )?;
+        writeln!(
+            f,
             "pub const EMBEDDING_SIZE: usize = {};",
             self.config.embedding_size
         )?;

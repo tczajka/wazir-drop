@@ -14,7 +14,7 @@ fn test_linear_evaluator<F: Features>(features: F) {
     let mut rng = StdRng::from_os_rng();
     let to_move_weight = rng.random();
     let feature_weights: Vec<i16> = (0..features.count()).map(|_| rng.random()).collect();
-    let evaluator = LinearEvaluator::new(features, to_move_weight, &feature_weights);
+    let evaluator = LinearEvaluator::new(features, to_move_weight, &feature_weights, 1000.0);
     test_evaluator(&evaluator, &mut rng);
 }
 
