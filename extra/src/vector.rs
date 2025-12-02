@@ -248,3 +248,12 @@ fn crelu16_32(a: &[__m128i; 4]) -> __m128i {
         _mm_max_epi8(res, _mm_setzero_si128())
     }
 }
+
+pub fn vector_concat<const A16: usize, const B16: usize, const C16: usize>(
+    a: &Vector8<A16>,
+    b: &Vector8<B16>,
+) -> Vector8<C16> {
+    assert_eq!(A16 + B16, C16);
+    let data = array::from_fn(|i| if i < A16 { a.data[i] } else { b.data[i - A16] });
+    Vector8 { data }
+}

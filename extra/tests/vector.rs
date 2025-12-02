@@ -1,6 +1,8 @@
 use std::array;
 
-use extra::vector::{Vector8, Vector16, Vector32, crelu16, crelu32, dot_product, mul_add};
+use extra::vector::{
+    Vector8, Vector16, Vector32, crelu16, crelu32, dot_product, mul_add, vector_concat,
+};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 #[test]
@@ -132,6 +134,24 @@ fn test_crelu32() {
     ];
     let a_vec: Vector32<8> = (&a).into();
     let result_vec: Vector8<2> = crelu32(&a_vec);
+    let result: [i8; 32] = (&result_vec).into();
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_vector_concat() {
+    let a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+    let b = [
+        17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+    ];
+    let expected = [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+        26, 27, 28, 29, 30, 31, 32,
+    ];
+
+    let a_vec: Vector8<1> = (&a).into();
+    let b_vec: Vector8<1> = (&b).into();
+    let result_vec: Vector8<2> = vector_concat(&a_vec, &b_vec);
     let result: [i8; 32] = (&result_vec).into();
     assert_eq!(result, expected);
 }

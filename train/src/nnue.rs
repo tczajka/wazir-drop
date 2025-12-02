@@ -212,13 +212,13 @@ impl<F: Features> Export for NnueModel<F> {
             "pub const EMBEDDING_SIZE: usize = {};",
             self.config.embedding_size
         )?;
-        write!(f, "pub const HIDDEN_SIZES: [usize; 2] = [")?;
-        for i in 0..2 {
-            let size = self.config.hidden_sizes.get(i).copied().unwrap_or(0);
-            write!(f, "{size}")?;
-            if i < 1 {
-                write!(f, ", ")?;
-            }
+        write!(
+            f,
+            "pub const HIDDEN_SIZES: [usize; {}] = [",
+            self.config.hidden_sizes.len()
+        )?;
+        for &size in &self.config.hidden_sizes {
+            write!(f, "{size}, ")?;
         }
         writeln!(f, "];")?;
         writeln!(
