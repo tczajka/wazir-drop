@@ -30,7 +30,7 @@ pub struct Config {
     depth: Depth,
     extra_depth: Depth,
     temperature: f64,
-    temperature_cutoff: Eval,
+    temperature_cutoff: f64,
     features: FeaturesConfig,
 }
 
@@ -136,7 +136,7 @@ fn play_game<F: Features>(
                     &position,
                     Some(config.depth),
                     None, /* deadline */
-                    Some(config.temperature_cutoff),
+                    Some((config.temperature_cutoff * evaluator.scale() as f64) as Eval),
                 );
                 assert!(!result.top_moves.is_empty());
                 match calc_deep_score(
@@ -163,7 +163,11 @@ fn play_game<F: Features>(
                         stats.invalid_pv += 1;
                     }
                 }
-                let (entropy, mov) = select_move(&result.top_moves, &mut rng, config.temperature);
+                let (entropy, mov) = select_move(
+                    &result.top_moves,
+                    &mut rng,
+                    config.temperature * evaluator.scale() as f64,
+                );
                 stats.entropy += entropy;
                 stats.moves += 1;
                 position = position.make_move(mov).unwrap();
@@ -245,7 +249,7 @@ fn calc_deep_score(
 }
 
 // Returns (entropy, move).
-fn select_move(moves: &[ScoredMove], rng: &mut StdRng, temperature: f64) -> (f64, Move) {
+fn select_move(moves: &[ScoredMove], rng: &mut StdRng, eval_temperature: f64) -> (f64, Move) {
     let ScoreExpanded::Eval(top_eval) = moves[0].score.into() else {
         return (0.0, moves[0].mov);
     };
@@ -254,7 +258,7 @@ fn select_move(moves: &[ScoredMove], rng: &mut StdRng, temperature: f64) -> (f64
             return f64::NEG_INFINITY;
         };
         let rel = eval - top_eval;
-        rel as f64 / temperature
+        rel as f64 / eval_temperature
     };
     let sum_weights: f64 = moves.iter().map(|m| log_weight(m).exp()).sum();
     let log_sum_weights = sum_weights.ln();
