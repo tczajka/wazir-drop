@@ -22,7 +22,7 @@ mod main_player;
 pub mod movegen;
 mod moves;
 mod nnue;
-mod nnue_wps_weights;
+mod nnue_weights;
 mod piece;
 mod player;
 mod position;
