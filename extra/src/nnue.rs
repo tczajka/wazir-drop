@@ -68,10 +68,10 @@ impl Nnue {
         }
     }
 
-    fn decode_vector8<const N: usize, const N8: usize>(
+    fn decode_vector8<const N: usize, const N16: usize>(
         decoder: &mut Base128Decoder,
-    ) -> Vector8<N8> {
-        assert_eq!(N, 8 * N8);
+    ) -> Vector8<N16> {
+        assert_eq!(N, 16 * N16);
         let arr: [i8; N] = array::from_fn(|_| decoder.decode_varint().try_into().unwrap());
         (&arr).into()
     }
