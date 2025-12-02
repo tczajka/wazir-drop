@@ -18,7 +18,7 @@ outcome_weight = 1.0
 #max_weight = 3.0
 
 [command.model.nnue.config]
-embedding_size = 64
+embedding_size = 16
 hidden_sizes = []
 hidden_weight_bits = 6
 value_scale = 10000
