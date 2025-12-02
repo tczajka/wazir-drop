@@ -146,7 +146,7 @@ pub fn mul_add<const M: usize, const M4: usize, const N16: usize, const SHIFT: i
     assert_eq!(M4 * 4, M);
 
     let data = array::from_fn(|y4| {
-        mul_add_4_rows::<_, SHIFT>(
+        mul_add_4_rows::<N16, SHIFT>(
             (&a[y4 * 4..(y4 + 1) * 4]).try_into().unwrap(),
             b,
             c.data[y4],

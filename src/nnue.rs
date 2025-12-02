@@ -36,18 +36,26 @@ impl Nnue {
         let features = WPSFeatures;
         let mut decoder = Base128Decoder::new(WEIGHTS);
         let embedding_weights = (0..features.count())
-            .map(|_| Self::decode_vector16::<EMBEDDING_SIZE, _>(&mut decoder))
+            .map(|_| {
+                Self::decode_vector16::<EMBEDDING_SIZE, { exact_div(EMBEDDING_SIZE, 8) }>(
+                    &mut decoder,
+                )
+            })
             .collect();
-        let embedding_bias = Self::decode_vector16::<EMBEDDING_SIZE, _>(&mut decoder);
+        let embedding_bias =
+            Self::decode_vector16::<EMBEDDING_SIZE, { exact_div(EMBEDDING_SIZE, 8) }>(&mut decoder);
         /*
         let hidden_0_weights =
-            array::from_fn(|_| Self::decode_vector8::<{ 2 * EMBEDDING_SIZE }, _>(&mut decoder));
-        let hidden_0_bias = Self::decode_vector32::<{ HIDDEN_SIZES[0] }, _>(&mut decoder);
+            array::from_fn(|_| Self::decode_vector8::<{ 2 * EMBEDDING_SIZE }, { exact_div(2 * EMBEDDING_SIZE, 16) }>(&mut decoder));
+        let hidden_0_bias = Self::decode_vector32::<{ HIDDEN_SIZES[0] }, { exact_div(HIDDEN_SIZES[0], 4) }>(&mut decoder);
         let hidden_1_weights =
-            array::from_fn(|_| Self::decode_vector8::<{ HIDDEN_SIZES[0] }, _>(&mut decoder));
-        let hidden_1_bias = Self::decode_vector32::<{ HIDDEN_SIZES[1] }, _>(&mut decoder);
+            array::from_fn(|_| Self::decode_vector8::<{ HIDDEN_SIZES[0] }, { exact_div(HIDDEN_SIZES[0], 16) }>(&mut decoder));
+        let hidden_1_bias = Self::decode_vector32::<{ HIDDEN_SIZES[1] }, { exact_div(HIDDEN_SIZES[1], 16) }>(&mut decoder);
         */
-        let final_layer_weights = Self::decode_vector8::<{ 2 * EMBEDDING_SIZE }, _>(&mut decoder);
+        let final_layer_weights = Self::decode_vector8::<
+            { 2 * EMBEDDING_SIZE },
+            { exact_div(2 * EMBEDDING_SIZE, 16) },
+        >(&mut decoder);
         let final_layer_bias = decoder.decode_varint();
 
         decoder.finish();
