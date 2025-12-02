@@ -1,7 +1,6 @@
 use crate::{
-    captured_index, enums::SimpleEnumExt, linear_wps_weights, smallvec::SmallVec, Color, Features,
-    LinearEvaluator, Move, NormalizedSquare, Piece, Position, SetupMove, Square, Symmetry,
-    NUM_CAPTURED_INDEXES,
+    captured_index, enums::SimpleEnumExt, smallvec::SmallVec, Color, Features, Move,
+    NormalizedSquare, Piece, Position, SetupMove, Square, Symmetry, NUM_CAPTURED_INDEXES,
 };
 use std::iter;
 
@@ -178,16 +177,5 @@ impl Features for WPSFeatures {
             }
         }
         Some((added.into_iter(), removed.into_iter()))
-    }
-}
-
-impl Default for LinearEvaluator<WPSFeatures> {
-    fn default() -> Self {
-        Self::new(
-            WPSFeatures,
-            linear_wps_weights::TO_MOVE,
-            &linear_wps_weights::FEATURES,
-            linear_wps_weights::SCALE,
-        )
     }
 }

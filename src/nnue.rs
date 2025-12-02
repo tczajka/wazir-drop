@@ -1,12 +1,12 @@
 use std::array;
 
 use crate::{
-    nnue_wps_weights::{EMBEDDING_SIZE, HIDDEN_SIZES, SCALE, WEIGHTS},
-    vector::{Vector8, Vector16, Vector32, crelu16, crelu32, dot_product, mul_add, vector_concat},
+    base128_decoder::Base128Decoder, constants::Eval, enums::EnumMap, Color, Evaluator, Features,
+    WPSFeatures,
 };
-use wazir_drop::{
-    Color, Evaluator, Features, WPSFeatures, base128_decoder::Base128Decoder, constants::Eval,
-    enums::EnumMap,
+use crate::{
+    nnue_wps_weights::{EMBEDDING_SIZE, HIDDEN_SIZES, SCALE, WEIGHTS},
+    vector::{crelu16, crelu32, dot_product, mul_add, vector_concat, Vector16, Vector32, Vector8},
 };
 
 const fn exact_div(a: usize, b: usize) -> usize {

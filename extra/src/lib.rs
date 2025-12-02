@@ -1,10 +1,9 @@
 pub mod base128_encoder;
+mod linear_eval;
 mod linear_ps_weights;
+mod linear_wps_weights;
 pub mod moverand;
-mod nnue;
-mod nnue_wps_weights;
 mod ps_features;
-pub mod vector;
 
-pub use nnue::Nnue;
-pub use ps_features::{PSFeatures, default_linear_ps_features};
+pub use linear_eval::LinearEvaluator;
+pub use ps_features::PSFeatures;

@@ -1,11 +1,11 @@
-use extra::{Nnue, default_linear_ps_features, moverand};
+use extra::{LinearEvaluator, PSFeatures, moverand};
 use rand::{SeedableRng, rngs::StdRng};
-use wazir_drop::{EvaluatedPosition, Evaluator, LinearEvaluator, Position, Stage, WPSFeatures};
+use wazir_drop::{EvaluatedPosition, Evaluator, Nnue, Position, Stage, WPSFeatures};
 
 #[test]
 fn test_evaluators() {
     test_evaluator(&LinearEvaluator::<WPSFeatures>::default());
-    test_evaluator(&default_linear_ps_features());
+    test_evaluator(&LinearEvaluator::<PSFeatures>::default());
     test_evaluator(&Nnue::default());
 }
 

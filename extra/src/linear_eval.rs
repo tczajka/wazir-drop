@@ -1,4 +1,5 @@
-use crate::{constants::Eval, enums::EnumMap, Color, Evaluator, Features};
+use crate::{linear_ps_weights, linear_wps_weights, ps_features::PSFeatures};
+use wazir_drop::{Color, Evaluator, Features, WPSFeatures, constants::Eval, enums::EnumMap};
 
 #[derive(Debug)]
 pub struct LinearEvaluator<F> {
@@ -46,5 +47,27 @@ impl<F: Features> Evaluator for LinearEvaluator<F> {
 
     fn scale(&self) -> f32 {
         self.scale
+    }
+}
+
+impl Default for LinearEvaluator<PSFeatures> {
+    fn default() -> Self {
+        Self::new(
+            PSFeatures,
+            linear_ps_weights::TO_MOVE,
+            &linear_ps_weights::FEATURES,
+            linear_ps_weights::SCALE,
+        )
+    }
+}
+
+impl Default for LinearEvaluator<WPSFeatures> {
+    fn default() -> Self {
+        Self::new(
+            WPSFeatures,
+            linear_wps_weights::TO_MOVE,
+            &linear_wps_weights::FEATURES,
+            linear_wps_weights::SCALE,
+        )
     }
 }

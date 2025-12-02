@@ -1,9 +1,8 @@
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::array;
-
-use extra::vector::{
-    Vector8, Vector16, Vector32, crelu16, crelu32, dot_product, mul_add, vector_concat,
+use wazir_drop::vector::{
+    crelu16, crelu32, dot_product, mul_add, vector_concat, Vector16, Vector32, Vector8,
 };
-use rand::{Rng, SeedableRng, rngs::StdRng};
 
 #[test]
 fn test_vector8_conversion() {

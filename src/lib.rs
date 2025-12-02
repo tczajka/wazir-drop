@@ -18,11 +18,11 @@ pub mod constants;
 mod eval;
 mod features;
 mod history;
-mod linear_eval;
-pub mod linear_wps_weights;
 mod main_player;
 pub mod movegen;
 mod moves;
+mod nnue;
+mod nnue_wps_weights;
 mod piece;
 mod player;
 mod position;
@@ -33,6 +33,7 @@ mod square;
 mod symmetry;
 mod ttable;
 mod variation;
+pub mod vector;
 mod wps_features;
 mod zobrist;
 
@@ -46,9 +47,9 @@ pub use cli::{run_cli, CliCommand};
 pub use color::Color;
 pub use eval::{EvaluatedPosition, Evaluator};
 pub use features::Features;
-pub use linear_eval::LinearEvaluator;
 pub use main_player::MainPlayerFactory;
 pub use moves::{AnyMove, InvalidMove, Move, SetupMove, ShortMove, ShortMoveFrom};
+pub use nnue::Nnue;
 pub use piece::{ColoredPiece, Piece};
 pub use player::{Player, PlayerFactory};
 pub use position::{Outcome, Position, Stage};
@@ -63,4 +64,4 @@ pub use variation::{
 };
 pub use wps_features::WPSFeatures;
 
-pub type DefaultEvaluator = LinearEvaluator<WPSFeatures>;
+pub type DefaultEvaluator = Nnue;

@@ -1,11 +1,8 @@
 use std::{fmt::Debug, iter};
 use wazir_drop::{
-    Color, Features, LinearEvaluator, Move, NUM_CAPTURED_INDEXES, NormalizedSquare, Piece,
-    Position, SetupMove, Square, Symmetry, captured_index, enums::SimpleEnumExt,
-    smallvec::SmallVec,
+    Color, Features, Move, NUM_CAPTURED_INDEXES, NormalizedSquare, Piece, Position, SetupMove,
+    Square, Symmetry, captured_index, enums::SimpleEnumExt, smallvec::SmallVec,
 };
-
-use crate::linear_ps_weights;
 
 /// Piece-Square features.
 #[derive(Debug, Clone, Copy)]
@@ -106,13 +103,4 @@ impl Features for PSFeatures {
         }
         Some((added.into_iter(), removed.into_iter()))
     }
-}
-
-pub fn default_linear_ps_features() -> LinearEvaluator<PSFeatures> {
-    LinearEvaluator::new(
-        PSFeatures,
-        linear_ps_weights::TO_MOVE,
-        &linear_ps_weights::FEATURES,
-        linear_ps_weights::SCALE,
-    )
 }
