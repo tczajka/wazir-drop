@@ -1,17 +1,17 @@
 use crate::{
     clock::Timer,
     constants::{Hyperparameters, TIME_MARGIN},
-    log, AnyMove, Color, DefaultEvaluator, Player, PlayerFactory, Position, Search, SetupMove,
-    Stage,
+    log, AnyMove, Color, DefaultEvaluator, Evaluator, Player, PlayerFactory, Position, Search,
+    SetupMove, Stage,
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
 
-struct MainPlayer {
+struct MainPlayer<E: Evaluator> {
     hyperparameters: Hyperparameters,
-    search: Search<DefaultEvaluator>,
+    search: Search<E>,
 }
 
-impl Player for MainPlayer {
+impl<E: Evaluator> Player for MainPlayer<E> {
     fn make_move(&mut self, position: &Position, timer: &Timer) -> AnyMove {
         match position.stage() {
             Stage::Setup => {
@@ -57,13 +57,13 @@ impl Player for MainPlayer {
 }
 
 #[derive(Debug)]
-pub struct MainPlayerFactory {
+pub struct MainPlayerFactory<E: Evaluator> {
     hyperparameters: Hyperparameters,
-    evaluator: Arc<DefaultEvaluator>,
+    evaluator: Arc<E>,
 }
 
-impl MainPlayerFactory {
-    pub fn new(hyperparameters: &Hyperparameters, evaluator: &Arc<DefaultEvaluator>) -> Self {
+impl<E: Evaluator> MainPlayerFactory<E> {
+    pub fn new(hyperparameters: &Hyperparameters, evaluator: &Arc<E>) -> Self {
         Self {
             hyperparameters: hyperparameters.clone(),
             evaluator: evaluator.clone(),
@@ -71,7 +71,7 @@ impl MainPlayerFactory {
     }
 }
 
-impl Default for MainPlayerFactory {
+impl Default for MainPlayerFactory<DefaultEvaluator> {
     fn default() -> Self {
         Self::new(
             &Hyperparameters::default(),
@@ -80,7 +80,7 @@ impl Default for MainPlayerFactory {
     }
 }
 
-impl PlayerFactory for MainPlayerFactory {
+impl<E: Evaluator> PlayerFactory for MainPlayerFactory<E> {
     fn create(
         &self,
         _game_id: &str,

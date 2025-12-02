@@ -3,7 +3,7 @@ use crate::{
     SetupMove,
 };
 
-pub trait Evaluator {
+pub trait Evaluator: Send + Sync + 'static {
     type Accumulator: Clone;
     type Features: Features;
 

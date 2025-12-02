@@ -1,7 +1,7 @@
 use crate::{either::Either, AnyMove, Color, Move, Position, SetupMove};
 use std::fmt::Debug;
 
-pub trait Features: Debug + Copy + Send + 'static {
+pub trait Features: Debug + Copy + Send + Sync + 'static {
     fn count(self) -> usize;
     fn approximate_avg_set(self) -> f64;
 
