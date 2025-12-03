@@ -2,24 +2,24 @@ log = "logs/learn.log"
 
 [[command]]
 type = "learn"
-save_weights = "data/nnue.weights"
+save_weights = "data/nnue1_128_16_16.weights"
 learning_rate = 1e-3
-epochs = 10
+epochs = 3
 log_period_seconds = 60
 
 [command.dataset]
-file = "data/train.data"
+file = "data/train1.data"
 features = "WPS"
 chunk_size = 4194304
 batch_size = 8192
-outcome_weight = 1.0
+outcome_weight = 0.2
 
 #[command.model.linear.learn]
 #max_weight = 3.0
 
 [command.model.nnue.config]
-embedding_size = 16
-hidden_sizes = []
+embedding_size = 128
+hidden_sizes = [16, 16]
 hidden_weight_bits = 6
 value_scale = 10000
 

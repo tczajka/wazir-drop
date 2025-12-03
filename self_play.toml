@@ -2,20 +2,6 @@ log = "logs/self_play.log"
 
 [[command]]
 type = "self_play"
-output = "data/train1.data"
-num_cpus = 31
-num_games = 18000000
-batch_size = 10000
-ttable_size_mb = 16
-pvtable_size_mb = 2
-depth = 3
-extra_depth = 3
-temperature = 0.03
-temperature_cutoff = 0.06
-features = "WPS"
-
-[[command]]
-type = "self_play"
 output = "data/test1.data"
 num_cpus = 30
 num_games = 1000000

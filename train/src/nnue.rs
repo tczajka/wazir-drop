@@ -223,7 +223,7 @@ impl<F: Features> Export for NnueModel<F> {
         writeln!(f, "];")?;
         writeln!(
             f,
-            "pub const HIDDEN_WEIGHT_BITS: u32 = {};",
+            "pub const HIDDEN_WEIGHT_BITS: i32 = {};",
             self.config.hidden_weight_bits
         )?;
         let mut encoder = Base128Encoder::new();
