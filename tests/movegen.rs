@@ -3,8 +3,8 @@ use std::str::FromStr;
 use wazir_drop::{
     movegen::{
         any_move_from_short_move, attacked_by, captures_of_wazir, check_evasions_capture_attacker,
-        drops, in_check, jumps, move_bitboard, pseudocaptures, pseudojumps, setup_moves,
-        validate_from_to,
+        double_move_bitboard, drops, in_check, jumps, move_bitboard, pseudocaptures, pseudojumps,
+        setup_moves, validate_from_to,
     },
     Color, Move, Piece, Position, ShortMove, Square,
 };
@@ -93,6 +93,24 @@ fn test_move_bitboard() {
 ......x.
 .....x..
 ........
+"
+    );
+}
+
+#[test]
+fn test_double_move_bitboard() {
+    // From a corner.
+    assert_eq!(
+        double_move_bitboard(Piece::Knight, Square::E4).to_string(),
+        "\
+.x.x.x..
+x.x.x.x.
+...x...x
+x.x.x.x.
+.x.x.x.x
+x.x.x.x.
+...x...x
+x.x.x.x.
 "
     );
 }
