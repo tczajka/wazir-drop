@@ -238,6 +238,77 @@ add.w..a
 }
 
 #[test]
+fn test_captures_of_wazir() {
+    let position = Position::from_str(
+        "\
+regular
+4
+Af
+FW.A.D.D
+AfFA.DDA
+..A.A.A.
+.....wA.
+...a..ad
+..d..nN.
+a.a...a.
+add....a
+",
+    )
+    .unwrap();
+
+    let moves: Vec<String> = captures_of_wazir(&position)
+        .map(|mov| mov.to_string())
+        .collect();
+    assert_eq!(&moves, &["Ab4xwd6", "Ab8xwd6", "Db6xwd6", "Nf7xwd6"]);
+}
+
+#[test]
+fn test_check_evasion_capture_attacker() {
+    let position = Position::from_str(
+        "\
+regular
+4
+Af
+FW.A.D.D
+AFfAD.DA
+..A...A.
+....A.A.
+...a..ad
+..d..nN.
+a.a...a.
+addw...a
+",
+    )
+    .unwrap();
+
+    let moves: Vec<String> = check_evasions_capture_attacker(&position)
+        .map(|mov| mov.to_string())
+        .collect();
+    assert_eq!(&moves, &["Ad5xfb3", "Db5xfb3"]);
+
+    // Double check.
+    let position = Position::from_str(
+        "\
+regular
+4
+Af
+FW.A.D.D
+AFfAD.DA
+.dA...A.
+....A.A.
+...a..ad
+..d..nN.
+a.a...a.
+a.dw...a
+",
+    )
+    .unwrap();
+
+    let moves: Vec<Move> = check_evasions_capture_attacker(&position).collect();
+    assert!(moves.is_empty());
+}
+
+#[test]
 fn test_jumps() {
     let position = Position::from_str(
         "\
@@ -362,75 +433,4 @@ add.w..a
 
     assert!(in_check(&position, Color::Red));
     assert!(!in_check(&position, Color::Blue));
-}
-
-#[test]
-fn test_captures_of_wazir() {
-    let position = Position::from_str(
-        "\
-regular
-4
-Af
-FW.A.D.D
-AfFA.DDA
-..A.A.A.
-.....wA.
-...a..ad
-..d..nN.
-a.a...a.
-add....a
-",
-    )
-    .unwrap();
-
-    let moves: Vec<String> = captures_of_wazir(&position)
-        .map(|mov| mov.to_string())
-        .collect();
-    assert_eq!(&moves, &["Ab4xwd6", "Ab8xwd6", "Db6xwd6", "Nf7xwd6"]);
-}
-
-#[test]
-fn test_check_evasion_capture_attacker() {
-    let position = Position::from_str(
-        "\
-regular
-4
-Af
-FW.A.D.D
-AFfAD.DA
-..A...A.
-....A.A.
-...a..ad
-..d..nN.
-a.a...a.
-addw...a
-",
-    )
-    .unwrap();
-
-    let moves: Vec<String> = check_evasions_capture_attacker(&position)
-        .map(|mov| mov.to_string())
-        .collect();
-    assert_eq!(&moves, &["Ad5xfb3", "Db5xfb3"]);
-
-    // Double check.
-    let position = Position::from_str(
-        "\
-regular
-4
-Af
-FW.A.D.D
-AFfAD.DA
-.dA...A.
-....A.A.
-...a..ad
-..d..nN.
-a.a...a.
-a.dw...a
-",
-    )
-    .unwrap();
-
-    let moves: Vec<Move> = check_evasions_capture_attacker(&position).collect();
-    assert!(moves.is_empty());
 }
