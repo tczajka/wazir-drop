@@ -17,13 +17,13 @@ features = "WPS"
 [[command]]
 type = "self_play"
 output = "data/test2.data"
-num_cpus = 30
+num_cpus = 62
 num_games = 1000000
 batch_size = 10000
 ttable_size_mb = 16
 pvtable_size_mb = 2
-depth = 3
-extra_depth = 3
+depth = 2
+extra_depth = 2
 temperature = 0.03
 temperature_cutoff = 0.06
 features = "WPS"
