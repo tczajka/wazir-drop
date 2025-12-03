@@ -76,8 +76,11 @@ fn run_with_model<M: EvalModel>(
         .map(|_| ActivationStats::new())
         .collect();
 
+    let _guard = tch::no_grad_guard();
+
     let mut num_samples = 0;
     let mut total_loss: f64 = 0.0;
+    let mut total_min_loss: f64 = 0.0;
     let start_time = Instant::now();
     let mut dataset_iterator = DatasetIterator::new(&config.dataset)?;
     while let Some(batch) = dataset_iterator.next_batch()? {
@@ -89,23 +92,27 @@ fn run_with_model<M: EvalModel>(
             None,
             Reduction::Mean,
         );
+        let min_loss =
+            batch
+                .outputs
+                .binary_cross_entropy::<Tensor>(&batch.outputs, None, Reduction::Mean);
         num_samples += batch.size;
         total_loss += batch.size as f64 * f64::try_from(&loss).unwrap();
+        total_min_loss += batch.size as f64 * f64::try_from(&min_loss).unwrap();
 
         for (layer, act_stats) in activation_stats.iter_mut().enumerate() {
-            let _guard = tch::no_grad_guard();
             act_stats.update(model.activations(layer));
         }
     }
     let elapsed_time = start_time.elapsed().as_secs_f64();
     log::info!(
         "samples={num_samples} time={elapsed_time:.2}s \
-        samples/s={samples_per_second:.0} loss={loss:.6}",
+        samples/s={samples_per_second:.0} loss={loss:.6} min_loss={min_loss:.6}",
         samples_per_second = num_samples as f64 / elapsed_time,
         loss = total_loss / num_samples as f64,
+        min_loss = total_min_loss / num_samples as f64,
     );
 
-    let _guard = tch::no_grad_guard();
     let graph_dir = config_dir.join(&config.graph_dir);
     fs::create_dir_all(&graph_dir)?;
     for layer in 0..model.num_layers() {
