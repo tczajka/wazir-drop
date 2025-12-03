@@ -2,7 +2,7 @@ log = "logs/validate.log"
 
 [[command]]
 type = "validate"
-weights = "data/nnue2_128_16_parial.weights"
+weights = "data/nnue2_128_16_partial.weights"
 graph_dir = "data"
 
 [command.dataset]

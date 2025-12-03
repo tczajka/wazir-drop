@@ -240,10 +240,18 @@ fn pseudocaptures_by_piece<'a>(
     position: &'a Position,
     piece: Piece,
 ) -> impl Iterator<Item = Move> + 'a {
+    pseudocaptures_by_piece_to_mask(position, piece, !Bitboard::EMPTY)
+}
+
+fn pseudocaptures_by_piece_to_mask<'a>(
+    position: &'a Position,
+    piece: Piece,
+    to_mask: Bitboard,
+) -> impl Iterator<Item = Move> + 'a {
     assert!(position.stage() == Stage::Regular);
     let me = position.to_move();
     let opp = me.opposite();
-    let opp_mask = position.occupied_by(opp);
+    let opp_mask = position.occupied_by(opp) & to_mask;
     let colored_piece = piece.with_color(me);
     position
         .occupied_by_piece(colored_piece)
@@ -398,13 +406,59 @@ pub fn check_evasions_capture_attacker<'a>(
         .flat_map(move |to| pseudocaptures_of_square(position, to))
 }
 
-// Must not be in check. Generates all captures that are not suicides.
+/// Must not be in check. Generates all captures that are not suicides.
 pub fn captures<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     Piece::all_non_wazir()
         .flat_map(move |piece| pseudocaptures_by_piece(position, piece))
         .chain(captures_by_wazir(position))
 }
 
+/// Must not be in check. Generates all captures that are checks.
+pub fn captures_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
+    let me = position.to_move();
+    let opp = me.opposite();
+    let wazir_square = position
+        .occupied_by_piece(Piece::Wazir.with_color(opp))
+        .first()
+        .unwrap();
+    Piece::all_non_wazir().flat_map(move |piece| {
+        let from_bitboard = double_move_bitboard(piece, wazir_square)
+            & position.occupied_by_piece(piece.with_color(me));
+        from_bitboard.into_iter().flat_map(move |from| {
+            let to_bitboard = move_bitboard(piece, from)
+                & move_bitboard(piece, wazir_square)
+                & position.occupied_by(opp);
+            to_bitboard.into_iter().map(move |to| {
+                let captured = position.square(to).unwrap();
+                assert_eq!(captured.color(), opp);
+                let captured = captured.piece();
+                Move {
+                    colored_piece: piece.with_color(me),
+                    from: Some(from),
+                    captured: Some(captured),
+                    to,
+                }
+            })
+        })
+    })
+}
+
+/// Must not be in check. Generates all captures that are not checks and not suicides.
+pub fn captures_non_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
+    let me = position.to_move();
+    let opp = me.opposite();
+    let wazir_square = position
+        .occupied_by_piece(Piece::Wazir.with_color(opp))
+        .first()
+        .unwrap();
+    Piece::all_non_wazir()
+        .flat_map(move |piece| {
+            pseudocaptures_by_piece_to_mask(position, piece, !move_bitboard(piece, wazir_square))
+        })
+        .chain(captures_by_wazir(position))
+}
+
+/// Generates all captures by the wazir.
 pub fn captures_by_wazir<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     let opp = position.to_move().opposite();
     pseudocaptures_by_piece(position, Piece::Wazir)

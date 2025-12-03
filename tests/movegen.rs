@@ -2,9 +2,9 @@ use std::str::FromStr;
 
 use wazir_drop::{
     movegen::{
-        any_move_from_short_move, attacked_by, captures_of_wazir, check_evasions_capture_attacker,
-        double_move_bitboard, drops, in_check, jumps, move_bitboard, pseudocaptures, pseudojumps,
-        setup_moves, validate_from_to,
+        any_move_from_short_move, attacked_by, captures, captures_checks, captures_non_checks,
+        captures_of_wazir, check_evasions_capture_attacker, double_move_bitboard, drops, in_check,
+        jumps, move_bitboard, pseudocaptures, pseudojumps, setup_moves, validate_from_to,
     },
     Color, Move, Piece, Position, ShortMove, Square,
 };
@@ -205,13 +205,13 @@ fn test_captures() {
         "\
 regular
 4
-AFf
+AF
 .W.A.D.D
 AfFA.DDA
-..A.A.A.
+f.A.A.A.
 ......A.
-...a..ad
-..d..nN.
+...a.Nad
+..d..n..
 a.a...a.
 add.w..a
 ",
@@ -221,18 +221,31 @@ add.w..a
     let moves: Vec<String> = pseudocaptures(&position)
         .map(|mov| mov.to_string())
         .collect();
-    assert_eq!(&moves, &["Ac5xae7", "Nf7xah8", "Wa2xfb2"]);
+    assert_eq!(&moves, &["Ac5xae7", "Ne6xag7", "Wa2xfb2"]);
+
+    let moves: Vec<String> = captures(&position).map(|mov| mov.to_string()).collect();
+    assert_eq!(&moves, &["Ac5xae7", "Ne6xag7"]);
+
+    let moves: Vec<String> = captures_checks(&position)
+        .map(|mov| mov.to_string())
+        .collect();
+    assert_eq!(&moves, &["Ne6xag7"]);
+
+    let moves: Vec<String> = captures_non_checks(&position)
+        .map(|mov| mov.to_string())
+        .collect();
+    assert_eq!(&moves, &["Ac5xae7"]);
 }
 
 #[test]
-fn test_pseudojumps() {
+fn test_jumps() {
     let position = Position::from_str(
         "\
 regular
 4
 AAAAAAAAddFf
 .W...DD.
-.fF.....
+..Ff....
 ......A.
 ........
 ...a..ad
@@ -248,7 +261,17 @@ add.w..a
         &moves,
         &[
             "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Da7-a5", "Fb3-a4", "Fb3-c2",
-            "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-g5", "Nf7-h6", "Wa2-a1", "Wa2-a3"
+            "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-g5", "Nf7-h6", "Wa2-a1", "Wa2-a3",
+            "Wa2-b2",
+        ]
+    );
+
+    let moves: Vec<String> = jumps(&position).map(|mov| mov.to_string()).collect();
+    assert_eq!(
+        &moves,
+        &[
+            "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Da7-a5", "Fb3-a4", "Fb3-c2",
+            "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-g5", "Nf7-h6", "Wa2-a1", "Wa2-b2",
         ]
     );
 }
@@ -342,7 +365,7 @@ add.w..a
 }
 
 #[test]
-fn test_wazir_captures() {
+fn test_captures_of_wazir() {
     let position = Position::from_str(
         "\
 regular
@@ -410,33 +433,4 @@ a.dw...a
 
     let moves: Vec<Move> = check_evasions_capture_attacker(&position).collect();
     assert!(moves.is_empty());
-}
-
-#[test]
-fn test_jumps() {
-    let position = Position::from_str(
-        "\
-regular
-4
-AAAAAAAAddFf
-.W...DD.
-.fF.....
-......A.
-........
-...a..ad
-..d..nN.
-a.a...a.
-add.w..a
-",
-    )
-    .unwrap();
-
-    let moves: Vec<String> = jumps(&position).map(|mov| mov.to_string()).collect();
-    assert_eq!(
-        &moves,
-        &[
-            "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Da7-a5", "Fb3-a4", "Fb3-c2",
-            "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-g5", "Nf7-h6"
-        ]
-    );
 }
