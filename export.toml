@@ -2,7 +2,7 @@ log = "logs/export.log"
 
 [[command]]
 type = "export"
-weights = "data/nnue2_128_16.weights"
+weights = "data/nnue3_128_16.weights"
 output = "data/nnue_weights.rs"
 features = "WPS"
 

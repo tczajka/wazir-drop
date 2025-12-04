@@ -2,11 +2,11 @@ log = "logs/validate.log"
 
 [[command]]
 type = "validate"
-weights = "data/nnue2_128_16.weights"
+weights = "data/nnue3_128_16.weights"
 graph_dir = "data"
 
 [command.dataset]
-file = "data/test2.data"
+file = "data/test3.data"
 features = "WPS"
 chunk_size = 4194304
 batch_size = 8192

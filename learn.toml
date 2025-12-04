@@ -2,13 +2,14 @@ log = "logs/learn.log"
 
 [[command]]
 type = "learn"
-save_weights = "data/x.weights"
+load_weights = "data/nnue3_128_16_partial.weights"
+save_weights = "data/nnue3_128_16.weights"
 learning_rate = 1e-5
 epochs = 3
 log_period_seconds = 60
 
 [command.dataset]
-file = "data/train2.data"
+file = "data/train3.data"
 features = "WPS"
 chunk_size = 4194304
 batch_size = 8192
