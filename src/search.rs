@@ -550,7 +550,9 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 return Ok(result);
             }
             Either::Right(Either::Left(
-                movegen::captures(eposition.position()).map(InternalMove::new),
+                movegen::captures_checks(eposition.position())
+                    .chain(movegen::captures_non_checks(eposition.position()))
+                    .map(InternalMove::new),
             ))
         } else {
             // Null move pruning. Don't do two in a row.
@@ -586,12 +588,15 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 .map(InternalMove::out_of_order);
 
             Either::Right(Either::Right(
-                movegen::captures(position)
+                movegen::captures_checks(position)
+                    .chain(movegen::captures_non_checks(position))
                     .map(InternalMove::new)
                     .chain(killers)
                     .chain(
-                        movegen::jumps(position)
-                            .chain(movegen::drops(position))
+                        movegen::jumps_checks(position)
+                            .chain(movegen::drops_checks(position))
+                            .chain(movegen::jumps_non_checks(position))
+                            .chain(movegen::drops_non_checks(position))
                             .map(InternalMove::new),
                     ),
             ))
