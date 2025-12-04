@@ -2,12 +2,12 @@ log = "logs/export.log"
 
 [[command]]
 type = "export"
-weights = "data/nnue1_128_16.weights"
+weights = "data/nnue2_128_16.weights"
 output = "data/nnue_weights.rs"
 features = "WPS"
 
 [command.model.nnue.config]
 embedding_size = 128
 hidden_sizes = [16]
-hidden_weight_bits = 6
+hidden_weight_bits = 8
 value_scale = 10000

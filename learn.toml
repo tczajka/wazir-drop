@@ -2,8 +2,7 @@ log = "logs/learn.log"
 
 [[command]]
 type = "learn"
-load_weights = "data/nnue2_128_16_partial.weights"
-save_weights = "data/nnue2_128_16.weights"
+save_weights = "data/x.weights"
 learning_rate = 1e-5
 epochs = 3
 log_period_seconds = 60
