@@ -4,7 +4,8 @@ use wazir_drop::{
     movegen::{
         any_move_from_short_move, attacked_by, captures, captures_checks, captures_non_checks,
         captures_of_wazir, check_evasions_capture_attacker, double_move_bitboard, drops, in_check,
-        jumps, move_bitboard, pseudocaptures, pseudojumps, setup_moves, validate_from_to,
+        jumps, jumps_checks, jumps_non_checks, move_bitboard, pseudocaptures, pseudojumps,
+        setup_moves, validate_from_to,
     },
     Color, Move, Piece, Position, ShortMove, Square,
 };
@@ -322,7 +323,7 @@ AAAAAAAAddFf
 ...a..ad
 ..d..nN.
 a.a...a.
-add.w..a
+add...wa
 ",
     )
     .unwrap();
@@ -343,6 +344,20 @@ add.w..a
         &[
             "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Da7-a5", "Fb3-a4", "Fb3-c2",
             "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-g5", "Nf7-h6", "Wa2-a1", "Wa2-b2",
+        ]
+    );
+
+    let moves: Vec<String> = jumps_checks(&position).map(|mov| mov.to_string()).collect();
+    assert_eq!(&moves, &["Nf7-g5"]);
+
+    let moves: Vec<String> = jumps_non_checks(&position)
+        .map(|mov| mov.to_string())
+        .collect();
+    assert_eq!(
+        &moves,
+        &[
+            "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Da7-a5", "Fb3-a4", "Fb3-c2",
+            "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-h6", "Wa2-a1", "Wa2-b2",
         ]
     );
 }
