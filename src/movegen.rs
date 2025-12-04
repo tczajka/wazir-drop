@@ -514,17 +514,59 @@ pub fn jumps_by_wazir<'a>(position: &'a Position) -> impl Iterator<Item = Move> 
 /// If in check, these are non-escapes.
 pub fn drops<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     assert!(position.stage() == Stage::Regular);
+    Piece::all_non_wazir()
+        .flat_map(move |piece| drops_piece_to_mask(position, piece, !Bitboard::EMPTY))
+}
+
+/// Piece drops that are checks.
+/// If in check, these are non-escapes.
+pub fn drops_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
+    assert!(position.stage() == Stage::Regular);
     let me = position.to_move();
-    let empty = position.empty_squares();
-    Piece::all()
-        .map(move |piece| piece.with_color(me))
-        .filter(move |&cpiece| position.num_captured(cpiece) > 0)
-        .flat_map(move |colored_piece| {
-            empty.into_iter().map(move |to| Move {
-                colored_piece,
-                from: None,
-                captured: None,
-                to,
-            })
-        })
+    let opp = me.opposite();
+    let wazir_square = position
+        .occupied_by_piece(Piece::Wazir.with_color(opp))
+        .first()
+        .unwrap();
+    Piece::all_non_wazir().flat_map(move |piece| {
+        drops_piece_to_mask(position, piece, move_bitboard(piece, wazir_square))
+    })
+}
+
+/// Piece drops that are not checks.
+/// If in check, these are non-escapes.
+pub fn drops_non_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
+    assert!(position.stage() == Stage::Regular);
+    let me = position.to_move();
+    let opp = me.opposite();
+    let wazir_square = position
+        .occupied_by_piece(Piece::Wazir.with_color(opp))
+        .first()
+        .unwrap();
+    Piece::all_non_wazir().flat_map(move |piece| {
+        drops_piece_to_mask(position, piece, !move_bitboard(piece, wazir_square))
+    })
+}
+
+/// Piece drops with a to mask.
+/// If in check, these are non-escapes.
+fn drops_piece_to_mask<'a>(
+    position: &'a Position,
+    piece: Piece,
+    to_mask: Bitboard,
+) -> impl Iterator<Item = Move> + 'a {
+    assert!(position.stage() == Stage::Regular);
+    let me = position.to_move();
+    let colored_piece = piece.with_color(me);
+    let targets = if position.num_captured(colored_piece) > 0 {
+        position.empty_squares() & to_mask
+    } else {
+        Bitboard::EMPTY
+    };
+    targets.into_iter().map(move |to| Move {
+        colored_piece,
+        from: None,
+        captured: None,
+        to,
+    })
 }
