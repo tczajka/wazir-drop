@@ -667,8 +667,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
     }
 
     /// Quiescence search.
-    /// `alpha` < `WIN_MAX_PLY`
-    /// `beta` > `-WIN_MAX_PLY`
     fn quiescence_search<V: ExtendableVariation>(
         &mut self,
         eposition: &EvaluatedPosition<E>,
@@ -676,6 +674,15 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         beta: Score,
     ) -> Result<SearchResultQuiescence<V>, Timeout> {
         self.new_node()?;
+
+        // Assume we're not going to checkmate the opponent in quiescence.
+        if alpha >= Score::WIN_MAX_PLY {
+            return Ok(SearchResultQuiescence {
+                score: Score::WIN_MAX_PLY,
+                pv: V::empty_truncated(),
+            });
+        }
+
         let position = eposition.position();
         let ply = position.ply();
         let in_check = movegen::in_check(position, position.to_move());
@@ -705,6 +712,14 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             if ply + 3 > PLY_DRAW || ply + 4 > PLY_DRAW && beta <= Score::DRAW {
                 return Ok(SearchResultQuiescence {
                     score: Score::DRAW,
+                    pv: V::empty_truncated(),
+                });
+            }
+
+            // We can at least stand pat, no need to eval.
+            if beta <= -Score::WIN_MAX_PLY {
+                return Ok(SearchResultQuiescence {
+                    score: -Score::WIN_MAX_PLY,
                     pv: V::empty_truncated(),
                 });
             }

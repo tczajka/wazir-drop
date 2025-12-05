@@ -67,7 +67,7 @@ pub struct Score(Eval);
 impl Score {
     pub const INFINITE: Score = Score(1000000000);
     pub const DRAW: Score = Score(0);
-    const WIN_MAX_PLY: Score = Score(Self::INFINITE.0 - u8::MAX as Eval);
+    pub const WIN_MAX_PLY: Score = Score(Self::INFINITE.0 - u8::MAX as Eval);
 
     pub fn next(self) -> Self {
         Self((self.0 + 1).min(Self::INFINITE.0))
