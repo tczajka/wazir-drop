@@ -207,7 +207,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
     }
 
     fn search_shallow(&mut self, eposition: &EvaluatedPosition<E>) {
-        let mut completed_depth = Depth::MAX;
         let hash = eposition.position().hash();
         self.history.push(hash);
         for move_idx in 0..self.root_moves.len() {
@@ -215,9 +214,8 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             let epos2 = eposition.make_move(mov).unwrap();
             let nodes_start = self.nodes;
             let result = self
-                .search_alpha_beta::<LongVariation>(&epos2, -Score::INFINITE, Score::INFINITE, 0)
+                .quiescence_search::<LongVariation>(&epos2, -Score::INFINITE, Score::INFINITE)
                 .unwrap();
-            completed_depth = completed_depth.min(result.depth.saturating_add(1));
             let score = -result.score;
             let root_move = &mut self.root_moves[move_idx];
             root_move.nodes += self.nodes - nodes_start;
@@ -228,7 +226,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
         }
         self.history.pop();
-        self.depth = completed_depth;
+        self.depth = 1;
         self.root_moves_considered = self.root_moves.len();
         self.root_moves_exact_score = self.root_moves.len();
         self.sort_root_moves();
@@ -350,22 +348,21 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         beta: Score,
         depth: Depth,
     ) -> Result<SearchResultInternal<V>, Timeout> {
-        self.new_node()?;
-        let position = eposition.position();
-        let ply = position.ply();
-
-        // Check whether game ended.
-        if let Stage::End(outcome) = position.stage() {
+        if depth == 0 {
+            let result = self.quiescence_search::<V>(eposition, alpha, beta)?;
             return Ok(SearchResultInternal {
-                score: outcome.to_score(ply),
-                depth: Depth::MAX,
-                pv: V::empty(),
+                score: result.score,
+                depth: 0,
+                pv: result.pv,
                 repetition_ply: Ply::MAX,
             });
         }
 
-        // Prune guaranteed draws or endgames (including lower/upper bounds)
+        self.new_node()?;
+        let position = eposition.position();
+        let ply = position.ply();
 
+        // Prune guaranteed draws or endgames (including lower/upper bounds)
         let earliest_win = ply + 3; // if we deliver checkmate this move
         let best_possible = if earliest_win > PLY_DRAW {
             Score::DRAW
@@ -530,7 +527,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
     ) -> Result<SearchResultInternal<V>, Timeout> {
         let position = eposition.position();
 
-        // Zugzwang case: we lose in 2 ply.
+        // ZFastest loss is at ply+2 if we are checkmated.
         let mut result = SearchResultInternal {
             score: ScoreExpanded::Loss(position.ply() + 2).into(),
             depth: Depth::MAX,
@@ -540,20 +537,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
 
         let moves = if in_check {
             Either::Left(movegen::check_evasions(position).map(InternalMove::new))
-        } else if depth == 0 {
-            // Quiescence search.
-            // Stand pat.
-            result.score = ScoreExpanded::Eval(eposition.evaluate()).into();
-            result.depth = 0;
-            result.pv = V::empty();
-            if result.score >= beta {
-                return Ok(result);
-            }
-            Either::Right(Either::Left(
-                movegen::captures_checks(eposition.position())
-                    .chain(movegen::captures_non_checks(eposition.position()))
-                    .map(InternalMove::new),
-            ))
         } else {
             // Null move pruning. Don't do two in a row.
             if depth >= self.hyperparameters.reduction_null_move
@@ -587,7 +570,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 .flatten()
                 .map(InternalMove::out_of_order);
 
-            Either::Right(Either::Right(
+            Either::Right(
                 movegen::captures_checks(position)
                     .chain(movegen::captures_non_checks(position))
                     .map(InternalMove::new)
@@ -599,7 +582,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                             .chain(movegen::drops_non_checks(position))
                             .map(InternalMove::new),
                     ),
-            ))
+            )
         };
 
         // Transposition table move first, then all other moves.
@@ -683,6 +666,85 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         Ok(result)
     }
 
+    /// Quiescence search.
+    /// `alpha` < `WIN_MAX_PLY`
+    /// `beta` > `-WIN_MAX_PLY`
+    fn quiescence_search<V: ExtendableVariation>(
+        &mut self,
+        eposition: &EvaluatedPosition<E>,
+        alpha: Score,
+        beta: Score,
+    ) -> Result<SearchResultQuiescence<V>, Timeout> {
+        self.new_node()?;
+        let position = eposition.position();
+        let ply = position.ply();
+        let in_check = movegen::in_check(position, position.to_move());
+
+        let mut result;
+        let moves;
+
+        if in_check {
+            // Fastest loss is at ply+2 if we are checkmated.
+            // Fastest win is at ply+3 (checkmate in 1).
+            if ply + 2 > PLY_DRAW || ply + 3 > PLY_DRAW && alpha >= Score::DRAW {
+                return Ok(SearchResultQuiescence {
+                    score: Score::DRAW,
+                    pv: V::empty_truncated(),
+                });
+            }
+
+            // If we are checkmated, we lose in 2 ply.
+            result = SearchResultQuiescence {
+                score: ScoreExpanded::Loss(position.ply() + 2).into(),
+                pv: V::empty_truncated(),
+            };
+            moves = Either::Left(movegen::check_evasions(position));
+        } else {
+            // Fastest win is at ply+3 (checkmate in 1).
+            // Fastest loss is at ply+4 (we get checkmated next move).
+            if ply + 3 > PLY_DRAW || ply + 4 > PLY_DRAW && beta <= Score::DRAW {
+                return Ok(SearchResultQuiescence {
+                    score: Score::DRAW,
+                    pv: V::empty_truncated(),
+                });
+            }
+
+            // Stand pat.
+            result = SearchResultQuiescence {
+                score: ScoreExpanded::Eval(eposition.evaluate()).into(),
+                pv: V::empty(),
+            };
+            if result.score >= beta {
+                return Ok(result);
+            }
+            moves = Either::Right(
+                movegen::captures_checks(eposition.position())
+                    .chain(movegen::captures_non_checks(eposition.position())),
+            );
+        }
+
+        for mov in moves {
+            let epos2 = eposition
+                .make_move(mov)
+                .expect("Illegal move in quiescence search");
+
+            let alpha2 = alpha.max(result.score);
+            let result2 = self.quiescence_search::<V>(&epos2, -beta, -alpha2)?;
+            let score = -result2.score;
+            if score > result.score {
+                result.score = score;
+                if score > alpha {
+                    result.pv = result2.pv.add_front(mov).truncate();
+                }
+                if score >= beta {
+                    break;
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
     fn new_node(&mut self) -> Result<(), Timeout> {
         self.nodes += 1;
         if let Some(deadline) = self.deadline {
@@ -743,6 +805,11 @@ struct SearchResultInternal<V> {
     pv: V,
     // Smallest ply when the position was repeated
     repetition_ply: Ply,
+}
+
+struct SearchResultQuiescence<V> {
+    score: Score,
+    pv: V,
 }
 
 #[derive(Debug)]
