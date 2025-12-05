@@ -535,131 +535,139 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             repetition_ply: Ply::MAX,
         };
 
+        let tt_move = tt_move.into_iter().map(InternalMove::extra);
+
         let moves = if in_check {
-            Either::Left(movegen::check_evasions(position).map(InternalMove::new))
+            Either::Left(tt_move.chain(movegen::check_evasions(position).map(InternalMove::new)))
         } else {
-            // Null move pruning. Don't do two in a row.
-            if depth >= self.hyperparameters.reduction_null_move
+            let null_move = if depth >= self.hyperparameters.reduction_null_move
                 && self.history.last_cut() != Some(position.ply())
             {
-                self.history.cut();
-                let epos2 = eposition.make_null_move().unwrap();
-                let result2 = self.search_alpha_beta::<EmptyVariation>(
-                    &epos2,
-                    -beta,
-                    -beta.prev(),
-                    depth - self.hyperparameters.reduction_null_move,
-                )?;
-                self.history.uncut();
-                if -result2.score >= beta {
-                    return Ok(SearchResultInternal {
-                        score: beta,
-                        depth: result2
-                            .depth
-                            .saturating_add(self.hyperparameters.reduction_null_move),
-                        pv: V::empty_truncated(),
-                        // Repetitions don't count accross null move.
-                        repetition_ply: Ply::MAX,
-                    });
-                }
+                Some(InternalMove::Null)
+            } else {
+                None
             }
+            .into_iter();
 
-            // Captures, killers, jumps, drops.
+            let captures_and_checks = movegen::captures_checks(position)
+                .chain(movegen::captures_non_checks(position))
+                .chain(movegen::jumps_checks(position))
+                .chain(movegen::drops_checks(position))
+                .map(InternalMove::new);
+
             let killers = self.killer_moves[position.ply() as usize]
                 .into_iter()
                 .flatten()
-                .map(InternalMove::out_of_order);
+                .map(InternalMove::extra);
+
+            let quiet_moves = movegen::jumps_non_checks(position)
+                .chain(movegen::drops_non_checks(position))
+                .map(InternalMove::new);
 
             Either::Right(
-                movegen::captures_checks(position)
-                    .chain(movegen::captures_non_checks(position))
-                    .map(InternalMove::new)
+                null_move
+                    .chain(tt_move)
+                    .chain(captures_and_checks)
                     .chain(killers)
-                    .chain(
-                        movegen::jumps_checks(position)
-                            .chain(movegen::drops_checks(position))
-                            .chain(movegen::jumps_non_checks(position))
-                            .chain(movegen::drops_non_checks(position))
-                            .map(InternalMove::new),
-                    ),
+                    .chain(quiet_moves),
             )
         };
 
-        // Transposition table move first, then all other moves.
-        let moves = tt_move
-            .into_iter()
-            .map(InternalMove::out_of_order)
-            .chain(moves);
+        let mut extra_moves = SmallVec::<Move, { 1 + NUM_KILLER_MOVES }>::new();
 
-        let mut out_of_order_moves = SmallVec::<Move, { 1 + NUM_KILLER_MOVES }>::new();
-
-        for InternalMove {
-            mov,
-            is_out_of_order,
-        } in moves
-        {
-            if out_of_order_moves.contains(&mov) {
-                continue;
-            }
-
-            let Ok(epos2) = eposition.make_move(mov) else {
-                // Illegal move. Could be a hash collision in the transposition table
-                // or invalid killer move.
-                continue;
-            };
-
-            if is_out_of_order {
-                if movegen::in_check(epos2.position(), position.to_move()) {
-                    // Skip suicide move.
-                    continue;
-                }
-                out_of_order_moves.push(mov);
-            }
-
-            let alpha2 = alpha.max(result.score);
-
-            // Try null window first.
-            let result_null_window = if beta > alpha2.next() {
-                self.search_alpha_beta::<EmptyVariation>(
-                    &epos2,
-                    -alpha2.next(),
-                    -alpha2,
-                    depth.saturating_sub(1),
-                )?
-            } else {
-                SearchResultInternal::<EmptyVariation> {
-                    score: -Score::INFINITE,
-                    depth: Depth::MAX,
-                    pv: EmptyVariation::empty_truncated(),
-                    repetition_ply: Ply::MAX,
-                }
-            };
-
-            if -result_null_window.score > alpha2 {
-                let result2 = self.search_alpha_beta::<V::Truncated>(
-                    &epos2,
-                    -beta,
-                    -alpha2,
-                    depth.saturating_sub(1),
-                )?;
-                let score = -result2.score;
-                if score > result.score {
-                    result.score = score;
-                    if score > alpha {
-                        result.pv = result2.pv.add_front(mov);
+        for internal_move in moves {
+            match internal_move {
+                InternalMove::Move { mov, extra } => {
+                    if extra_moves.contains(&mov) {
+                        continue;
                     }
-                    if score >= beta {
-                        result.depth = result2.depth.saturating_add(1);
-                        result.repetition_ply = result2.repetition_ply;
-                        break;
+
+                    let Ok(epos2) = eposition.make_move(mov) else {
+                        // Illegal move. Could be a hash collision in the transposition table
+                        // or invalid killer move.
+                        if extra {
+                            continue;
+                        } else {
+                            panic!("Illegal move in search_alpha_beta_deeper");
+                        }
+                    };
+
+                    if extra {
+                        if movegen::in_check(epos2.position(), position.to_move()) {
+                            // Skip suicide move.
+                            continue;
+                        }
+                        extra_moves.push(mov);
+                    }
+
+                    let alpha2 = alpha.max(result.score);
+
+                    // Try null window first.
+                    let result_null_window = if beta > alpha2.next() {
+                        self.search_alpha_beta::<EmptyVariation>(
+                            &epos2,
+                            -alpha2.next(),
+                            -alpha2,
+                            depth.saturating_sub(1),
+                        )?
+                    } else {
+                        SearchResultInternal::<EmptyVariation> {
+                            score: -Score::INFINITE,
+                            depth: Depth::MAX,
+                            pv: EmptyVariation::empty_truncated(),
+                            repetition_ply: Ply::MAX,
+                        }
+                    };
+
+                    if -result_null_window.score > alpha2 {
+                        let result2 = self.search_alpha_beta::<V::Truncated>(
+                            &epos2,
+                            -beta,
+                            -alpha2,
+                            depth.saturating_sub(1),
+                        )?;
+                        let score = -result2.score;
+                        if score > result.score {
+                            result.score = score;
+                            if score > alpha {
+                                result.pv = result2.pv.add_front(mov);
+                            }
+                            if score >= beta {
+                                result.depth = result2.depth.saturating_add(1);
+                                result.repetition_ply = result2.repetition_ply;
+                                break;
+                            }
+                        }
+                        result.depth = result.depth.min(result2.depth.saturating_add(1));
+                        result.repetition_ply = result.repetition_ply.min(result2.repetition_ply);
+                    } else {
+                        result.depth = result.depth.min(result_null_window.depth.saturating_add(1));
+                        result.repetition_ply =
+                            result.repetition_ply.min(result_null_window.repetition_ply);
                     }
                 }
-                result.depth = result.depth.min(result2.depth.saturating_add(1));
-                result.repetition_ply = result.repetition_ply.min(result2.repetition_ply);
-            } else {
-                result.depth = result.depth.min(result_null_window.depth.saturating_add(1));
-                result.repetition_ply =
-                    result.repetition_ply.min(result_null_window.repetition_ply);
+                InternalMove::Null => {
+                    self.history.cut();
+                    let epos2 = eposition.make_null_move().unwrap();
+                    let result2 = self.search_alpha_beta::<EmptyVariation>(
+                        &epos2,
+                        -beta,
+                        -beta.prev(),
+                        depth - self.hyperparameters.reduction_null_move,
+                    )?;
+                    self.history.uncut();
+                    if -result2.score >= beta {
+                        return Ok(SearchResultInternal {
+                            score: beta,
+                            depth: result2
+                                .depth
+                                .saturating_add(self.hyperparameters.reduction_null_move),
+                            pv: V::empty_truncated(),
+                            // Repetitions don't count accross null move.
+                            repetition_ply: Ply::MAX,
+                        });
+                    }
+                }
             }
         }
 
@@ -793,24 +801,18 @@ struct RootMove {
     nodes: u64,
 }
 
-struct InternalMove {
-    mov: Move,
-    is_out_of_order: bool,
+enum InternalMove {
+    Move { mov: Move, extra: bool },
+    Null,
 }
 
 impl InternalMove {
     fn new(mov: Move) -> Self {
-        Self {
-            mov,
-            is_out_of_order: false,
-        }
+        Self::Move { mov, extra: false }
     }
 
-    fn out_of_order(mov: Move) -> Self {
-        Self {
-            mov,
-            is_out_of_order: true,
-        }
+    fn extra(mov: Move) -> Self {
+        Self::Move { mov, extra: true }
     }
 }
 
