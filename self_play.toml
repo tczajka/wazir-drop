@@ -2,7 +2,7 @@ log = "logs/self_play.log"
 
 [[command]]
 type = "self_play"
-output = "data/train3.data"
+output = "data/x.data"
 num_cpus = 62
 num_games = 25000000
 batch_size = 10000
@@ -16,7 +16,7 @@ features = "WPS"
 
 [[command]]
 type = "self_play"
-output = "data/test3.data"
+output = "data/x.data"
 num_cpus = 62
 num_games = 1000000
 batch_size = 10000
