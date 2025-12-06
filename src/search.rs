@@ -549,9 +549,11 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
             .into_iter();
 
-            let captures_and_checks = movegen::captures_checks(position)
+            let captures = movegen::captures_checks(position)
                 .chain(movegen::captures_non_checks(position))
-                .chain(movegen::jumps_checks(position))
+                .map(InternalMove::new);
+
+            let checks = movegen::jumps_checks(position)
                 .chain(movegen::drops_checks(position))
                 .map(InternalMove::new);
 
@@ -567,8 +569,9 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             Either::Right(
                 null_move
                     .chain(tt_move)
-                    .chain(captures_and_checks)
+                    .chain(captures)
                     .chain(killers)
+                    .chain(checks)
                     .chain(quiet_moves),
             )
         };
@@ -649,19 +652,18 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 InternalMove::Null => {
                     self.history.cut();
                     let epos2 = eposition.make_null_move().unwrap();
+                    let depth_diff = 1 + self.hyperparameters.reduction_null_move;
                     let result2 = self.search_alpha_beta::<EmptyVariation>(
                         &epos2,
                         -beta,
                         -beta.prev(),
-                        depth - self.hyperparameters.reduction_null_move,
+                        depth.saturating_sub(depth_diff),
                     )?;
                     self.history.uncut();
                     if -result2.score >= beta {
                         return Ok(SearchResultInternal {
                             score: beta,
-                            depth: result2
-                                .depth
-                                .saturating_add(self.hyperparameters.reduction_null_move),
+                            depth: result2.depth.saturating_add(depth_diff),
                             pv: V::empty_truncated(),
                             // Repetitions don't count accross null move.
                             repetition_ply: Ply::MAX,

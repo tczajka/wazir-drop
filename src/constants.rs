@@ -36,7 +36,7 @@ impl Default for Hyperparameters {
             pvtable_size: 16 << 20,
             time_alloc_decay_moves: 20.0,
             min_depth_ttable: 2,
-            reduction_null_move: 2,
+            reduction_null_move: 1,
         }
     }
 }
