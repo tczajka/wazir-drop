@@ -1,6 +1,6 @@
 use crate::{
     constants::{
-        Depth, Hyperparameters, Ply, CHECK_TIMEOUT_NODES, MAX_SEARCH_DEPTH, NUM_KILLER_MOVES,
+        Depth, Eval, Hyperparameters, Ply, CHECK_TIMEOUT_NODES, MAX_SEARCH_DEPTH, NUM_KILLER_MOVES,
         PLY_DRAW,
     },
     either::Either,
@@ -553,14 +553,21 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 .chain(movegen::captures_non_checks(position))
                 .map(InternalMove::new);
 
-            let checks = movegen::jumps_checks(position)
-                .chain(movegen::drops_checks(position))
-                .map(InternalMove::new);
+            let futility = if depth == 1 {
+                Some(InternalMove::Futility)
+            } else {
+                None
+            }
+            .into_iter();
 
             let killers = self.killer_moves[position.ply() as usize]
                 .into_iter()
                 .flatten()
                 .map(InternalMove::extra);
+
+            let checks = movegen::jumps_checks(position)
+                .chain(movegen::drops_checks(position))
+                .map(InternalMove::new);
 
             let quiet_moves = movegen::jumps_non_checks(position)
                 .chain(movegen::drops_non_checks(position))
@@ -572,6 +579,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     .chain(captures)
                     .chain(killers)
                     .chain(checks)
+                    .chain(futility)
                     .chain(quiet_moves),
             )
         };
@@ -666,6 +674,26 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                             depth: result2.depth.saturating_add(depth_diff),
                             pv: V::empty_truncated(),
                             // Repetitions don't count accross null move.
+                            repetition_ply: Ply::MAX,
+                        });
+                    }
+                }
+                InternalMove::Futility => {
+                    let futile = match ScoreExpanded::from(alpha) {
+                        ScoreExpanded::Win(_) => true,
+                        ScoreExpanded::Loss(_) => false,
+                        ScoreExpanded::Eval(alpha_eval) => {
+                            let margin = (self.hyperparameters.futility_margin
+                                * self.evaluator.scale())
+                                as Eval;
+                            eposition.evaluate() <= alpha_eval - margin
+                        }
+                    };
+                    if futile {
+                        return Ok(SearchResultInternal {
+                            score: alpha,
+                            depth,
+                            pv: V::empty_truncated(),
                             repetition_ply: Ply::MAX,
                         });
                     }
@@ -806,6 +834,7 @@ struct RootMove {
 enum InternalMove {
     Move { mov: Move, extra: bool },
     Null,
+    Futility,
 }
 
 impl InternalMove {

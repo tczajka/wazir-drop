@@ -27,6 +27,7 @@ pub struct Hyperparameters {
     pub time_alloc_decay_moves: f64,
     pub min_depth_ttable: Depth,
     pub reduction_null_move: Depth,
+    pub futility_margin: f32,
 }
 
 impl Default for Hyperparameters {
@@ -37,6 +38,7 @@ impl Default for Hyperparameters {
             time_alloc_decay_moves: 20.0,
             min_depth_ttable: 2,
             reduction_null_move: 1,
+            futility_margin: 0.8,
         }
     }
 }
