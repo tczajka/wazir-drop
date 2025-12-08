@@ -1,7 +1,7 @@
 use crate::{
     constants::{
-        Depth, Eval, Hyperparameters, Ply, CHECK_TIMEOUT_NODES, MAX_SEARCH_DEPTH, NUM_KILLER_MOVES,
-        PLY_DRAW,
+        Depth, Eval, Hyperparameters, Ply, CHECK_TIMEOUT_NODES, DEPTH_INCREMENT, MAX_SEARCH_DEPTH,
+        NUM_KILLER_MOVES, ONE_PLY, PLY_DRAW,
     },
     either::Either,
     history::History,
@@ -226,7 +226,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
         }
         self.history.pop();
-        self.depth = 1;
+        self.depth = ONE_PLY;
         self.root_moves_considered = self.root_moves.len();
         self.root_moves_exact_score = self.root_moves.len();
         self.sort_root_moves();
@@ -262,7 +262,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         let mut completed_depth;
         // First move.
         {
-            let next_depth = self.depth + 1;
+            let next_depth = self.depth + DEPTH_INCREMENT;
             let mov = self.root_moves[0].mov;
             let epos2 = eposition.make_move(mov).unwrap();
             let nodes_start = self.nodes;
@@ -270,14 +270,14 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 &epos2,
                 -Score::INFINITE,
                 Score::INFINITE,
-                next_depth - 1,
+                next_depth.saturating_sub(ONE_PLY),
             )?;
             self.depth = next_depth;
             self.pv = result.pv.add_front(mov);
             let root_move = &mut self.root_moves[0];
             root_move.score = -result.score;
             root_move.nodes += self.nodes - nodes_start;
-            completed_depth = result.depth.saturating_add(1);
+            completed_depth = result.depth.saturating_add(ONE_PLY);
             self.root_moves_considered = 1;
             self.root_moves_exact_score = 1;
         }
@@ -300,7 +300,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 &epos2,
                 -alpha.next(),
                 -alpha,
-                self.depth - 1,
+                self.depth.saturating_sub(ONE_PLY),
             )?;
             let score = -result_null_window.score;
             let root_move = &mut self.root_moves[self.root_moves_considered];
@@ -314,13 +314,13 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     &epos2,
                     -Score::INFINITE,
                     -alpha,
-                    self.depth - 1,
+                    self.depth.saturating_sub(ONE_PLY),
                 )?;
                 let score = -result.score;
                 let root_move = &mut self.root_moves[self.root_moves_considered];
                 root_move.nodes += self.nodes - nodes_start;
                 root_move.score = score;
-                completed_depth = completed_depth.min(result.depth.saturating_add(1));
+                completed_depth = completed_depth.min(result.depth.saturating_add(ONE_PLY));
                 if score > alpha {
                     self.root_moves
                         .swap(self.root_moves_exact_score, self.root_moves_considered);
@@ -331,7 +331,8 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     self.root_moves_exact_score += 1;
                 }
             } else {
-                completed_depth = completed_depth.min(result_null_window.depth.saturating_add(1));
+                completed_depth =
+                    completed_depth.min(result_null_window.depth.saturating_add(ONE_PLY));
             }
             self.root_moves_considered += 1;
         }
@@ -612,6 +613,8 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     }
 
                     let alpha2 = alpha.max(result.score);
+                    let depth_diff = ONE_PLY;
+                    let depth2 = depth.saturating_sub(depth_diff);
 
                     // Try null window first.
                     let result_null_window = if beta > alpha2.next() {
@@ -619,7 +622,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                             &epos2,
                             -alpha2.next(),
                             -alpha2,
-                            depth.saturating_sub(1),
+                            depth2,
                         )?
                     } else {
                         SearchResultInternal::<EmptyVariation> {
@@ -631,28 +634,26 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     };
 
                     if -result_null_window.score > alpha2 {
-                        let result2 = self.search_alpha_beta::<V::Truncated>(
-                            &epos2,
-                            -beta,
-                            -alpha2,
-                            depth.saturating_sub(1),
-                        )?;
+                        let result2 =
+                            self.search_alpha_beta::<V::Truncated>(&epos2, -beta, -alpha2, depth2)?;
                         let score = -result2.score;
+                        let depth_actual = result2.depth.saturating_add(depth_diff);
                         if score > result.score {
                             result.score = score;
                             if score > alpha {
                                 result.pv = result2.pv.add_front(mov);
                             }
                             if score >= beta {
-                                result.depth = result2.depth.saturating_add(1);
+                                result.depth = depth_actual;
                                 result.repetition_ply = result2.repetition_ply;
                                 break;
                             }
                         }
-                        result.depth = result.depth.min(result2.depth.saturating_add(1));
+                        result.depth = result.depth.min(depth_actual);
                         result.repetition_ply = result.repetition_ply.min(result2.repetition_ply);
                     } else {
-                        result.depth = result.depth.min(result_null_window.depth.saturating_add(1));
+                        let depth_actual = result_null_window.depth.saturating_add(depth_diff);
+                        result.depth = result.depth.min(depth_actual);
                         result.repetition_ply =
                             result.repetition_ply.min(result_null_window.repetition_ply);
                     }
@@ -660,7 +661,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 InternalMove::Null => {
                     self.history.cut();
                     let epos2 = eposition.make_null_move().unwrap();
-                    let depth_diff = 1 + self.hyperparameters.reduction_null_move;
+                    let depth_diff = ONE_PLY + self.hyperparameters.reduction_null_move;
                     let result2 = self.search_alpha_beta::<EmptyVariation>(
                         &epos2,
                         -beta,
