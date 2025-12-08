@@ -63,6 +63,10 @@ impl Timer {
         self.initial.saturating_sub(self.stopwatch.get())
     }
 
+    pub fn get_used(&self) -> Duration {
+        self.stopwatch.get()
+    }
+
     pub fn instant_at(&self, t: Duration) -> Instant {
         self.stopwatch.instant_at(self.initial.saturating_sub(t))
     }

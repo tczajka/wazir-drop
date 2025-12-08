@@ -8,7 +8,7 @@ use wazir_drop::{
 pub struct FinishedGame {
     pub moves: Vec<AnyMove>,
     pub outcome: Outcome,
-    pub time_left: EnumMap<Color, Duration>,
+    pub time_used: EnumMap<Color, Duration>,
 }
 
 pub fn run_game(
@@ -60,6 +60,6 @@ pub fn run_game(
     FinishedGame {
         moves,
         outcome,
-        time_left: EnumMap::from_fn(|color| timers[color].get()),
+        time_used: EnumMap::from_fn(|color| timers[color].get_used()),
     }
 }

@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 use threadpool::ThreadPool;
-use wazir_drop::{Color, Outcome, PlayerFactory, constants::DEFAULT_TIME_LIMIT, enums::EnumMap};
+use wazir_drop::{Color, Outcome, PlayerFactory, enums::EnumMap};
 
 #[derive(Debug, Clone)]
 pub struct MatchResult {
@@ -15,7 +15,7 @@ pub struct MatchResult {
     pub num_draws: usize,
     pub player0_points: i32,
     pub total_game_length: usize,
-    pub min_time_left: [Duration; 2],
+    pub max_time_used: [Duration; 2],
 }
 
 impl Display for MatchResult {
@@ -48,8 +48,8 @@ impl Display for MatchResult {
         // elo_diff = -400 * log10(2 / (score_per_game + 1) - 1)
         let elo_diff = -400.0 * (2.0 / (score_per_game + 1.0) - 1.0).log10();
         writeln!(f, "  ELO: {elo_diff:.3}")?;
-        write!(f, "  Min time left:")?;
-        for t in self.min_time_left {
+        write!(f, "  Max time used:")?;
+        for t in self.max_time_used {
             write!(f, " {}", t.as_millis())?;
         }
         writeln!(f)?;
@@ -73,7 +73,7 @@ pub fn run_match<RNG: Rng>(
         num_draws: 0,
         player0_points: 0,
         total_game_length: 0,
-        min_time_left: time_limits.map(|limit| limit.unwrap_or(DEFAULT_TIME_LIMIT)),
+        max_time_used: [Duration::ZERO; 2],
     }));
     for round in 0..num_rounds {
         let opening = random_opening(opening_length, rng);
@@ -102,12 +102,14 @@ pub fn run_match<RNG: Rng>(
                 match_result.total_game_length += finished_game.moves.len();
                 match_result.player0_points += player0_points;
                 for i in 0..2 {
-                    match_result.min_time_left[i] = match_result.min_time_left[i]
-                        .min(finished_game.time_left[Color::from_index(i ^ red_player_idx)]);
+                    match_result.max_time_used[i] = match_result.max_time_used[i]
+                        .max(finished_game.time_used[Color::from_index(i ^ red_player_idx)]);
                 }
                 log::info!(
-                    "{game_id} points {player0_points} total {running_points}",
-                    running_points = match_result.player0_points
+                    "{game_id} points {player0_points} total {running_points} time used {time_used_0} ms {time_used_1} ms",
+                    running_points = match_result.player0_points,
+                    time_used_0 = finished_game.time_used[Color::from_index(red_player_idx)].as_millis(),
+                    time_used_1 = finished_game.time_used[Color::from_index(red_player_idx ^ 1)].as_millis(),
                 );
             });
         }
