@@ -696,7 +696,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     }
                 }
                 InternalMove::Futility => {
-                    if depth == 1 {
+                    if depth <= ONE_PLY {
                         let futile = match ScoreExpanded::from(alpha) {
                             ScoreExpanded::Win(_) => true,
                             ScoreExpanded::Loss(_) => false,
