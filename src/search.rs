@@ -12,7 +12,7 @@ use crate::{
     EmptyVariation, EvaluatedPosition, Evaluator, ExtendableVariation, Move, NonEmptyVariation,
     PVTable, Position, Score, ScoreExpanded, Stage, Variation,
 };
-use std::{cmp::Reverse, sync::Arc, time::Instant};
+use std::{cmp::Reverse, iter, sync::Arc, time::Instant};
 
 pub struct Search<E> {
     hyperparameters: Hyperparameters,
@@ -554,12 +554,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 .chain(movegen::captures_non_checks(position))
                 .map(InternalMove::new);
 
-            let futility = if depth == 1 {
-                Some(InternalMove::Futility)
-            } else {
-                None
-            }
-            .into_iter();
+            let futility = iter::once(InternalMove::Futility);
 
             let killers = self.killer_moves[position.ply() as usize]
                 .into_iter()
@@ -587,6 +582,9 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
 
         let mut extra_moves = SmallVec::<Move, { 1 + NUM_KILLER_MOVES }>::new();
 
+        let mut move_index = 0;
+        let mut enable_late_move_reduction = false;
+
         for internal_move in moves {
             match internal_move {
                 InternalMove::Move { mov, extra } => {
@@ -612,51 +610,69 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                         extra_moves.push(mov);
                     }
 
-                    let alpha2 = alpha.max(result.score);
-                    let depth_diff = ONE_PLY;
-                    let depth2 = depth.saturating_sub(depth_diff);
+                    move_index += 1;
 
-                    // Try null window first.
-                    let result_null_window = if beta > alpha2.next() {
-                        self.search_alpha_beta::<EmptyVariation>(
+                    let alpha2 = alpha.max(result.score);
+
+                    // Try late move first.
+                    if enable_late_move_reduction
+                        && move_index > self.hyperparameters.late_move_reduction_start
+                    {
+                        let depth_diff = 2 * ONE_PLY;
+                        let depth2 = depth.saturating_sub(depth_diff);
+                        let result2 = self.search_alpha_beta::<V::Truncated>(
                             &epos2,
                             -alpha2.next(),
                             -alpha2,
                             depth2,
-                        )?
-                    } else {
-                        SearchResultInternal::<EmptyVariation> {
-                            score: -Score::INFINITE,
-                            depth: Depth::MAX,
-                            pv: EmptyVariation::empty_truncated(),
-                            repetition_ply: Ply::MAX,
+                        )?;
+                        if -result2.score <= alpha2 {
+                            result.depth =
+                                result.depth.min(result2.depth.saturating_add(depth_diff));
+                            result.repetition_ply =
+                                result.repetition_ply.min(result2.repetition_ply);
+                            continue;
+                        }
+                    }
+
+                    let depth_diff = ONE_PLY;
+                    let depth2 = depth.saturating_sub(depth_diff);
+
+                    // Try null window.
+                    if beta > alpha2.next() {
+                        let result2 = self.search_alpha_beta::<EmptyVariation>(
+                            &epos2,
+                            -alpha2.next(),
+                            -alpha2,
+                            depth2,
+                        )?;
+                        if -result2.score <= alpha2 {
+                            result.depth =
+                                result.depth.min(result2.depth.saturating_add(depth_diff));
+                            result.repetition_ply =
+                                result.repetition_ply.min(result2.repetition_ply);
+                            continue;
                         }
                     };
 
-                    if -result_null_window.score > alpha2 {
-                        let result2 =
-                            self.search_alpha_beta::<V::Truncated>(&epos2, -beta, -alpha2, depth2)?;
-                        let score = -result2.score;
-                        let depth_actual = result2.depth.saturating_add(depth_diff);
-                        if score > result.score {
-                            result.score = score;
-                            if score > alpha {
-                                result.pv = result2.pv.add_front(mov);
-                            }
-                            if score >= beta {
-                                result.depth = depth_actual;
-                                result.repetition_ply = result2.repetition_ply;
-                                break;
-                            }
+                    // Proper search.
+                    let result2 =
+                        self.search_alpha_beta::<V::Truncated>(&epos2, -beta, -alpha2, depth2)?;
+                    let score = -result2.score;
+                    let depth_actual = result2.depth.saturating_add(depth_diff);
+                    if score > result.score {
+                        result.score = score;
+                        if score > alpha {
+                            result.pv = result2.pv.add_front(mov);
                         }
-                        result.depth = result.depth.min(depth_actual);
-                        result.repetition_ply = result.repetition_ply.min(result2.repetition_ply);
-                    } else {
-                        let depth_actual = result_null_window.depth.saturating_add(depth_diff);
-                        result.depth = result.depth.min(depth_actual);
-                        result.repetition_ply =
-                            result.repetition_ply.min(result_null_window.repetition_ply);
+                        if score >= beta {
+                            result.depth = depth_actual;
+                            result.repetition_ply = result2.repetition_ply;
+                            break;
+                        }
                     }
+                    result.depth = result.depth.min(depth_actual);
+                    result.repetition_ply = result.repetition_ply.min(result2.repetition_ply);
                 }
                 InternalMove::Null => {
                     self.history.cut();
@@ -680,23 +696,27 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     }
                 }
                 InternalMove::Futility => {
-                    let futile = match ScoreExpanded::from(alpha) {
-                        ScoreExpanded::Win(_) => true,
-                        ScoreExpanded::Loss(_) => false,
-                        ScoreExpanded::Eval(alpha_eval) => {
-                            let margin = (self.hyperparameters.futility_margin
-                                * self.evaluator.scale())
-                                as Eval;
-                            eposition.evaluate() <= alpha_eval - margin
+                    if depth == 1 {
+                        let futile = match ScoreExpanded::from(alpha) {
+                            ScoreExpanded::Win(_) => true,
+                            ScoreExpanded::Loss(_) => false,
+                            ScoreExpanded::Eval(alpha_eval) => {
+                                let margin = (self.hyperparameters.futility_margin
+                                    * self.evaluator.scale())
+                                    as Eval;
+                                eposition.evaluate() <= alpha_eval - margin
+                            }
+                        };
+                        if futile {
+                            return Ok(SearchResultInternal {
+                                score: alpha,
+                                depth,
+                                pv: V::empty_truncated(),
+                                repetition_ply: Ply::MAX,
+                            });
                         }
-                    };
-                    if futile {
-                        return Ok(SearchResultInternal {
-                            score: alpha,
-                            depth,
-                            pv: V::empty_truncated(),
-                            repetition_ply: Ply::MAX,
-                        });
+                    } else {
+                        enable_late_move_reduction = true;
                     }
                 }
             }
