@@ -156,8 +156,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         self.history = History::new(position.ply());
 
         let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
-        self.search_shallow(&eposition);
-
         let max_depth = max_depth.unwrap_or(MAX_SEARCH_DEPTH);
         self.deadline = deadline;
         // Ignore timeout.
@@ -178,12 +176,22 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
     }
 
     fn generate_root_moves(&mut self, position: &Position) {
-        for mov in movegen::moves(position) {
-            self.root_moves.push(RootMove {
-                mov,
-                score: -Score::INFINITE,
-                nodes: 0,
-            });
+        let in_check = movegen::in_check(position, position.to_move());
+        for move_candidate in self.generate_move_candidates(position, in_check, false, None, false)
+        {
+            match move_candidate {
+                MoveCandidate::Move { mov, extra: _extra } => {
+                    self.root_moves.push(RootMove {
+                        mov,
+                        score: -Score::INFINITE,
+                        nodes: 0,
+                    });
+                }
+                MoveCandidate::Futility => {}
+                MoveCandidate::Null => {
+                    panic!("Null move in root moves");
+                }
+            }
         }
     }
 
@@ -206,39 +214,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         self.root_moves_exact_score = self.root_moves.len();
     }
 
-    fn search_shallow(&mut self, eposition: &EvaluatedPosition<E>) {
-        let hash = eposition.position().hash();
-        self.history.push(hash);
-        for move_idx in 0..self.root_moves.len() {
-            let mov = self.root_moves[move_idx].mov;
-            let epos2 = eposition.make_move(mov).unwrap();
-            let nodes_start = self.nodes;
-            let result = self
-                .quiescence_search::<LongVariation>(&epos2, -Score::INFINITE, Score::INFINITE)
-                .unwrap();
-            let score = -result.score;
-            let root_move = &mut self.root_moves[move_idx];
-            root_move.nodes += self.nodes - nodes_start;
-            root_move.score = score;
-            if move_idx == 0 || score > self.root_moves[0].score {
-                self.root_moves.swap(0, move_idx);
-                self.pv = result.pv.add_front(mov).truncate();
-            }
-        }
-        self.history.pop();
-        self.depth = ONE_PLY;
-        self.root_moves_considered = self.root_moves.len();
-        self.root_moves_exact_score = self.root_moves.len();
-        self.sort_root_moves();
-    }
-
-    fn sort_root_moves(&mut self) {
-        let (exact, other) = self.root_moves.split_at_mut(self.root_moves_exact_score);
-        let (_, exact_other) = exact.split_first_mut().unwrap();
-        exact_other.sort_by_key(|root_move| Reverse(root_move.score));
-        other.sort_by_key(|root_move| Reverse(root_move.nodes));
-    }
-
     fn iterative_deepening(
         &mut self,
         eposition: &EvaluatedPosition<E>,
@@ -247,11 +222,46 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
     ) -> Result<(), Timeout> {
         let hash = eposition.position().hash();
         self.history.push(hash);
+        // In case we can't finish quiescence search for a singl move, use the first generated move.
+        self.pv = LongVariation::empty().add_front(self.root_moves[0].mov);
+        self.search_shallow(eposition)?;
         while self.depth < max_depth {
             self.iterative_deepening_iteration(eposition, multi_move_threshold)?;
         }
         self.history.pop();
         Ok(())
+    }
+
+    fn search_shallow(&mut self, eposition: &EvaluatedPosition<E>) -> Result<(), Timeout> {
+        self.depth = ONE_PLY;
+        self.root_moves_considered = 0;
+        self.root_moves_exact_score = 0;
+        while self.root_moves_considered < self.root_moves.len() {
+            let mov = self.root_moves[self.root_moves_considered].mov;
+            let epos2 = eposition.make_move(mov).unwrap();
+            let nodes_start = self.nodes;
+            let result =
+                self.quiescence_search::<LongVariation>(&epos2, -Score::INFINITE, Score::INFINITE)?;
+            let score = -result.score;
+            let root_move = &mut self.root_moves[self.root_moves_considered];
+            root_move.nodes += self.nodes - nodes_start;
+            root_move.score = score;
+            if self.root_moves_considered == 0 || score > self.root_moves[0].score {
+                self.root_moves.swap(0, self.root_moves_considered);
+                self.pv = result.pv.add_front(mov).truncate();
+            }
+            self.root_moves_considered += 1;
+            self.root_moves_exact_score = self.root_moves_considered;
+        }
+        self.sort_root_moves();
+        Ok(())
+    }
+
+    fn sort_root_moves(&mut self) {
+        let (exact, other) = self.root_moves.split_at_mut(self.root_moves_exact_score);
+        let (_, exact_other) = exact.split_first_mut().unwrap();
+        exact_other.sort_by_key(|root_move| Reverse(root_move.score));
+        other.sort_by_key(|root_move| Reverse(root_move.nodes));
     }
 
     fn iterative_deepening_iteration(
@@ -536,58 +546,23 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             repetition_ply: Ply::MAX,
         };
 
-        let tt_move = tt_move.into_iter().map(InternalMove::extra);
-
-        let moves = if in_check {
-            Either::Left(tt_move.chain(movegen::check_evasions(position).map(InternalMove::new)))
-        } else {
-            let null_move = if depth >= self.hyperparameters.reduction_null_move
-                && self.history.last_cut() != Some(position.ply())
-            {
-                Some(InternalMove::Null)
-            } else {
-                None
-            }
-            .into_iter();
-
-            let captures = movegen::captures_checks(position)
-                .chain(movegen::captures_non_checks(position))
-                .map(InternalMove::new);
-
-            let futility = iter::once(InternalMove::Futility);
-
-            let killers = self.killer_moves[position.ply() as usize]
-                .into_iter()
-                .flatten()
-                .map(InternalMove::extra);
-
-            let checks = movegen::jumps_checks(position)
-                .chain(movegen::drops_checks(position))
-                .map(InternalMove::new);
-
-            let quiet_moves = movegen::jumps_non_checks(position)
-                .chain(movegen::drops_non_checks(position))
-                .map(InternalMove::new);
-
-            Either::Right(
-                null_move
-                    .chain(tt_move)
-                    .chain(captures)
-                    .chain(killers)
-                    .chain(checks)
-                    .chain(futility)
-                    .chain(quiet_moves),
-            )
-        };
+        let move_candidates = self.generate_move_candidates(
+            position,
+            in_check,
+            depth >= self.hyperparameters.reduction_null_move
+                && self.history.last_cut() != Some(position.ply()),
+            tt_move,
+            true,
+        );
 
         let mut extra_moves = SmallVec::<Move, { 1 + NUM_KILLER_MOVES }>::new();
 
         let mut move_index = 0;
         let mut enable_late_move_reduction = false;
 
-        for internal_move in moves {
-            match internal_move {
-                InternalMove::Move { mov, extra } => {
+        for move_candidate in move_candidates {
+            match move_candidate {
+                MoveCandidate::Move { mov, extra } => {
                     if extra_moves.contains(&mov) {
                         continue;
                     }
@@ -674,7 +649,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     result.depth = result.depth.min(depth_actual);
                     result.repetition_ply = result.repetition_ply.min(result2.repetition_ply);
                 }
-                InternalMove::Null => {
+                MoveCandidate::Null => {
                     self.history.cut();
                     let epos2 = eposition.make_null_move().unwrap();
                     let depth_diff = ONE_PLY + self.hyperparameters.reduction_null_move;
@@ -695,7 +670,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                         });
                     }
                 }
-                InternalMove::Futility => {
+                MoveCandidate::Futility => {
                     if depth <= ONE_PLY {
                         let futile = match ScoreExpanded::from(alpha) {
                             ScoreExpanded::Win(_) => true,
@@ -828,6 +803,62 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         }
         Ok(())
     }
+
+    fn generate_move_candidates<'pos>(
+        &self,
+        position: &'pos Position,
+        in_check: bool,
+        use_null_move: bool,
+        tt_move: Option<Move>,
+        use_killers: bool,
+    ) -> impl Iterator<Item = MoveCandidate> + 'pos {
+        let tt_move = tt_move.into_iter().map(MoveCandidate::extra);
+        if in_check {
+            Either::Left(tt_move.chain(movegen::check_evasions(position).map(MoveCandidate::new)))
+        } else {
+            let null_move = if use_null_move {
+                Some(MoveCandidate::Null)
+            } else {
+                None
+            }
+            .into_iter();
+
+            let captures = movegen::captures_checks(position)
+                .chain(movegen::captures_non_checks(position))
+                .map(MoveCandidate::new);
+
+            let futility = iter::once(MoveCandidate::Futility);
+
+            let killers = if use_killers {
+                Either::Left(
+                    self.killer_moves[position.ply() as usize]
+                        .into_iter()
+                        .flatten()
+                        .map(MoveCandidate::extra),
+                )
+            } else {
+                Either::Right(iter::empty())
+            };
+
+            let checks = movegen::jumps_checks(position)
+                .chain(movegen::drops_checks(position))
+                .map(MoveCandidate::new);
+
+            let quiet_moves = movegen::jumps_non_checks(position)
+                .chain(movegen::drops_non_checks(position))
+                .map(MoveCandidate::new);
+
+            Either::Right(
+                null_move
+                    .chain(tt_move)
+                    .chain(captures)
+                    .chain(killers)
+                    .chain(checks)
+                    .chain(futility)
+                    .chain(quiet_moves),
+            )
+        }
+    }
 }
 
 pub struct SearchResult {
@@ -852,13 +883,13 @@ struct RootMove {
     nodes: u64,
 }
 
-enum InternalMove {
+enum MoveCandidate {
     Move { mov: Move, extra: bool },
     Null,
     Futility,
 }
 
-impl InternalMove {
+impl MoveCandidate {
     fn new(mov: Move) -> Self {
         Self::Move { mov, extra: false }
     }
