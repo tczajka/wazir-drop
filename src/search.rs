@@ -168,7 +168,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             self.root_moves.push(RootMove {
                 mov,
                 score,
-                nodes: 0,
+                futile: false,
             });
         }
         self.root_moves_considered = self.root_moves.len();
@@ -177,6 +177,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
 
     fn generate_root_moves(&mut self, position: &Position) {
         let in_check = movegen::in_check(position, position.to_move());
+        let mut futile = false;
         for move_candidate in self.generate_move_candidates(position, in_check, false, None, false)
         {
             match move_candidate {
@@ -184,10 +185,12 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     self.root_moves.push(RootMove {
                         mov,
                         score: -Score::INFINITE,
-                        nodes: 0,
+                        futile,
                     });
                 }
-                MoveCandidate::Futility => {}
+                MoveCandidate::Futility => {
+                    futile = true;
+                }
                 MoveCandidate::Null => {
                     panic!("Null move in root moves");
                 }
@@ -207,7 +210,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             self.root_moves.push(RootMove {
                 mov,
                 score,
-                nodes: 0,
+                futile: false,
             });
         }
         self.root_moves_considered = self.root_moves.len();
@@ -239,12 +242,10 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         while self.root_moves_considered < self.root_moves.len() {
             let mov = self.root_moves[self.root_moves_considered].mov;
             let epos2 = eposition.make_move(mov).unwrap();
-            let nodes_start = self.nodes;
             let result =
                 self.quiescence_search::<LongVariation>(&epos2, -Score::INFINITE, Score::INFINITE)?;
             let score = -result.score;
             let root_move = &mut self.root_moves[self.root_moves_considered];
-            root_move.nodes += self.nodes - nodes_start;
             root_move.score = score;
             if self.root_moves_considered == 0 || score > self.root_moves[0].score {
                 self.root_moves.swap(0, self.root_moves_considered);
@@ -258,10 +259,8 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
     }
 
     fn sort_root_moves(&mut self) {
-        let (exact, other) = self.root_moves.split_at_mut(self.root_moves_exact_score);
-        let (_, exact_other) = exact.split_first_mut().unwrap();
-        exact_other.sort_by_key(|root_move| Reverse(root_move.score));
-        other.sort_by_key(|root_move| Reverse(root_move.nodes));
+        self.root_moves[1..self.root_moves_exact_score]
+            .sort_by_key(|root_move| Reverse(root_move.score));
     }
 
     fn iterative_deepening_iteration(
@@ -273,21 +272,19 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         // First move.
         {
             let next_depth = self.depth + DEPTH_INCREMENT;
+            let depth_diff = ONE_PLY;
             let mov = self.root_moves[0].mov;
             let epos2 = eposition.make_move(mov).unwrap();
-            let nodes_start = self.nodes;
             let result = self.search_alpha_beta::<LongVariation>(
                 &epos2,
                 -Score::INFINITE,
                 Score::INFINITE,
-                next_depth.saturating_sub(ONE_PLY),
+                next_depth.saturating_sub(depth_diff),
             )?;
             self.depth = next_depth;
             self.pv = result.pv.add_front(mov);
-            let root_move = &mut self.root_moves[0];
-            root_move.score = -result.score;
-            root_move.nodes += self.nodes - nodes_start;
-            completed_depth = result.depth.saturating_add(ONE_PLY);
+            self.root_moves[0].score = -result.score;
+            completed_depth = result.depth.saturating_add(depth_diff);
             self.root_moves_considered = 1;
             self.root_moves_exact_score = 1;
         }
@@ -297,7 +294,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             let mov = self.root_moves[self.root_moves_considered].mov;
             let epos2 = eposition.make_move(mov).unwrap();
 
-            // PVS: Try null window first.
             let alpha = match multi_move_threshold {
                 Some(multi_move_threshold) => self.root_moves[0]
                     .score
@@ -305,44 +301,63 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     .prev(),
                 None => self.root_moves[0].score,
             };
-            let nodes_start = self.nodes;
-            let result_null_window = self.search_alpha_beta::<EmptyVariation>(
+
+            // Late move reduction.
+            if self.root_moves_considered >= self.hyperparameters.late_move_reduction_start
+                && self.root_moves[self.root_moves_considered].futile
+            {
+                let depth_diff = 2 * ONE_PLY;
+                let result = self.search_alpha_beta::<EmptyVariation>(
+                    &epos2,
+                    -alpha.next(),
+                    -alpha,
+                    self.depth.saturating_sub(depth_diff),
+                )?;
+                let score = -result.score;
+                self.root_moves[self.root_moves_considered].score = score;
+                if score <= alpha {
+                    completed_depth = completed_depth.min(result.depth.saturating_add(depth_diff));
+                    self.root_moves_considered += 1;
+                    continue;
+                }
+            }
+
+            let depth_diff = ONE_PLY;
+
+            // Null window.
+            let result = self.search_alpha_beta::<EmptyVariation>(
                 &epos2,
                 -alpha.next(),
                 -alpha,
-                self.depth.saturating_sub(ONE_PLY),
+                self.depth.saturating_sub(depth_diff),
             )?;
-            let score = -result_null_window.score;
-            let root_move = &mut self.root_moves[self.root_moves_considered];
-            root_move.nodes += self.nodes - nodes_start;
-            root_move.score = score;
+            let score = -result.score;
+            self.root_moves[self.root_moves_considered].score = score;
 
+            if score <= alpha {
+                completed_depth = completed_depth.min(result.depth.saturating_add(depth_diff));
+                self.root_moves_considered += 1;
+                continue;
+            }
+
+            // Full window search.
+            let result = self.search_alpha_beta::<LongVariation>(
+                &epos2,
+                -Score::INFINITE,
+                -alpha,
+                self.depth.saturating_sub(depth_diff),
+            )?;
+            let score = -result.score;
+            self.root_moves[self.root_moves_considered].score = score;
+            completed_depth = completed_depth.min(result.depth.saturating_add(depth_diff));
             if score > alpha {
-                // Full window search.
-                let nodes_start = self.nodes;
-                let result = self.search_alpha_beta::<LongVariation>(
-                    &epos2,
-                    -Score::INFINITE,
-                    -alpha,
-                    self.depth.saturating_sub(ONE_PLY),
-                )?;
-                let score = -result.score;
-                let root_move = &mut self.root_moves[self.root_moves_considered];
-                root_move.nodes += self.nodes - nodes_start;
-                root_move.score = score;
-                completed_depth = completed_depth.min(result.depth.saturating_add(ONE_PLY));
-                if score > alpha {
-                    self.root_moves
-                        .swap(self.root_moves_exact_score, self.root_moves_considered);
-                    if score > self.root_moves[0].score {
-                        self.root_moves.swap(0, self.root_moves_exact_score);
-                        self.pv = result.pv.add_front(mov);
-                    }
-                    self.root_moves_exact_score += 1;
+                self.root_moves
+                    .swap(self.root_moves_exact_score, self.root_moves_considered);
+                if score > self.root_moves[0].score {
+                    self.root_moves.swap(0, self.root_moves_exact_score);
+                    self.pv = result.pv.add_front(mov);
                 }
-            } else {
-                completed_depth =
-                    completed_depth.min(result_null_window.depth.saturating_add(ONE_PLY));
+                self.root_moves_exact_score += 1;
             }
             self.root_moves_considered += 1;
         }
@@ -880,7 +895,7 @@ pub struct ScoredMove {
 struct RootMove {
     mov: Move,
     score: Score,
-    nodes: u64,
+    futile: bool,
 }
 
 enum MoveCandidate {
