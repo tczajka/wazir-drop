@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 pub const DEFAULT_TIME_LIMIT: Duration = Duration::from_secs(30);
-pub const TIME_MARGIN: Duration = Duration::from_millis(200);
+pub const TIME_MARGIN: Duration = Duration::from_millis(300);
 pub const MAX_VARIATION_LENGTH: usize = 100;
 pub const CHECK_TIMEOUT_NODES: u64 = 256;
 
