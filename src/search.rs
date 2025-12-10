@@ -262,7 +262,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             let root_move = &mut self.root_moves[self.root_moves_considered];
             root_move.score = score;
             if self.root_moves_considered == 0 || score > self.root_moves[0].score {
-                self.root_moves.swap(0, self.root_moves_considered);
+                self.root_moves[0..=self.root_moves_considered].rotate_right(1);
                 self.pv = result.pv.add_front(mov).truncate();
             }
             self.root_moves_considered += 1;
@@ -386,13 +386,13 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             self.root_moves[self.root_moves_considered].score = score;
             completed_depth = completed_depth.min(result.depth.saturating_add(depth_diff));
             if score > alpha {
-                self.root_moves
-                    .swap(self.root_moves_exact_score, self.root_moves_considered);
+                self.root_moves[self.root_moves_exact_score..=self.root_moves_considered]
+                    .rotate_right(1);
+                self.root_moves_exact_score += 1;
                 if score > self.root_moves[0].score {
-                    self.root_moves.swap(0, self.root_moves_exact_score);
+                    self.root_moves[0..self.root_moves_exact_score].rotate_right(1);
                     self.pv = result.pv.add_front(mov);
                 }
-                self.root_moves_exact_score += 1;
             }
             self.root_moves_considered += 1;
         }
