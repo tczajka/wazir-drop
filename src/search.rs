@@ -5,7 +5,7 @@ use crate::{
     },
     either::Either,
     history::History,
-    movegen,
+    log, movegen,
     smallvec::SmallVec,
     ttable::{TTable, TTableEntry, TTableScoreType},
     variation::LongVariation,
@@ -20,6 +20,13 @@ pub struct Search<E> {
     ttable: TTable,
     pvtable: PVTable,
     killer_moves: Vec<[Option<Move>; NUM_KILLER_MOVES]>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct Deadlines {
+    pub hard: Instant,
+    pub soft: Instant,
+    pub start_next_depth: Instant,
 }
 
 impl<E: Evaluator> Search<E> {
@@ -37,11 +44,11 @@ impl<E: Evaluator> Search<E> {
         &mut self,
         position: &Position,
         max_depth: Option<Depth>,
-        deadline: Option<Instant>,
+        deadlines: Option<Deadlines>,
         multi_move_threshold: Option<i32>,
     ) -> SearchResult {
-        let mut instance = SearchInstance::new(self);
-        instance.search(position, max_depth, deadline, multi_move_threshold)
+        let mut instance = SearchInstance::new(self, max_depth, deadlines, multi_move_threshold);
+        instance.search(position)
     }
 }
 
@@ -52,7 +59,10 @@ struct SearchInstance<'a, E: Evaluator> {
     ttable: &'a mut TTable,
     pvtable: &'a mut PVTable,
     killer_moves: &'a mut [[Option<Move>; NUM_KILLER_MOVES]],
-    deadline: Option<Instant>,
+    max_depth: Depth,
+    deadlines: Option<Deadlines>,
+    multi_move_threshold: Option<i32>,
+    hard_deadline: Option<Instant>,
     nodes: u64,
     root_moves: Vec<RootMove>,
     depth: Depth,
@@ -63,14 +73,23 @@ struct SearchInstance<'a, E: Evaluator> {
 }
 
 impl<'a, E: Evaluator> SearchInstance<'a, E> {
-    fn new(search: &'a mut Search<E>) -> Self {
+    fn new(
+        search: &'a mut Search<E>,
+        max_depth: Option<Depth>,
+        deadlines: Option<Deadlines>,
+        multi_move_threshold: Option<i32>,
+    ) -> Self {
+        assert!(multi_move_threshold.is_none() || deadlines.is_none());
         Self {
             hyperparameters: search.hyperparameters.clone(),
             evaluator: &search.evaluator,
             ttable: &mut search.ttable,
             pvtable: &mut search.pvtable,
             killer_moves: &mut search.killer_moves,
-            deadline: None,
+            max_depth: max_depth.unwrap_or(MAX_SEARCH_DEPTH),
+            deadlines,
+            multi_move_threshold,
+            hard_deadline: None,
             nodes: 0,
             root_moves: Vec::new(),
             depth: 0,
@@ -81,25 +100,17 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         }
     }
 
-    fn search(
-        &mut self,
-        position: &Position,
-        max_depth: Option<Depth>,
-        deadline: Option<Instant>,
-        multi_move_threshold: Option<i32>,
-    ) -> SearchResult {
-        assert!(multi_move_threshold.is_none() || deadline.is_none());
-
+    fn search(&mut self, position: &Position) -> SearchResult {
         let score = match position.stage() {
             Stage::Setup => panic!("SearchInstance::search does not support setup"),
             Stage::Regular => {
-                self.search_root(position, max_depth, deadline, multi_move_threshold);
+                self.search_root(position);
                 self.root_moves[0].score
             }
             Stage::End(outcome) => outcome.to_score(position.ply()),
         };
 
-        let top_moves = match multi_move_threshold {
+        let top_moves = match self.multi_move_threshold {
             Some(multi_move_threshold) => {
                 let threshold = score.offset(-multi_move_threshold);
                 self.root_moves[..self.root_moves_exact_score]
@@ -125,13 +136,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         }
     }
 
-    fn search_root(
-        &mut self,
-        position: &Position,
-        max_depth: Option<Depth>,
-        deadline: Option<Instant>,
-        multi_move_threshold: Option<i32>,
-    ) {
+    fn search_root(&mut self, position: &Position) {
         self.generate_root_captures_of_wazir(position);
         if let Some(root_move) = self.root_moves.first() {
             self.depth = Depth::MAX;
@@ -156,10 +161,9 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         self.history = History::new(position.ply());
 
         let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
-        let max_depth = max_depth.unwrap_or(MAX_SEARCH_DEPTH);
-        self.deadline = deadline;
+
         // Ignore timeout.
-        _ = self.iterative_deepening(&eposition, max_depth, multi_move_threshold);
+        _ = self.iterative_deepening(&eposition);
     }
 
     fn generate_root_captures_of_wazir(&mut self, position: &Position) {
@@ -217,29 +221,37 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         self.root_moves_exact_score = self.root_moves.len();
     }
 
-    fn iterative_deepening(
-        &mut self,
-        eposition: &EvaluatedPosition<E>,
-        max_depth: Depth,
-        multi_move_threshold: Option<i32>,
-    ) -> Result<(), Timeout> {
+    fn iterative_deepening(&mut self, eposition: &EvaluatedPosition<E>) -> Result<(), Timeout> {
         let hash = eposition.position().hash();
         self.history.push(hash);
         // In case we can't finish quiescence search for a singl move, use the first generated move.
         self.pv = LongVariation::empty().add_front(self.root_moves[0].mov);
         self.search_shallow(eposition)?;
-        while self.depth < max_depth {
-            self.iterative_deepening_iteration(eposition, multi_move_threshold)?;
+        while self.depth < self.max_depth {
+            if let Some(ds) = self.deadlines.as_ref() {
+                if Instant::now() >= ds.start_next_depth {
+                    log::info!("next depth timeout");
+                    break;
+                }
+            }
+            self.iterative_deepening_iteration(eposition)?;
         }
         self.history.pop();
         Ok(())
     }
 
     fn search_shallow(&mut self, eposition: &EvaluatedPosition<E>) -> Result<(), Timeout> {
+        self.hard_deadline = self.deadlines.as_ref().map(|ds| ds.hard);
         self.depth = ONE_PLY;
         self.root_moves_considered = 0;
         self.root_moves_exact_score = 0;
         while self.root_moves_considered < self.root_moves.len() {
+            if let Some(ds) = self.deadlines.as_ref() {
+                if Instant::now() >= ds.soft {
+                    log::info!("shallow soft timeout");
+                    return Err(Timeout);
+                }
+            }
             let mov = self.root_moves[self.root_moves_considered].mov;
             let epos2 = eposition.make_move(mov).unwrap();
             let result =
@@ -266,9 +278,9 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
     fn iterative_deepening_iteration(
         &mut self,
         eposition: &EvaluatedPosition<E>,
-        multi_move_threshold: Option<i32>,
     ) -> Result<(), Timeout> {
         let mut completed_depth;
+        self.hard_deadline = self.deadlines.as_ref().map(|ds| ds.hard);
         // First move.
         {
             let next_depth = self.depth + DEPTH_INCREMENT;
@@ -291,10 +303,16 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
 
         // Other moves.
         while self.root_moves_considered < self.root_moves.len() {
+            if let Some(ds) = self.deadlines.as_ref() {
+                if Instant::now() >= ds.soft {
+                    log::info!("soft timeout");
+                    return Err(Timeout);
+                }
+            }
             let mov = self.root_moves[self.root_moves_considered].mov;
             let epos2 = eposition.make_move(mov).unwrap();
 
-            let alpha = match multi_move_threshold {
+            let alpha = match self.multi_move_threshold {
                 Some(multi_move_threshold) => self.root_moves[0]
                     .score
                     .offset(-multi_move_threshold)
@@ -811,8 +829,9 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
 
     fn new_node(&mut self) -> Result<(), Timeout> {
         self.nodes += 1;
-        if let Some(deadline) = self.deadline {
+        if let Some(deadline) = self.hard_deadline {
             if self.nodes % CHECK_TIMEOUT_NODES == 0 && Instant::now() >= deadline {
+                log::info!("hard timeout");
                 return Err(Timeout);
             }
         }

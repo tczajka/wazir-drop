@@ -1,8 +1,8 @@
 use crate::{
     clock::Timer,
-    constants::{Hyperparameters, TIME_MARGIN},
-    log, AnyMove, Color, DefaultEvaluator, Evaluator, Player, PlayerFactory, Position, Search,
-    SetupMove, Stage,
+    constants::{Hyperparameters, Ply, PLY_DRAW, TIME_MARGIN},
+    log, AnyMove, Color, Deadlines, DefaultEvaluator, Evaluator, Player, PlayerFactory, Position,
+    Search, SetupMove, Stage,
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
 
@@ -11,8 +11,40 @@ struct MainPlayer<E: Evaluator> {
     search: Search<E>,
 }
 
+impl<E: Evaluator> MainPlayer<E> {
+    fn time_allocation(&self, ply: Ply, time_left: Duration, timer: &Timer) -> Deadlines {
+        let mut weight = 1.0;
+        let mut total_weight = 0.0;
+        let mut p = ply;
+        while p < PLY_DRAW {
+            total_weight += weight;
+            let reduction = if p < self.hyperparameters.late_ply {
+                self.hyperparameters.time_reduction_per_move
+            } else {
+                self.hyperparameters.time_reduction_per_late_move
+            };
+            weight *= 1.0 - reduction;
+            p += 2;
+        }
+        let fraction = 1.0 / total_weight;
+        let time_left = time_left.saturating_sub(TIME_MARGIN);
+        Deadlines {
+            hard: timer.instant_at(time_left.mul_f64(1.0 - fraction) + TIME_MARGIN),
+            soft: timer.instant_at(
+                time_left.mul_f64(1.0 - fraction * self.hyperparameters.soft_time_fraction)
+                    + TIME_MARGIN,
+            ),
+            start_next_depth: timer.instant_at(
+                time_left.mul_f64(1.0 - fraction * self.hyperparameters.start_next_depth_fraction)
+                    + TIME_MARGIN,
+            ),
+        }
+    }
+}
+
 impl<E: Evaluator> Player for MainPlayer<E> {
     fn make_move(&mut self, position: &Position, timer: &Timer) -> AnyMove {
+        let time_left = timer.get();
         match position.stage() {
             Stage::Setup => {
                 let mov = SetupMove::from_str("AAAAAAWANDDDDFFA").unwrap();
@@ -23,17 +55,11 @@ impl<E: Evaluator> Player for MainPlayer<E> {
                 .into()
             }
             Stage::Regular => {
-                // TODO: Use more time when approaching 100 moves.
-                let time_left = timer.get();
-                let fraction = 1.0 / self.hyperparameters.time_alloc_decay_moves;
-                let deadline = timer.instant_at(
-                    TIME_MARGIN + (time_left.saturating_sub(TIME_MARGIN)).mul_f64(1.0 - fraction),
-                );
-
+                let deadlines = self.time_allocation(position.ply(), time_left, timer);
                 let result = self.search.search(
                     position,
                     None, /* max_depth */
-                    Some(deadline),
+                    Some(deadlines),
                     None, /* multi_move_threshold */
                 );
                 let elapsed = time_left.saturating_sub(timer.get());

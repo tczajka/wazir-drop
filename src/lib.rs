@@ -55,7 +55,7 @@ pub use player::{Player, PlayerFactory};
 pub use position::{Outcome, Position, Stage};
 pub use pvtable::PVTable;
 pub use score::{Score, ScoreExpanded};
-pub use search::{ScoredMove, Search};
+pub use search::{Deadlines, ScoredMove, Search};
 pub use square::{Coord, Direction, Square};
 pub use symmetry::{NormalizedSquare, Symmetry};
 pub use variation::{

@@ -26,11 +26,15 @@ pub const HISTORY_BLOOM_FILTER_NUM_HASHES: usize = 2;
 pub struct Hyperparameters {
     pub ttable_size: usize,
     pub pvtable_size: usize,
-    pub time_alloc_decay_moves: f64,
     pub min_depth_ttable: Depth,
     pub reduction_null_move: Depth,
     pub futility_margin: f32,
     pub late_move_reduction_start: usize,
+    pub time_reduction_per_move: f64,
+    pub time_reduction_per_late_move: f64,
+    pub late_ply: Ply,
+    pub soft_time_fraction: f64,
+    pub start_next_depth_fraction: f64,
 }
 
 impl Default for Hyperparameters {
@@ -38,11 +42,15 @@ impl Default for Hyperparameters {
         Self {
             ttable_size: 256 << 20,
             pvtable_size: 16 << 20,
-            time_alloc_decay_moves: 20.0,
             min_depth_ttable: 2 * ONE_PLY,
             reduction_null_move: ONE_PLY,
             futility_margin: 0.8,
             late_move_reduction_start: 5,
+            time_reduction_per_move: 0.05,
+            time_reduction_per_late_move: 0.5,
+            late_ply: 96,
+            soft_time_fraction: 0.8,
+            start_next_depth_fraction: 0.4,
         }
     }
 }

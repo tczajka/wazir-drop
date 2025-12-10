@@ -16,8 +16,8 @@ use std::{
     time::{Duration, Instant},
 };
 use wazir_drop::{
-    AnyMove, Color, ColoredPiece, Coord, DefaultEvaluator, Piece, Position, Search, SetupMove,
-    ShortMove, ShortMoveFrom, Square, Stage, Symmetry,
+    AnyMove, Color, ColoredPiece, Coord, Deadlines, DefaultEvaluator, Piece, Position, Search,
+    SetupMove, ShortMove, ShortMoveFrom, Square, Stage, Symmetry,
     constants::Hyperparameters,
     enums::{EnumMap, SimpleEnumExt},
     movegen,
@@ -313,9 +313,15 @@ impl WazirDropApp {
         let search = self.search.clone();
         let ctx = ctx.clone();
         let time_limit_ms = self.time_limit_str.parse::<u32>().unwrap_or(1000);
+        let time_limit = Duration::from_millis(time_limit_ms.into());
 
         _ = thread::spawn(move || {
-            let deadline = Instant::now() + Duration::from_millis(time_limit_ms.into());
+            let now = Instant::now();
+            let deadlines = Deadlines {
+                hard: now + time_limit,
+                soft: now + time_limit.mul_f64(0.9),
+                start_next_depth: now + time_limit.mul_f64(0.5),
+            };
             let mov = match position.stage() {
                 Stage::Setup => {
                     moverand::random_setup(position.to_move(), &mut rng.lock().unwrap()).into()
@@ -324,7 +330,7 @@ impl WazirDropApp {
                     let result = search.lock().unwrap().search(
                         &position,
                         None, /* max_depth */
-                        Some(deadline),
+                        Some(deadlines),
                         None, /* multi_move_threshold */
                     );
                     log::info!(
