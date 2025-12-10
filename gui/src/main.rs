@@ -321,6 +321,8 @@ impl WazirDropApp {
                 hard: now + time_limit,
                 soft: now + time_limit.mul_f64(0.9),
                 start_next_depth: now + time_limit.mul_f64(0.5),
+                panic_hard: now + time_limit.mul_f64(4.0),
+                panic_soft: now + time_limit.mul_f64(4.0 * 0.9),
             };
             let mov = match position.stage() {
                 Stage::Setup => {

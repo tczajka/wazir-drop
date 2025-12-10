@@ -35,6 +35,9 @@ pub struct Hyperparameters {
     pub late_ply: Ply,
     pub soft_time_fraction: f64,
     pub start_next_depth_fraction: f64,
+    pub panic_eval_threshold: f64,
+    pub panic_multiplier: f64,
+    pub panic_max_remaining: f64,
 }
 
 impl Default for Hyperparameters {
@@ -51,6 +54,9 @@ impl Default for Hyperparameters {
             late_ply: 96,
             soft_time_fraction: 0.8,
             start_next_depth_fraction: 0.4,
+            panic_eval_threshold: 0.1,
+            panic_multiplier: 2.0,
+            panic_max_remaining: 0.3,
         }
     }
 }

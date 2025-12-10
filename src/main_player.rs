@@ -26,18 +26,23 @@ impl<E: Evaluator> MainPlayer<E> {
             weight *= 1.0 - reduction;
             p += 2;
         }
+        let to_allocate = time_left.saturating_sub(TIME_MARGIN);
         let fraction = 1.0 / total_weight;
-        let time_left = time_left.saturating_sub(TIME_MARGIN);
+        let soft_fraction = fraction * self.hyperparameters.soft_time_fraction;
+        let next_depth_fraction = fraction * self.hyperparameters.start_next_depth_fraction;
+        let panic_fraction = (fraction * self.hyperparameters.panic_multiplier)
+            .min(self.hyperparameters.panic_max_remaining)
+            .max(fraction);
+        let panic_soft_fraction = panic_fraction * self.hyperparameters.soft_time_fraction;
         Deadlines {
-            hard: timer.instant_at(time_left.mul_f64(1.0 - fraction) + TIME_MARGIN),
-            soft: timer.instant_at(
-                time_left.mul_f64(1.0 - fraction * self.hyperparameters.soft_time_fraction)
-                    + TIME_MARGIN,
-            ),
-            start_next_depth: timer.instant_at(
-                time_left.mul_f64(1.0 - fraction * self.hyperparameters.start_next_depth_fraction)
-                    + TIME_MARGIN,
-            ),
+            hard: timer.instant_at(time_left.saturating_sub(to_allocate.mul_f64(fraction))),
+            soft: timer.instant_at(time_left.saturating_sub(to_allocate.mul_f64(soft_fraction))),
+            start_next_depth: timer
+                .instant_at(time_left.saturating_sub(to_allocate.mul_f64(next_depth_fraction))),
+            panic_hard: timer
+                .instant_at(time_left.saturating_sub(to_allocate.mul_f64(panic_fraction))),
+            panic_soft: timer
+                .instant_at(time_left.saturating_sub(to_allocate.mul_f64(panic_soft_fraction))),
         }
     }
 }

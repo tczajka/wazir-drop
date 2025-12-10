@@ -27,6 +27,8 @@ pub struct Deadlines {
     pub hard: Instant,
     pub soft: Instant,
     pub start_next_depth: Instant,
+    pub panic_hard: Instant,
+    pub panic_soft: Instant,
 }
 
 impl<E: Evaluator> Search<E> {
@@ -280,9 +282,18 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         eposition: &EvaluatedPosition<E>,
     ) -> Result<(), Timeout> {
         let mut completed_depth;
-        self.hard_deadline = self.deadlines.as_ref().map(|ds| ds.hard);
+        let panic_threshold = match ScoreExpanded::from(self.root_moves[0].score) {
+            ScoreExpanded::Win(_) => Score::WIN_MAX_PLY,
+            ScoreExpanded::Loss(_) => -Score::INFINITE,
+            ScoreExpanded::Eval(eval) => ScoreExpanded::Eval(
+                eval - (self.evaluator.scale() as f64 * self.hyperparameters.panic_eval_threshold)
+                    as Eval,
+            )
+            .into(),
+        };
         // First move.
         {
+            self.hard_deadline = self.deadlines.as_ref().map(|ds| ds.hard);
             let next_depth = self.depth + DEPTH_INCREMENT;
             let depth_diff = ONE_PLY;
             let mov = self.root_moves[0].mov;
@@ -304,11 +315,17 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         // Other moves.
         while self.root_moves_considered < self.root_moves.len() {
             if let Some(ds) = self.deadlines.as_ref() {
-                if Instant::now() >= ds.soft {
+                let is_panic = self.root_moves[0].score < panic_threshold;
+                let soft_deadline = if is_panic { ds.panic_soft } else { ds.soft };
+                if Instant::now() >= soft_deadline {
                     log::info!("soft timeout");
                     return Err(Timeout);
                 }
+                self.hard_deadline = Some(if is_panic { ds.panic_hard } else { ds.hard });
+            } else {
+                self.hard_deadline = None;
             }
+
             let mov = self.root_moves[self.root_moves_considered].mov;
             let epos2 = eposition.make_move(mov).unwrap();
 
