@@ -1,8 +1,8 @@
 use crate::{
+    Color, ColoredPiece, Piece, Square,
     enums::EnumMap,
     impl_from_str_for_parsable,
     parser::{self, ParseError, Parser, ParserExt},
-    Color, ColoredPiece, Piece, Square,
 };
 use std::{
     array,
@@ -13,7 +13,7 @@ use std::{
 #[derive(Debug, Clone, Copy)]
 pub struct InvalidMove;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct SetupMove {
     pub color: Color,
     // From square 0 or square 63.

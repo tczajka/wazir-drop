@@ -2777,6 +2777,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
+name = "opening"
+version = "0.0.0"
+dependencies = [
+ "clap",
+ "log",
+ "serde",
+ "simplelog",
+ "toml",
+ "wazir-drop",
+]
+
+[[package]]
 name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3555,18 +3567,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e24345aa0fe688594e73770a5f6d1b216508b4f93484c0026d521acd30134392"
 dependencies = [
  "serde_core",
-]
-
-[[package]]
-name = "setup"
-version = "0.0.0"
-dependencies = [
- "clap",
- "log",
- "serde",
- "simplelog",
- "toml",
- "wazir-drop",
 ]
 
 [[package]]

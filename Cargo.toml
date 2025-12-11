@@ -15,9 +15,9 @@ members = [
     "extra",
     "gen-zobrist",
     "gui",
+    "opening",
     "random-player",
     "referee",
-    "setup",
     "train",
 ]
 

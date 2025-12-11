@@ -1,0 +1,2 @@
+log = "logs/opening.log"
+num_openings = 10
