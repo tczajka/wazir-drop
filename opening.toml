@@ -1,2 +1,4 @@
 log = "logs/opening.log"
-num_openings = 10
+sample = 10
+reasonable = 10000
+openings = 1000

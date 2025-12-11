@@ -1,5 +1,6 @@
 use clap::Parser;
 use log::LevelFilter;
+use rand::{SeedableRng, rngs::StdRng, seq::IteratorRandom};
 use serde::Deserialize;
 use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode, WriteLogger};
 use std::{
@@ -24,7 +25,9 @@ struct Args {
 #[serde(deny_unknown_fields)]
 struct Config {
     log: PathBuf,
-    num_openings: usize,
+    sample: usize,
+    reasonable: usize,
+    openings: usize,
 }
 
 fn main() -> ExitCode {
@@ -67,10 +70,38 @@ fn run() -> Result<(), Box<dyn Error>> {
 
 fn run_with_config(config: &Config) -> Result<(), Box<dyn Error>> {
     let evaluator = Arc::new(DefaultEvaluator::default());
-    let openings = compute_openings_eval(&*evaluator, config.num_openings);
+    let mut rng = StdRng::from_os_rng();
+    log::info!("Sampling {sample} setup moves", sample = config.sample);
+    let sample = all_normalized_red_setup_moves().choose_multiple(&mut rng, config.sample);
+    log::info!(
+        "Finding {reasonable} reasonable openings",
+        reasonable = config.reasonable
+    );
+
+    let reasonable: Vec<SetupMove> = find_openings(
+        config.reasonable,
+        &*evaluator,
+        all_normalized_red_setup_moves(),
+        &sample,
+    )
+    .into_iter()
+    .map(|opening| opening.red)
+    .collect();
+
+    log::info!(
+        "Finding {num_openings} openings",
+        num_openings = config.openings
+    );
+    let openings = find_openings(
+        config.openings,
+        &*evaluator,
+        reasonable.iter().copied(),
+        &reasonable,
+    );
     for (index, opening) in openings.iter().enumerate() {
         log::info!(
-            "{index}. {red} {blue}",
+            "{index}. {score} {red} {blue}",
+            score = opening.score,
             red = opening.red,
             blue = opening.blue
         );
@@ -78,23 +109,27 @@ fn run_with_config(config: &Config) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn compute_openings_eval<E: Evaluator>(evaluator: &E, num_openings: usize) -> Vec<Opening> {
+fn all_normalized_red_setup_moves() -> impl Iterator<Item = SetupMove> {
+    movegen::setup_moves(Color::Red)
+        .filter(|mov| Symmetry::normalize_red_setup(*mov).0 == Symmetry::Identity)
+}
+
+fn find_openings<E: Evaluator>(
+    num_openings: usize,
+    evaluator: &E,
+    possible: impl Iterator<Item = SetupMove>,
+    reasonable: &[SetupMove],
+) -> Vec<Opening> {
     let evaluated_position = EvaluatedPosition::new(evaluator, Position::initial());
     let mut openings: BTreeSet<Opening> = BTreeSet::new();
-    let mut move_index = 0;
-    for mov in movegen::setup_moves(Color::Red) {
-        let (symmetry, mov) = Symmetry::normalize_red_setup(mov);
-        if symmetry != Symmetry::Identity {
-            continue;
-        }
-        log::info!("red move {move_index}");
-        let evaluated_position = evaluated_position.make_setup_move(mov).unwrap();
+    for mov in possible {
+        let epos2 = evaluated_position.make_setup_move(mov).unwrap();
         let alpha = if openings.len() < num_openings {
             -Score::INFINITE
         } else {
             openings.first().unwrap().score
         };
-        let result = search_blue_setup_eval(&evaluated_position, -alpha);
+        let result = search_blue(&epos2, -alpha, reasonable);
         let score = -result.score;
         if score > alpha {
             let inserted = openings.insert(Opening {
@@ -107,26 +142,33 @@ fn compute_openings_eval<E: Evaluator>(evaluator: &E, num_openings: usize) -> Ve
                 _ = openings.pop_first().unwrap();
             }
         }
-        move_index += 1;
     }
     openings.into_iter().rev().collect()
 }
 
-fn search_blue_setup_eval<E: Evaluator>(
+fn search_blue<E: Evaluator>(
     evaluated_position: &EvaluatedPosition<E>,
     beta: Score,
-) -> BlueSetup {
-    let mut result = BlueSetup {
+    reasonable: &[SetupMove],
+) -> BlueResult {
+    let mut result = BlueResult {
         score: -Score::INFINITE,
         mov: movegen::setup_moves(Color::Blue).next().unwrap(),
     };
-    for mov in movegen::setup_moves(Color::Blue) {
-        let epos2 = evaluated_position.make_setup_move(mov).unwrap();
-        let score = -Score::from(ScoreExpanded::Eval(epos2.evaluate()));
-        if score > result.score {
-            result = BlueSetup { score, mov };
-            if score >= beta {
-                break;
+    for &red_mov in reasonable {
+        for symmetry in [Symmetry::Identity, Symmetry::FlipX] {
+            let mov = SetupMove {
+                color: Color::Blue,
+                pieces: symmetry.apply_to_setup(red_mov).pieces,
+            };
+
+            let epos2 = evaluated_position.make_setup_move(mov).unwrap();
+            let score = -Score::from(ScoreExpanded::Eval(epos2.evaluate()));
+            if score > result.score {
+                result = BlueResult { score, mov };
+                if score >= beta {
+                    break;
+                }
             }
         }
     }
@@ -141,7 +183,7 @@ struct Opening {
 }
 
 #[derive(Debug, Copy, Clone)]
-struct BlueSetup {
+struct BlueResult {
     score: Score,
     mov: SetupMove,
 }
