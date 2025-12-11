@@ -207,7 +207,7 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
             .map_err(|_| CliError::InvalidPlayerMove(mov))?;
         timer.stop();
         log::info!(
-            "{ply}. move {mov} {t} ms",
+            "{ply}. {mov} {t} ms",
             ply = position.ply(),
             t = timer.get().as_millis()
         );

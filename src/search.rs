@@ -232,7 +232,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         while self.depth < self.max_depth {
             if let Some(ds) = self.deadlines.as_ref() {
                 if Instant::now() >= ds.start_next_depth {
-                    log::info!("next depth timeout");
+                    log::info!("ndto"); // next depth timeout
                     break;
                 }
             }
@@ -250,7 +250,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         while self.root_moves_considered < self.root_moves.len() {
             if let Some(ds) = self.deadlines.as_ref() {
                 if Instant::now() >= ds.soft {
-                    log::info!("shallow soft timeout");
+                    log::info!("ssto"); // shallow soft timeout
                     return Err(Timeout);
                 }
             }
@@ -318,7 +318,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 let is_panic = self.root_moves[0].score < panic_threshold;
                 let soft_deadline = if is_panic { ds.panic_soft } else { ds.soft };
                 if Instant::now() >= soft_deadline {
-                    log::info!("soft timeout");
+                    log::info!("sto"); // soft timeout
                     return Err(Timeout);
                 }
                 self.hard_deadline = Some(if is_panic { ds.panic_hard } else { ds.hard });
@@ -848,7 +848,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         self.nodes += 1;
         if let Some(deadline) = self.hard_deadline {
             if self.nodes % CHECK_TIMEOUT_NODES == 0 && Instant::now() >= deadline {
-                log::info!("hard timeout");
+                log::info!("hto"); // hard timeout
                 return Err(Timeout);
             }
         }

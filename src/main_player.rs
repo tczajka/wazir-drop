@@ -69,13 +69,13 @@ impl<E: Evaluator> Player for MainPlayer<E> {
                 );
                 let elapsed = time_left.saturating_sub(timer.get());
                 log::info!(
-                    "depth={depth} score={score} \
-                        root={root_moves_considered}/{root_all_moves} \
-                        nodes={nodes} knps={knps:.0} pv={pv}",
+                    "d={depth} {root_moves_considered}/{root_all_moves} \
+                        s={score} \
+                        n={nodes} knps={knps:.0} pv={pv}",
                     depth = result.depth,
-                    score = result.score.to_relative(position.ply()),
                     root_moves_considered = result.root_moves_considered,
                     root_all_moves = result.num_root_moves,
+                    score = result.score.to_relative(position.ply()),
                     nodes = result.nodes,
                     knps = result.nodes as f64 / elapsed.as_secs_f64() / 1000.0,
                     pv = result.pv,
