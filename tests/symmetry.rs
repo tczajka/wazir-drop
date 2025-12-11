@@ -1,4 +1,6 @@
-use wazir_drop::{enums::SimpleEnumExt, NormalizedSquare, Square, Symmetry};
+use std::str::FromStr;
+
+use wazir_drop::{enums::SimpleEnumExt, NormalizedSquare, SetupMove, Square, Symmetry};
 
 #[test]
 fn test_inverse() {
@@ -67,4 +69,34 @@ fn test_normalize() {
         let (symmetry, normalized_square) = Symmetry::normalize(square);
         assert_eq!(symmetry.inverse().apply(normalized_square.into()), square);
     }
+}
+
+#[test]
+fn test_apply_to_setup() {
+    let setup = SetupMove::from_str("AWNAADADAFFAADDA").unwrap();
+    assert_eq!(Symmetry::Identity.apply_to_setup(setup), setup);
+    assert_eq!(
+        Symmetry::FlipX.apply_to_setup(setup),
+        SetupMove::from_str("DADAANWAADDAAFFA").unwrap()
+    );
+    let setup = SetupMove::from_str("awnaadadaffaadda").unwrap();
+    assert_eq!(Symmetry::Identity.apply_to_setup(setup), setup);
+    assert_eq!(
+        Symmetry::FlipX.apply_to_setup(setup),
+        SetupMove::from_str("dadaanwaaddaaffa").unwrap()
+    );
+}
+
+#[test]
+fn test_normalize_red_setup() {
+    let setup = SetupMove::from_str("AWNAADADAFFAADDA").unwrap();
+    assert_eq!(
+        Symmetry::normalize_red_setup(setup),
+        (Symmetry::Identity, setup)
+    );
+    let setup2 = SetupMove::from_str("DADAANWAADDAAFFA").unwrap();
+    assert_eq!(
+        Symmetry::normalize_red_setup(setup2),
+        (Symmetry::FlipX, setup)
+    );
 }

@@ -1,6 +1,5 @@
+use crate::{enums::EnumMap, unsafe_simple_enum, Color, Coord, Piece, SetupMove, Square};
 use std::fmt::{self, Display, Formatter};
-
-use crate::{enums::EnumMap, unsafe_simple_enum, Color, Coord, Square};
 
 /// Apply FlipX, FlipY and SwapXY in that order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -47,6 +46,40 @@ impl Symmetry {
             Color::Red => Self::Identity,
             Color::Blue => Self::Rotate180,
         }
+    }
+
+    pub fn apply_to_setup(self, setup: SetupMove) -> SetupMove {
+        match self {
+            Self::Identity => setup,
+            Self::FlipX => {
+                let mut pieces = setup.pieces;
+                for chunk in pieces.chunks_exact_mut(Coord::WIDTH) {
+                    chunk.reverse();
+                }
+                SetupMove {
+                    color: setup.color,
+                    pieces,
+                }
+            }
+            _ => panic!("Unsupported symmetry for SetupMove"),
+        }
+    }
+
+    pub fn normalize_red_setup(setup: SetupMove) -> (Self, SetupMove) {
+        assert_eq!(setup.color, Color::Red);
+        let wazir_square = setup
+            .pieces
+            .iter()
+            .position(|&piece| piece == Piece::Wazir)
+            .expect("Invalid setup");
+        let wazir_square = Square::from_index(wazir_square);
+        let wazir_coord = Coord::from_square(wazir_square);
+        let symmetry = if wazir_coord.x() < Coord::WIDTH / 2 {
+            Self::Identity
+        } else {
+            Self::FlipX
+        };
+        (symmetry, symmetry.apply_to_setup(setup))
     }
 }
 
