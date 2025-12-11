@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use wazir_drop::{enums::SimpleEnumExt, AnyMove, Move, Piece, SetupMove, ShortMove};
+use wazir_drop::{enums::SimpleEnumExt, AnyMove, Color, Move, Piece, SetupMove, ShortMove};
 
 #[test]
 fn test_setup_move_size_matches_piece_initial_count() {
@@ -62,4 +62,11 @@ fn test_setup_move_validate_pieces() {
     assert!(mov.validate_pieces().is_ok());
     let mov = SetupMove::from_str("AWNAADADAFFAADDN").unwrap();
     assert!(mov.validate_pieces().is_err());
+}
+
+#[test]
+fn test_setup_move_with_color() {
+    let mov = SetupMove::from_str("AWNAADADAFFAADDA").unwrap();
+    assert_eq!(mov.with_color(Color::Red), mov);
+    assert_eq!(mov.with_color(Color::Blue).to_string(), "addaaffadadaanwa");
 }

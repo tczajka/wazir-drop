@@ -129,10 +129,7 @@ fn run_with_config(config: &Config) -> Result<(), Box<dyn Error>> {
         .collect();
 
     for (index, opening) in openings.iter().enumerate() {
-        let red_equivalent = SetupMove {
-            color: Color::Red,
-            pieces: opening.blue.pieces,
-        };
+        let red_equivalent = opening.blue.with_color(Color::Red);
         let (symmetry, red_equivalent) = Symmetry::normalize_red_setup(red_equivalent);
         let setup_number = setup_number_mapping
             .get(&red_equivalent)
@@ -209,11 +206,9 @@ fn search_blue<E: Evaluator>(
     let epos_red = initial_position.make_setup_move(red).unwrap();
     'main_loop: for &reasonable_red in reasonable {
         for symmetry in [Symmetry::Identity, Symmetry::FlipX] {
-            let mov = SetupMove {
-                color: Color::Blue,
-                pieces: symmetry.apply_to_setup(reasonable_red).pieces,
-            };
-
+            let mov = symmetry
+                .apply_to_setup(reasonable_red)
+                .with_color(Color::Blue);
             let epos_blue = epos_red.make_setup_move(mov).unwrap();
             let score = Score::from(ScoreExpanded::Eval(epos_blue.evaluate()));
             if score < result.score {

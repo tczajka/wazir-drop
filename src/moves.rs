@@ -1,8 +1,8 @@
 use crate::{
-    Color, ColoredPiece, Piece, Square,
     enums::EnumMap,
     impl_from_str_for_parsable,
     parser::{self, ParseError, Parser, ParserExt},
+    Color, ColoredPiece, Piece, Square,
 };
 use std::{
     array,
@@ -54,6 +54,13 @@ impl SetupMove {
             return Err(InvalidMove);
         }
         Ok(())
+    }
+
+    pub fn with_color(self, color: Color) -> Self {
+        Self {
+            color,
+            pieces: self.pieces,
+        }
     }
 }
 
