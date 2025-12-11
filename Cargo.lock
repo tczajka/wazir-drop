@@ -3558,6 +3558,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "setup"
+version = "0.0.0"
+dependencies = [
+ "clap",
+ "log",
+ "serde",
+ "simplelog",
+ "toml",
+ "wazir-drop",
+]
+
+[[package]]
 name = "sha1"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
