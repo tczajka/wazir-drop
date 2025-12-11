@@ -1,4 +1,6 @@
 log = "logs/opening.log"
-sample = 10
-reasonable = 10000
-openings = 1000
+cpus = 60
+sample = 1000
+reasonable = 100000
+openings = 10000
+block_size = 1000

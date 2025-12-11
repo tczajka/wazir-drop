@@ -1,6 +1,7 @@
 use clap::Parser;
 use log::LevelFilter;
-use rand::{SeedableRng, rngs::StdRng, seq::IteratorRandom};
+use rand::{SeedableRng, rngs::StdRng, seq::IndexedRandom};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode, WriteLogger};
 use std::{
@@ -25,9 +26,11 @@ struct Args {
 #[serde(deny_unknown_fields)]
 struct Config {
     log: PathBuf,
+    cpus: usize,
     sample: usize,
     reasonable: usize,
     openings: usize,
+    block_size: usize,
 }
 
 fn main() -> ExitCode {
@@ -69,34 +72,55 @@ fn run() -> Result<(), Box<dyn Error>> {
 }
 
 fn run_with_config(config: &Config) -> Result<(), Box<dyn Error>> {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(config.cpus)
+        .build_global()
+        .unwrap();
+
     let evaluator = Arc::new(DefaultEvaluator::default());
     let mut rng = StdRng::from_os_rng();
-    log::info!("Sampling {sample} setup moves", sample = config.sample);
-    let sample = all_normalized_red_setup_moves().choose_multiple(&mut rng, config.sample);
-    log::info!(
-        "Finding {reasonable} reasonable openings",
-        reasonable = config.reasonable
-    );
 
+    log::info!("Random sample: {sample}", sample = config.sample);
+    let all: Vec<SetupMove> = all_normalized_red_setup_moves().collect();
+    let random_sample: Vec<SetupMove> = all
+        .choose_multiple(&mut rng, config.sample)
+        .copied()
+        .collect();
+
+    log::info!("Reasonable sample: {sample}", sample = config.sample,);
+    let reasonable_sample: Vec<SetupMove> = find_openings(
+        config.sample,
+        &*evaluator,
+        &all,
+        &random_sample,
+        config.block_size,
+    )
+    .into_iter()
+    .map(|opening| opening.red)
+    .collect();
+
+    log::info!("Reasonable: {reasonable}", reasonable = config.reasonable);
     let reasonable: Vec<SetupMove> = find_openings(
         config.reasonable,
         &*evaluator,
-        all_normalized_red_setup_moves(),
-        &sample,
+        &all,
+        &reasonable_sample,
+        config.block_size,
     )
     .into_iter()
     .map(|opening| opening.red)
     .collect();
 
     log::info!(
-        "Finding {num_openings} openings",
+        "Best openings: {num_openings}",
         num_openings = config.openings
     );
     let openings = find_openings(
         config.openings,
         &*evaluator,
-        reasonable.iter().copied(),
         &reasonable,
+        &reasonable,
+        config.block_size,
     );
     for (index, opening) in openings.iter().enumerate() {
         log::info!(
@@ -117,57 +141,66 @@ fn all_normalized_red_setup_moves() -> impl Iterator<Item = SetupMove> {
 fn find_openings<E: Evaluator>(
     num_openings: usize,
     evaluator: &E,
-    possible: impl Iterator<Item = SetupMove>,
+    possible: &[SetupMove],
     reasonable: &[SetupMove],
+    block_size: usize,
 ) -> Vec<Opening> {
-    let evaluated_position = EvaluatedPosition::new(evaluator, Position::initial());
     let mut openings: BTreeSet<Opening> = BTreeSet::new();
-    for mov in possible {
-        let epos2 = evaluated_position.make_setup_move(mov).unwrap();
+    let log_blocks = possible.len() / block_size / 30 + 1;
+    for (block_index, possible_block) in possible.chunks(block_size).enumerate() {
+        if block_index % log_blocks == 0 {
+            log::info!("Red move index {index}", index = block_index * block_size);
+        }
         let alpha = if openings.len() < num_openings {
             -Score::INFINITE
         } else {
             openings.first().unwrap().score
         };
-        let result = search_blue(&epos2, -alpha, reasonable);
-        let score = -result.score;
-        if score > alpha {
-            let inserted = openings.insert(Opening {
-                score,
-                red: mov,
-                blue: result.mov,
-            });
-            assert!(inserted);
-            if openings.len() > num_openings {
-                _ = openings.pop_first().unwrap();
+        let results: Vec<Opening> = possible_block
+            .par_iter()
+            .map(|&mov| search_blue(evaluator, mov, alpha, reasonable))
+            .collect();
+
+        for opening in results {
+            if opening.score > alpha {
+                let inserted = openings.insert(opening);
+                assert!(inserted);
             }
+        }
+        while openings.len() > num_openings {
+            _ = openings.pop_first().unwrap();
         }
     }
     openings.into_iter().rev().collect()
 }
 
 fn search_blue<E: Evaluator>(
-    evaluated_position: &EvaluatedPosition<E>,
-    beta: Score,
+    evaluator: &E,
+    red: SetupMove,
+    alpha: Score,
     reasonable: &[SetupMove],
-) -> BlueResult {
-    let mut result = BlueResult {
-        score: -Score::INFINITE,
-        mov: movegen::setup_moves(Color::Blue).next().unwrap(),
+) -> Opening {
+    let mut result = Opening {
+        score: Score::INFINITE,
+        red,
+        blue: red,
     };
-    for &red_mov in reasonable {
+    let initial_position = EvaluatedPosition::new(evaluator, Position::initial());
+    let epos_red = initial_position.make_setup_move(red).unwrap();
+    'main_loop: for &reasonable_red in reasonable {
         for symmetry in [Symmetry::Identity, Symmetry::FlipX] {
             let mov = SetupMove {
                 color: Color::Blue,
-                pieces: symmetry.apply_to_setup(red_mov).pieces,
+                pieces: symmetry.apply_to_setup(reasonable_red).pieces,
             };
 
-            let epos2 = evaluated_position.make_setup_move(mov).unwrap();
-            let score = -Score::from(ScoreExpanded::Eval(epos2.evaluate()));
-            if score > result.score {
-                result = BlueResult { score, mov };
-                if score >= beta {
-                    break;
+            let epos_blue = epos_red.make_setup_move(mov).unwrap();
+            let score = Score::from(ScoreExpanded::Eval(epos_blue.evaluate()));
+            if score < result.score {
+                result.score = score;
+                result.blue = mov;
+                if score <= alpha {
+                    break 'main_loop;
                 }
             }
         }
@@ -180,10 +213,4 @@ struct Opening {
     score: Score,
     red: SetupMove,
     blue: SetupMove,
-}
-
-#[derive(Debug, Copy, Clone)]
-struct BlueResult {
-    score: Score,
-    mov: SetupMove,
 }
