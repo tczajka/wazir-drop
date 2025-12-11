@@ -83,6 +83,22 @@ impl Symmetry {
     }
 }
 
+impl Display for Symmetry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let s = match *self {
+            Self::Identity => "Identity",
+            Self::FlipX => "FlipX",
+            Self::FlipY => "FlipY",
+            Self::Rotate180 => "Rotate180",
+            Self::SwapXY => "SwapXY",
+            Self::RotateLeft => "RotateLeft",
+            Self::RotateRight => "RotateRight",
+            Self::OtherDiagonal => "OtherDiagonal",
+        };
+        write!(f, "{s}")
+    }
+}
+
 #[rustfmt::skip]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]

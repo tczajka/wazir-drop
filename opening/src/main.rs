@@ -140,11 +140,6 @@ fn run_with_config(config: &Config) -> Result<(), Box<dyn Error>> {
             score = opening.score,
             red = opening.red,
             blue = opening.blue,
-            symmetry = match symmetry {
-                Symmetry::Identity => "same",
-                Symmetry::FlipX => "flipped",
-                _ => panic!("Unsupported symmetry"),
-            },
         );
     }
     Ok(())
