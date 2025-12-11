@@ -5,7 +5,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode, WriteLogger};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeSet, HashMap},
     error::Error,
     fs::{self, File},
     path::PathBuf,
@@ -122,12 +122,32 @@ fn run_with_config(config: &Config) -> Result<(), Box<dyn Error>> {
         &reasonable,
         config.block_size,
     );
+    let setup_number_mapping: HashMap<SetupMove, usize> = openings
+        .iter()
+        .enumerate()
+        .map(|(index, opening)| (opening.red, index))
+        .collect();
+
     for (index, opening) in openings.iter().enumerate() {
+        let red_equivalent = SetupMove {
+            color: Color::Red,
+            pieces: opening.blue.pieces,
+        };
+        let (symmetry, red_equivalent) = Symmetry::normalize_red_setup(red_equivalent);
+        let setup_number = setup_number_mapping
+            .get(&red_equivalent)
+            .copied()
+            .unwrap_or(usize::MAX);
         log::info!(
-            "{index}. {score} {red} {blue}",
+            "{index}. {score} {red} {blue} ({setup_number}, {symmetry})",
             score = opening.score,
             red = opening.red,
-            blue = opening.blue
+            blue = opening.blue,
+            symmetry = match symmetry {
+                Symmetry::Identity => "same",
+                Symmetry::FlipX => "flipped",
+                _ => panic!("Unsupported symmetry"),
+            },
         );
     }
     Ok(())
