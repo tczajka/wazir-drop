@@ -1,7 +1,9 @@
+use std::time::{Duration, SystemTime};
+
 use crate::{
     base128::{Base128Decoder, Base128Encoder},
     book_data,
-    constants::RED_SETUP_INDEX,
+    constants::{RED_SETUP_INDEX_BEGIN, RED_SETUP_INDEX_END},
     log, Color, Piece, SetupMove, Symmetry,
 };
 
@@ -44,13 +46,30 @@ pub fn decode_piece(decoder: &mut Base128Decoder) -> Piece {
 }
 
 pub fn red_setup() -> SetupMove {
+    let r = time_based_random(2 * (RED_SETUP_INDEX_END - RED_SETUP_INDEX_BEGIN));
+    let setup_idx = r / 2 + RED_SETUP_INDEX_BEGIN;
+    let symmetry = [Symmetry::Identity, Symmetry::FlipX][r % 2];
+    log::info!("red setup #{setup_idx} {symmetry}");
     for book_opening in BookIterator::new() {
-        if book_opening.index == RED_SETUP_INDEX {
-            log::info!("red setup #{}", RED_SETUP_INDEX);
-            return book_opening.red;
+        if book_opening.index == setup_idx {
+            return symmetry.apply_to_setup(book_opening.red);
         }
     }
-    panic!("RED_SETUP_INDEX not found")
+    panic!("red opening not found")
+}
+
+fn time_based_random(n: usize) -> usize {
+    // Compute hash x = (a * t + b) % MODULUS % n;
+    const MODULUS: u128 = (1 << 61) - 1;
+    const A: u128 = 0x10c82ee50ad34876;
+    const B: u128 = 0x41cd6910f455faa;
+    let t: u128 = SystemTime::UNIX_EPOCH
+        .elapsed()
+        .unwrap_or(Duration::ZERO)
+        .as_nanos()
+        % MODULUS;
+    let x = (A * t + B) % MODULUS % n as u128;
+    x as usize
 }
 
 pub fn blue_setup(red: SetupMove) -> Option<SetupMove> {
