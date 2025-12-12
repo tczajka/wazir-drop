@@ -64,33 +64,32 @@ impl<E: Evaluator> Player for MainPlayer<E> {
         let time_left = timer.get();
         let deadlines = self.time_allocation(position.ply(), time_left, timer);
         match position.stage() {
-            Stage::Setup => {
-                let mov = match position.to_move() {
-                    Color::Red => book::red_setup(),
-                    Color::Blue => match book::blue_setup(self.opp_red_setup.unwrap()) {
-                        Some(mov) => mov,
-                        None => {
-                            let result = self.search.search_blue_setup(position, deadlines);
-                            let elapsed = time_left.saturating_sub(timer.get());
-                            log::info!(
-                                "d={depth} {root_moves_considered}/{root_all_moves} \
-                                    s={score} n={nodes} knps={knps:.0} t={t}ms pv={setup} {pv}",
-                                depth = result.depth,
-                                root_moves_considered = result.root_moves_considered,
-                                root_all_moves = result.num_root_moves,
-                                score = result.score.to_relative(position.ply()),
-                                nodes = result.nodes,
-                                knps = result.nodes as f64 / elapsed.as_secs_f64() / 1000.0,
-                                setup = result.mov,
-                                t = elapsed.as_millis(),
-                                pv = result.pv,
-                            );
-                            result.mov
+            Stage::Setup => match position.to_move() {
+                Color::Red => book::red_setup().into(),
+                Color::Blue => {
+                    if let Some(opp_red_setup) = self.opp_red_setup {
+                        if let Some(mov) = book::blue_setup(opp_red_setup) {
+                            return mov.into();
                         }
-                    },
-                };
-                mov.into()
-            }
+                    }
+                    let result = self.search.search_blue_setup(position, deadlines);
+                    let elapsed = time_left.saturating_sub(timer.get());
+                    log::info!(
+                        "d={depth} {root_moves_considered}/{root_all_moves} \
+                                s={score} n={nodes} knps={knps:.0} t={t}ms pv={setup} {pv}",
+                        depth = result.depth,
+                        root_moves_considered = result.root_moves_considered,
+                        root_all_moves = result.num_root_moves,
+                        score = result.score.to_relative(position.ply()),
+                        nodes = result.nodes,
+                        knps = result.nodes as f64 / elapsed.as_secs_f64() / 1000.0,
+                        setup = result.mov,
+                        t = elapsed.as_millis(),
+                        pv = result.pv,
+                    );
+                    result.mov.into()
+                }
+            },
             Stage::Regular => {
                 let result = self.search.search(
                     position,

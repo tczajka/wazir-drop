@@ -46,7 +46,7 @@ impl ExternalPlayer {
         if !opening.is_empty() {
             this.send_command(CliCommand::Opening(opening.to_vec()));
         }
-        if color == Color::Red {
+        if color.index() == opening.len() % Color::COUNT {
             this.send_command(CliCommand::Start);
         }
         Ok(this)
