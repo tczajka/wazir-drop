@@ -12,6 +12,7 @@ pub mod smallvec;
 mod bitboard;
 mod board;
 pub mod book;
+mod book_data;
 mod captured;
 mod cli;
 mod color;
