@@ -166,7 +166,7 @@ impl OpeningSolver {
             let alpha = if new_openings.len() < min_num_exact {
                 -Score::INFINITE
             } else {
-                self.openings.first().unwrap().score
+                new_openings.first().unwrap().score
             };
             // Ok(new) if > alpha, Err(old) if <= alpha.
             let results: Vec<Result<Opening, Opening>> = block
@@ -204,6 +204,7 @@ impl OpeningSolver {
     }
 
     fn print_openings(&self) -> Result<(), Box<dyn Error>> {
+        log::info!("Print openings to {}", self.config.openings_file.display());
         let file = File::create(&self.config.openings_file)?;
         let mut writer = BufWriter::new(file);
 
