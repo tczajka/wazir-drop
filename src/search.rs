@@ -1,5 +1,4 @@
 use crate::{
-    book,
     constants::{
         Depth, Eval, Hyperparameters, Ply, CHECK_TIMEOUT_NODES, DEPTH_INCREMENT, MAX_SEARCH_DEPTH,
         NUM_KILLER_MOVES, ONE_PLY, PLY_DRAW,
@@ -57,10 +56,12 @@ impl<E: Evaluator> Search<E> {
     pub fn search_blue_setup(
         &mut self,
         position: &Position,
-        deadlines: Deadlines,
+        max_depth: Option<Depth>,
+        deadlines: Option<Deadlines>,
+        possible_moves: &[SetupMove],
     ) -> SearchResultBlueSetup {
-        let mut instance = SearchInstance::new(self, None, Some(deadlines), None);
-        instance.search_blue_setup(position)
+        let mut instance = SearchInstance::new(self, max_depth, deadlines, None);
+        instance.search_blue_setup(position, possible_moves)
     }
 }
 
@@ -925,10 +926,14 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         }
     }
 
-    fn search_blue_setup(&mut self, position: &Position) -> SearchResultBlueSetup {
+    fn search_blue_setup(
+        &mut self,
+        position: &Position,
+        possible_moves: &[SetupMove],
+    ) -> SearchResultBlueSetup {
         assert_eq!(position.stage(), Stage::Setup);
         assert_eq!(position.to_move(), Color::Blue);
-        self.root_moves_setup = book::blue_setup_moves();
+        self.root_moves_setup = possible_moves.to_vec();
         self.ttable.new_epoch();
         self.pvtable.new_epoch();
         self.history = History::new(position.ply());

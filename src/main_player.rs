@@ -72,7 +72,12 @@ impl<E: Evaluator> Player for MainPlayer<E> {
                             return mov.into();
                         }
                     }
-                    let result = self.search.search_blue_setup(position, deadlines);
+                    let result = self.search.search_blue_setup(
+                        position,
+                        None,
+                        Some(deadlines),
+                        &book::blue_setup_moves(),
+                    );
                     let elapsed = time_left.saturating_sub(timer.get());
                     log::info!(
                         "d={depth} {root_moves_considered}/{root_all_moves} \

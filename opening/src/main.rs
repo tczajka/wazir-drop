@@ -1,10 +1,11 @@
 use clap::Parser;
 use log::LevelFilter;
 use rand::{SeedableRng, rngs::StdRng, seq::IndexedRandom};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
 use serde::Deserialize;
 use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode, WriteLogger};
 use std::{
+    cmp::Reverse,
     collections::{BTreeSet, HashMap, HashSet},
     error::Error,
     fs::{self, File},
@@ -15,8 +16,11 @@ use std::{
     time::Instant,
 };
 use wazir_drop::{
-    Color, DefaultEvaluator, EvaluatedPosition, Position, Score, ScoreExpanded, SetupMove,
-    Symmetry, base128::Base128Encoder, book::encode_setup_move, constants::Hyperparameters,
+    Color, DefaultEvaluator, EvaluatedPosition, Position, Score, ScoreExpanded, Search, SetupMove,
+    Symmetry,
+    base128::Base128Encoder,
+    book::encode_setup_move,
+    constants::{Depth, Hyperparameters, ONE_PLY},
     movegen,
 };
 
@@ -37,6 +41,10 @@ struct Config {
     seed: u64,
     sample_size: usize,
     sample_iterations: usize,
+    reasonable_size: usize,
+    depth: Depth,
+    book_size: usize,
+    extra_depth_book_size: Vec<usize>,
     block: usize,
     log_period_seconds: f32,
 }
@@ -122,6 +130,20 @@ impl OpeningSolver {
             self.improve_openings(self.config.sample_size);
             self.use_openings_as_blue_setups();
         }
+        log::info!("Find reasonable openings");
+        self.improve_openings(self.config.reasonable_size);
+        self.use_openings_as_blue_setups();
+
+        assert!(self.openings.len() >= self.config.book_size);
+        self.openings.truncate(self.config.book_size);
+        let mut depth = self.config.depth;
+        self.improve_openings_using_search(self.config.book_size, self.config.depth);
+        for extra_depth_book_size in self.config.extra_depth_book_size.clone() {
+            depth += ONE_PLY;
+            self.improve_openings_using_search(extra_depth_book_size, depth);
+        }
+
+        self.log_opening_stats();
         self.print_openings()?;
         self.export_openings()?;
         Ok(())
@@ -197,6 +219,48 @@ impl OpeningSolver {
         let overlap = calculate_overlap(&self.openings, &new_openings);
         log::info!("Overlap with previous: {overlap} / {n}");
         self.openings = new_openings;
+    }
+
+    fn improve_openings_using_search(&mut self, n: usize, depth: Depth) {
+        log::info!("Build book openings: {n} depth {depth}");
+        let mut last_log_time = Instant::now();
+        for (block_index, block) in self.openings[..n].chunks_mut(self.config.block).enumerate() {
+            if last_log_time.elapsed().as_secs_f32() >= self.config.log_period_seconds {
+                log::info!("Done {done} / {n}", done = block_index * self.config.block);
+                last_log_time = Instant::now();
+            }
+            block.par_iter_mut().for_each(|opening| {
+                *opening = compute_opening_search(
+                    opening.red,
+                    &self.evaluator,
+                    &self.hyperparameters,
+                    depth,
+                    &self.blue_setups,
+                );
+            });
+        }
+        self.openings[..n].sort_by_key(|&opening| Reverse(opening));
+    }
+
+    fn log_opening_stats(&self) {
+        let blue_index: HashMap<SetupMove, usize> = self
+            .blue_setups
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(index, setup)| (setup, index))
+            .collect();
+
+        let mut index_sum: u64 = 0;
+        let mut index_max: usize = 0;
+        for opening in &self.openings {
+            let index = *blue_index.get(&opening.blue.unwrap()).unwrap();
+            index_sum += index as u64;
+            index_max = index_max.max(index);
+        }
+        let average_index = index_sum as f64 / self.openings.len() as f64;
+        log::info!("Average blue index: {average_index:.2}");
+        log::info!("Max blue index: {index_max} / {}", self.blue_setups.len());
     }
 
     fn print_openings(&self) -> Result<(), Box<dyn Error>> {
@@ -285,6 +349,23 @@ fn compute_opening_eval(
         }
     }
     Some(result)
+}
+
+fn compute_opening_search(
+    red: SetupMove,
+    evaluator: &Arc<DefaultEvaluator>,
+    hyperparameters: &Hyperparameters,
+    depth: Depth,
+    blue_setups: &[SetupMove],
+) -> Opening {
+    let mut search = Search::new(hyperparameters, evaluator);
+    let position = Position::initial().make_setup_move(red).unwrap();
+    let result = search.search_blue_setup(&position, Some(depth), None, blue_setups);
+    Opening {
+        score: -result.score,
+        red,
+        blue: Some(result.mov),
+    }
 }
 
 fn calculate_overlap(a: &[Opening], b: &[Opening]) -> usize {

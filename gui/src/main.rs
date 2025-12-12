@@ -332,10 +332,12 @@ impl WazirDropApp {
                         match book::blue_setup(red) {
                             Some(mov) => mov.into(),
                             None => {
-                                let result = search
-                                    .lock()
-                                    .unwrap()
-                                    .search_blue_setup(&position, deadlines);
+                                let result = search.lock().unwrap().search_blue_setup(
+                                    &position,
+                                    None,
+                                    Some(deadlines),
+                                    &book::blue_setup_moves(),
+                                );
                                 log::info!(
                                     "depth {depth} score {score} \
                                         root {root_moves_considered}/{root_all_moves} \
