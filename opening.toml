@@ -1,6 +1,9 @@
 log = "logs/opening.log"
+openings_file = "data/openings.txt"
 cpus = 60
-sample = 1000
-reasonable = 100000
+seed = 1234
+blue_random_sample = 2000
+reasonable_setups = [1000, 100000]
 openings = 10000
-block_size = 1000
+block = 500
+log_period_seconds = 60
