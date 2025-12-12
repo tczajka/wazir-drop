@@ -5,8 +5,6 @@ use eframe::{
         SidePanel, Theme, Ui, Vec2, ViewportBuilder, include_image,
     },
 };
-use extra::moverand;
-use rand::{SeedableRng, rngs::StdRng};
 use simplelog::{ColorChoice, LevelFilter, TermLogger, TerminalMode};
 use std::{
     error::Error,
@@ -17,7 +15,7 @@ use std::{
 };
 use wazir_drop::{
     AnyMove, Color, ColoredPiece, Coord, Deadlines, DefaultEvaluator, Piece, Position, Search,
-    SetupMove, ShortMove, ShortMoveFrom, Square, Stage, Symmetry,
+    SetupMove, ShortMove, ShortMoveFrom, Square, Stage, Symmetry, book,
     constants::Hyperparameters,
     enums::{EnumMap, SimpleEnumExt},
     movegen,
@@ -34,6 +32,7 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), Box<dyn Error>> {
     wazir_drop::log::init(wazir_drop::log::Level::Info);
+
     TermLogger::init(
         LevelFilter::Info,
         simplelog::Config::default(),
@@ -62,7 +61,6 @@ struct WazirDropApp {
     position: Position,
     next_move_state: NextMoveState,
     history: Vec<HistoryEntry>,
-    rng: Arc<Mutex<StdRng>>,
     search: Arc<Mutex<Search<DefaultEvaluator>>>,
 }
 
@@ -78,7 +76,6 @@ impl WazirDropApp {
             position: Position::initial(),
             next_move_state: NextMoveState::EndOfGame, // temporary
             history: Vec::new(),
-            rng: Arc::new(Mutex::new(StdRng::from_os_rng())),
             search: Arc::new(Mutex::new(Search::new(
                 &Hyperparameters::default(),
                 &Arc::new(DefaultEvaluator::default()),
@@ -309,11 +306,11 @@ impl WazirDropApp {
 
     fn launch_computer_thread(&mut self, ctx: &egui::Context, result: Arc<Mutex<Option<AnyMove>>>) {
         let position = self.position.clone();
-        let rng = self.rng.clone();
         let search = self.search.clone();
         let ctx = ctx.clone();
         let time_limit_ms = self.time_limit_str.parse::<u32>().unwrap_or(1000);
         let time_limit = Duration::from_millis(time_limit_ms.into());
+        let history_first = self.history.first().cloned();
 
         _ = thread::spawn(move || {
             let now = Instant::now();
@@ -325,9 +322,15 @@ impl WazirDropApp {
                 panic_soft: now + time_limit.mul_f64(4.0 * 0.9),
             };
             let mov = match position.stage() {
-                Stage::Setup => {
-                    moverand::random_setup(position.to_move(), &mut rng.lock().unwrap()).into()
-                }
+                Stage::Setup => match position.to_move() {
+                    Color::Red => book::red_setup().into(),
+                    Color::Blue => {
+                        let AnyMove::Setup(red) = history_first.unwrap().mov else {
+                            panic!("bad first move");
+                        };
+                        book::blue_setup(red, &mut search.lock().unwrap(), deadlines.hard).into()
+                    }
+                },
                 Stage::Regular => {
                     let result = search.lock().unwrap().search(
                         &position,
@@ -578,7 +581,7 @@ enum NextMoveState {
     EndOfGame,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct HistoryEntry {
     position: Position,
     mov: AnyMove,

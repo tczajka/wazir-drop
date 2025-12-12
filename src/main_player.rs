@@ -5,7 +5,10 @@ use crate::{
     log, AnyMove, Color, Deadlines, DefaultEvaluator, Evaluator, Player, PlayerFactory, Position,
     Search, SetupMove, Stage,
 };
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 struct MainPlayer<E: Evaluator> {
     hyperparameters: Hyperparameters,
@@ -47,6 +50,13 @@ impl<E: Evaluator> MainPlayer<E> {
                 .instant_at(time_left.saturating_sub(to_allocate.mul_f64(panic_soft_fraction))),
         }
     }
+
+    fn time_allocation_setup(&self, time_left: Duration, timer: &Timer) -> Instant {
+        let to_allocate = time_left.saturating_sub(TIME_MARGIN);
+        timer.instant_at(
+            time_left.saturating_sub(to_allocate.mul_f64(self.hyperparameters.time_setup)),
+        )
+    }
 }
 
 impl<E: Evaluator> Player for MainPlayer<E> {
@@ -62,9 +72,12 @@ impl<E: Evaluator> Player for MainPlayer<E> {
         let time_left = timer.get();
         match position.stage() {
             Stage::Setup => {
+                let deadline = self.time_allocation_setup(time_left, timer);
                 let mov = match position.to_move() {
                     Color::Red => book::red_setup(),
-                    Color::Blue => book::blue_setup(self.opp_red_setup.unwrap()),
+                    Color::Blue => {
+                        book::blue_setup(self.opp_red_setup.unwrap(), &mut self.search, deadline)
+                    }
                 };
                 mov.into()
             }
