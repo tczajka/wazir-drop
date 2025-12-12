@@ -137,6 +137,7 @@ fn play_game<F: Features>(
                     Some(config.depth),
                     None, /* deadline */
                     Some((config.temperature_cutoff * evaluator.scale() as f64) as Eval),
+                    false, /* is_score_important */
                 );
                 assert!(!result.top_moves.is_empty());
                 match calc_deep_score(
@@ -244,6 +245,7 @@ fn calc_deep_score(
         Some(extra_depth),
         None, /* deadline */
         None, /* multi_move_threshold */
+        true, /* is_score_important */
     );
     Ok((pv_position, result.score))
 }

@@ -100,7 +100,8 @@ impl<E: Evaluator> Player for MainPlayer<E> {
                     position,
                     None, /* max_depth */
                     Some(deadlines),
-                    None, /* multi_move_threshold */
+                    None,  /* multi_move_threshold */
+                    false, /* is_score_important */
                 );
                 let elapsed = time_left.saturating_sub(timer.get());
                 log::info!(

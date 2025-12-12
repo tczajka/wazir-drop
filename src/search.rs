@@ -48,9 +48,10 @@ impl<E: Evaluator> Search<E> {
         max_depth: Option<Depth>,
         deadlines: Option<Deadlines>,
         multi_move_threshold: Option<i32>,
+        is_score_important: bool,
     ) -> SearchResult {
         let mut instance = SearchInstance::new(self, max_depth, deadlines, multi_move_threshold);
-        instance.search(position)
+        instance.search(position, is_score_important)
     }
 
     pub fn search_blue_setup(
@@ -117,11 +118,11 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         }
     }
 
-    fn search(&mut self, position: &Position) -> SearchResult {
+    fn search(&mut self, position: &Position, is_score_important: bool) -> SearchResult {
         let score = match position.stage() {
             Stage::Setup => panic!("SearchInstance::search does not support setup"),
             Stage::Regular => {
-                self.search_root(position);
+                self.search_root(position, is_score_important);
                 self.root_moves[0].score
             }
             Stage::End(outcome) => outcome.to_score(position.ply()),
@@ -153,7 +154,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         }
     }
 
-    fn search_root(&mut self, position: &Position) {
+    fn search_root(&mut self, position: &Position, is_score_important: bool) {
         self.generate_root_captures_of_wazir(position);
         if let Some(root_move) = self.root_moves.first() {
             self.depth = Depth::MAX;
@@ -170,6 +171,14 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             };
             self.depth = Depth::MAX;
             self.pv = LongVariation::empty().add_front(root_move.mov);
+            return;
+        }
+
+        if self.root_moves.len() == 1 && !is_score_important {
+            log::info!("only one choice");
+            self.depth = 0;
+            self.root_moves_considered = 1;
+            self.pv = LongVariation::empty().add_front(self.root_moves[0].mov);
             return;
         }
 
@@ -205,7 +214,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 MoveCandidate::Move { mov, extra: _extra } => {
                     self.root_moves.push(RootMove {
                         mov,
-                        score: -Score::INFINITE,
+                        score: Score::DRAW,
                         futile,
                     });
                 }

@@ -360,7 +360,8 @@ impl WazirDropApp {
                         &position,
                         None, /* max_depth */
                         Some(deadlines),
-                        None, /* multi_move_threshold */
+                        None,  /* multi_move_threshold */
+                        false, /* is_score_important */
                     );
                     log::info!(
                         "depth {depth} score {score} \
