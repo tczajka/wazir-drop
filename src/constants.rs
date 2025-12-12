@@ -1,6 +1,5 @@
-use std::time::Duration;
-
 use crate::book_data;
+use std::time::Duration;
 
 pub const DEFAULT_TIME_LIMIT: Duration = Duration::from_secs(30);
 pub const TIME_MARGIN: Duration = Duration::from_millis(300);

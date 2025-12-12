@@ -1,11 +1,11 @@
 use clap::Parser;
 use log::LevelFilter;
-use rand::{SeedableRng, rngs::StdRng, seq::IteratorRandom};
+use rand::{SeedableRng, rngs::StdRng, seq::IndexedRandom};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode, WriteLogger};
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeSet, HashMap, HashSet},
     error::Error,
     fs::{self, File},
     io::{BufWriter, Write},
@@ -15,10 +15,8 @@ use std::{
     time::Instant,
 };
 use wazir_drop::{
-    Color, DefaultEvaluator, Position, Score, Search, SetupMove, Symmetry,
-    base128::Base128Encoder,
-    book::encode_setup_move,
-    constants::{Depth, Hyperparameters, ONE_PLY},
+    Color, DefaultEvaluator, EvaluatedPosition, Position, Score, ScoreExpanded, SetupMove,
+    Symmetry, base128::Base128Encoder, book::encode_setup_move, constants::Hyperparameters,
     movegen,
 };
 
@@ -34,13 +32,11 @@ struct Config {
     openings_file: PathBuf,
     export_book: PathBuf,
     cpus: usize,
-    ttable_size_kb: usize,
-    pvtable_size_kb: usize,
+    ttable_size_mb: usize,
+    pvtable_size_mb: usize,
     seed: u64,
-    blue_random_sample: usize,
-    reasonable_setups: Vec<usize>,
-    /// How many to compute with depth 1, 2, etc.
-    openings: Vec<usize>,
+    sample_size: usize,
+    sample_iterations: usize,
     block: usize,
     log_period_seconds: f32,
 }
@@ -88,7 +84,9 @@ fn run() -> Result<(), Box<dyn Error>> {
 struct OpeningSolver {
     config: Config,
     rng: StdRng,
+    evaluator: Arc<DefaultEvaluator>,
     hyperparameters: Hyperparameters,
+    all_openings: Vec<Opening>,
     openings: Vec<Opening>,
     blue_setups: Vec<SetupMove>,
 }
@@ -96,50 +94,47 @@ struct OpeningSolver {
 impl OpeningSolver {
     fn new(config: &Config) -> Self {
         let hyperparameters = Hyperparameters {
-            ttable_size: config.ttable_size_kb << 10,
-            pvtable_size: config.pvtable_size_kb << 10,
+            ttable_size: config.ttable_size_mb << 20,
+            pvtable_size: config.pvtable_size_mb << 20,
             ..Hyperparameters::default()
         };
         Self {
             config: config.clone(),
             rng: StdRng::seed_from_u64(config.seed),
+            evaluator: Arc::new(DefaultEvaluator::default()),
             hyperparameters,
+            all_openings: Vec::new(),
             openings: Vec::new(),
             blue_setups: Vec::new(),
         }
     }
 
     fn run(&mut self) -> Result<(), Box<dyn Error>> {
-        self.random_sample_blue_setups();
+        self.generate_all_openings();
+        self.random_sample_openings();
+        self.use_openings_as_blue_setups();
 
-        let mut depth = ONE_PLY;
-        for num in self.config.reasonable_setups.clone() {
-            self.all_openings();
-            self.improve_openings(num, depth);
-            log::info!("Truncate to {num} openings");
-            self.openings.truncate(num);
+        for iteration in 0..self.config.sample_iterations {
+            log::info!(
+                "Sample iteration {iteration} / {n}",
+                n = self.config.sample_iterations
+            );
+            self.improve_openings(self.config.sample_size);
             self.use_openings_as_blue_setups();
         }
-        for num in self.config.openings.clone() {
-            log::info!("Calculate {num} openings at depth {depth}");
-            self.improve_openings(num, depth);
-            self.use_openings_as_blue_setups();
-            depth += ONE_PLY;
-        }
-        log::info!("Truncate to {num} openings", num = self.config.openings[0]);
-        self.openings.truncate(self.config.openings[0]);
         self.print_openings()?;
         self.export_openings()?;
         Ok(())
     }
 
-    fn random_sample_blue_setups(&mut self) {
-        log::info!(
-            "Random sample {sample} blue setups",
-            sample = self.config.blue_random_sample
-        );
-        self.blue_setups = movegen::setup_moves(Color::Blue)
-            .choose_multiple(&mut self.rng, self.config.blue_random_sample);
+    fn random_sample_openings(&mut self) {
+        let n = self.config.sample_size;
+        log::info!("Random sample {n} openings");
+        self.openings = self
+            .all_openings
+            .choose_multiple(&mut self.rng, n)
+            .copied()
+            .collect();
     }
 
     fn use_openings_as_blue_setups(&mut self) {
@@ -154,9 +149,9 @@ impl OpeningSolver {
             .collect();
     }
 
-    fn all_openings(&mut self) {
+    fn generate_all_openings(&mut self) {
         log::info!("Generate all openings");
-        self.openings = movegen::setup_moves(Color::Red)
+        self.all_openings = movegen::setup_moves(Color::Red)
             .filter(|mov| Symmetry::normalize_red_setup(*mov).0 == Symmetry::Identity)
             .map(|red| Opening {
                 score: Score::DRAW,
@@ -164,69 +159,44 @@ impl OpeningSolver {
                 blue: None,
             })
             .collect();
-        log::info!("Number of openings: {num}", num = self.openings.len());
+        log::info!("Number of openings: {num}", num = self.all_openings.len());
     }
 
-    fn improve_openings(&mut self, min_num_exact: usize, depth: Depth) {
-        log::info!("Calculating {min_num_exact} openings");
+    fn improve_openings(&mut self, n: usize) {
+        log::info!("Calculating {n} openings");
         let mut last_log_time = Instant::now();
-        // <= min_num_exact
         let mut new_openings: BTreeSet<Opening> = BTreeSet::new();
-        let mut extra_openings: BTreeSet<Opening> = BTreeSet::new();
-        let mut old_openings: Vec<Opening> = Vec::new();
-        for (block_index, block) in self.openings.chunks(self.config.block).enumerate() {
+        for (block_index, block) in self.all_openings.chunks(self.config.block).enumerate() {
             if last_log_time.elapsed().as_secs_f32() >= self.config.log_period_seconds {
                 log::info!(
                     "Done {done} / {all}",
                     done = block_index * self.config.block,
-                    all = self.openings.len()
+                    all = self.all_openings.len()
                 );
                 last_log_time = Instant::now();
             }
-            let alpha = if new_openings.len() < min_num_exact {
+            let alpha = if new_openings.len() < n {
                 -Score::INFINITE
             } else {
                 new_openings.first().unwrap().score
             };
-            // Ok(new) if > alpha, Err(old) if <= alpha.
-            let results: Vec<Result<Opening, Opening>> = block
+            let new: Vec<Opening> = block
                 .par_iter()
-                .map(|&opening| {
-                    match compute_opening(
-                        opening,
-                        &self.hyperparameters,
-                        depth,
-                        alpha,
-                        &self.blue_setups,
-                    ) {
-                        Some(new) => Ok(new),
-                        None => Err(opening),
-                    }
+                .filter_map(|opening| {
+                    compute_opening_eval(opening.red, &self.evaluator, alpha, &self.blue_setups)
                 })
                 .collect();
-            for result in results {
-                match result {
-                    Ok(new) => {
-                        assert!(new_openings.insert(new));
-                        if new_openings.len() > min_num_exact {
-                            let worst = new_openings.pop_first().unwrap();
-                            assert!(extra_openings.insert(worst));
-                        }
-                    }
-                    Err(old) => {
-                        old_openings.push(old);
-                    }
+            for opening in new {
+                assert!(new_openings.insert(opening));
+                if new_openings.len() > n {
+                    _ = new_openings.pop_first().unwrap();
                 }
             }
         }
-        self.openings = new_openings.iter().rev().copied().collect();
-        self.openings.extend(extra_openings.iter().rev().copied());
-        self.openings.extend(old_openings.iter().rev().copied());
-        log::info!(
-            "Exact openings: {exact} / {all}",
-            exact = new_openings.len() + extra_openings.len(),
-            all = self.openings.len()
-        );
+        let new_openings: Vec<Opening> = new_openings.into_iter().rev().collect();
+        let overlap = calculate_overlap(&self.openings, &new_openings);
+        log::info!("Overlap with previous: {overlap} / {n}");
+        self.openings = new_openings;
     }
 
     fn print_openings(&self) -> Result<(), Box<dyn Error>> {
@@ -290,37 +260,34 @@ struct Opening {
 }
 
 // Only return something if score > alpha.
-fn compute_opening(
-    prev_opening: Opening,
-    hyperparameters: &Hyperparameters,
-    depth: Depth,
+fn compute_opening_eval(
+    red: SetupMove,
+    evaluator: &DefaultEvaluator,
     alpha: Score,
     blue_setups: &[SetupMove],
 ) -> Option<Opening> {
     let mut result = Opening {
         score: Score::INFINITE,
-        red: prev_opening.red,
+        red,
         blue: None,
     };
-    let pos0 = Position::initial();
-    let pos1 = pos0.make_setup_move(prev_opening.red).unwrap();
-    let mut search = Search::new(hyperparameters, &Arc::new(DefaultEvaluator::default()));
-    let blue_iter = prev_opening.blue.into_iter().chain(
-        blue_setups
-            .iter()
-            .copied()
-            .filter(|&blue| prev_opening.blue != Some(blue)),
-    );
-    for blue_setup in blue_iter {
+    let pos0 = EvaluatedPosition::new(evaluator, Position::initial());
+    let pos1 = pos0.make_setup_move(red).unwrap();
+    for &blue_setup in blue_setups {
         let pos2 = pos1.make_setup_move(blue_setup).unwrap();
-        let result2 = search.search(&pos2, Some(depth), None, None);
-        if result2.score < result.score {
-            if result2.score <= alpha {
+        let score = Score::from(ScoreExpanded::Eval(pos2.evaluate()));
+        if score < result.score {
+            if score <= alpha {
                 return None;
             }
-            result.score = result2.score;
+            result.score = score;
             result.blue = Some(blue_setup);
         }
     }
     Some(result)
+}
+
+fn calculate_overlap(a: &[Opening], b: &[Opening]) -> usize {
+    let s: HashSet<SetupMove> = a.iter().map(|opening| opening.red).collect();
+    b.iter().filter(|opening| s.contains(&opening.red)).count()
 }
