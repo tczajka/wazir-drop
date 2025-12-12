@@ -15,8 +15,11 @@ use std::{
     time::Instant,
 };
 use wazir_drop::{
-    Color, DefaultEvaluator, EvaluatedPosition, Position, Score, ScoreExpanded, SetupMove,
-    Symmetry, base128::Base128Encoder, book::encode_setup_move, movegen,
+    Color, DefaultEvaluator, Position, Score, Search, SetupMove, Symmetry,
+    base128::Base128Encoder,
+    book::encode_setup_move,
+    constants::{Depth, Hyperparameters, ONE_PLY},
+    movegen,
 };
 
 #[derive(Parser, Debug)]
@@ -31,10 +34,13 @@ struct Config {
     openings_file: PathBuf,
     export_book: PathBuf,
     cpus: usize,
+    ttable_size_kb: usize,
+    pvtable_size_kb: usize,
     seed: u64,
     blue_random_sample: usize,
     reasonable_setups: Vec<usize>,
-    openings: usize,
+    /// How many to compute with depth 1, 2, etc.
+    openings: Vec<usize>,
     block: usize,
     log_period_seconds: f32,
 }
@@ -82,17 +88,22 @@ fn run() -> Result<(), Box<dyn Error>> {
 struct OpeningSolver {
     config: Config,
     rng: StdRng,
-    evaluator: Arc<DefaultEvaluator>,
+    hyperparameters: Hyperparameters,
     openings: Vec<Opening>,
     blue_setups: Vec<SetupMove>,
 }
 
 impl OpeningSolver {
     fn new(config: &Config) -> Self {
+        let hyperparameters = Hyperparameters {
+            ttable_size: config.ttable_size_kb << 10,
+            pvtable_size: config.pvtable_size_kb << 10,
+            ..Hyperparameters::default()
+        };
         Self {
             config: config.clone(),
             rng: StdRng::seed_from_u64(config.seed),
-            evaluator: Arc::new(DefaultEvaluator::default()),
+            hyperparameters,
             openings: Vec::new(),
             blue_setups: Vec::new(),
         }
@@ -101,16 +112,22 @@ impl OpeningSolver {
     fn run(&mut self) -> Result<(), Box<dyn Error>> {
         self.random_sample_blue_setups();
 
+        let mut depth = ONE_PLY;
         for num in self.config.reasonable_setups.clone() {
             self.all_openings();
-            self.improve_openings(num);
+            self.improve_openings(num, depth);
             log::info!("Truncate to {num} openings");
             self.openings.truncate(num);
             self.use_openings_as_blue_setups();
         }
-        self.improve_openings(self.config.openings);
-        log::info!("Truncate to {num} openings", num = self.config.openings);
-        self.openings.truncate(self.config.openings);
+        for num in self.config.openings.clone() {
+            log::info!("Calculate {num} openings at depth {depth}");
+            self.improve_openings(num, depth);
+            self.use_openings_as_blue_setups();
+            depth += ONE_PLY;
+        }
+        log::info!("Truncate to {num} openings", num = self.config.openings[0]);
+        self.openings.truncate(self.config.openings[0]);
         self.print_openings()?;
         self.export_openings()?;
         Ok(())
@@ -150,7 +167,7 @@ impl OpeningSolver {
         log::info!("Number of openings: {num}", num = self.openings.len());
     }
 
-    fn improve_openings(&mut self, min_num_exact: usize) {
+    fn improve_openings(&mut self, min_num_exact: usize, depth: Depth) {
         log::info!("Calculating {min_num_exact} openings");
         let mut last_log_time = Instant::now();
         // <= min_num_exact
@@ -175,7 +192,13 @@ impl OpeningSolver {
             let results: Vec<Result<Opening, Opening>> = block
                 .par_iter()
                 .map(|&opening| {
-                    match compute_opening(opening.red, &self.evaluator, alpha, &self.blue_setups) {
+                    match compute_opening(
+                        opening.red,
+                        &self.hyperparameters,
+                        depth,
+                        alpha,
+                        &self.blue_setups,
+                    ) {
                         Some(new) => Ok(new),
                         None => Err(opening),
                     }
@@ -269,7 +292,8 @@ struct Opening {
 // Only return something if score > alpha.
 fn compute_opening(
     red: SetupMove,
-    evaluator: &DefaultEvaluator,
+    hyperparameters: &Hyperparameters,
+    depth: Depth,
     alpha: Score,
     blue_setups: &[SetupMove],
 ) -> Option<Opening> {
@@ -278,16 +302,17 @@ fn compute_opening(
         red,
         blue: blue_setups[0],
     };
-    let epos0 = EvaluatedPosition::new(evaluator, Position::initial());
-    let epos1 = epos0.make_setup_move(red).unwrap();
+    let pos0 = Position::initial();
+    let pos1 = pos0.make_setup_move(red).unwrap();
+    let mut search = Search::new(hyperparameters, &Arc::new(DefaultEvaluator::default()));
     for &blue_setup in blue_setups {
-        let epos2 = epos1.make_setup_move(blue_setup).unwrap();
-        let score = Score::from(ScoreExpanded::Eval(epos2.evaluate()));
-        if score < result.score {
-            if score <= alpha {
+        let pos2 = pos1.make_setup_move(blue_setup).unwrap();
+        let result2 = search.search(&pos2, Some(depth), None, None);
+        if result2.score < result.score {
+            if result2.score <= alpha {
                 return None;
             }
-            result.score = score;
+            result.score = result2.score;
             result.blue = blue_setup;
         }
     }
