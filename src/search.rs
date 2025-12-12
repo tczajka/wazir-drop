@@ -1,4 +1,5 @@
 use crate::{
+    book,
     constants::{
         Depth, Eval, Hyperparameters, Ply, CHECK_TIMEOUT_NODES, DEPTH_INCREMENT, MAX_SEARCH_DEPTH,
         NUM_KILLER_MOVES, ONE_PLY, PLY_DRAW,
@@ -9,8 +10,8 @@ use crate::{
     smallvec::SmallVec,
     ttable::{TTable, TTableEntry, TTableScoreType},
     variation::LongVariation,
-    EmptyVariation, EvaluatedPosition, Evaluator, ExtendableVariation, Move, NonEmptyVariation,
-    PVTable, Position, Score, ScoreExpanded, Stage, Variation,
+    Color, EmptyVariation, EvaluatedPosition, Evaluator, ExtendableVariation, Move,
+    NonEmptyVariation, PVTable, Position, Score, ScoreExpanded, SetupMove, Stage, Variation,
 };
 use std::{cmp::Reverse, iter, sync::Arc, time::Instant};
 
@@ -53,16 +54,13 @@ impl<E: Evaluator> Search<E> {
         instance.search(position)
     }
 
-    pub fn try_search_position(
+    pub fn search_blue_setup(
         &mut self,
         position: &Position,
-        depth: Depth,
-        alpha: Score,
-        beta: Score,
-        deadline: Option<Instant>,
-    ) -> Result<Score, Timeout> {
-        let mut instance = SearchInstance::new(self, None, None, None);
-        instance.try_search_position(position, depth, alpha, beta, deadline)
+        deadlines: Deadlines,
+    ) -> SearchResultBlueSetup {
+        let mut instance = SearchInstance::new(self, None, Some(deadlines), None);
+        instance.search_blue_setup(position)
     }
 }
 
@@ -79,11 +77,13 @@ struct SearchInstance<'a, E: Evaluator> {
     hard_deadline: Option<Instant>,
     nodes: u64,
     root_moves: Vec<RootMove>,
+    root_moves_setup: Vec<SetupMove>,
     depth: Depth,
     root_moves_considered: usize,
     root_moves_exact_score: usize,
     pv: LongVariation,
     history: History,
+    blue_setup_score: Score,
 }
 
 impl<'a, E: Evaluator> SearchInstance<'a, E> {
@@ -106,11 +106,13 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             hard_deadline: None,
             nodes: 0,
             root_moves: Vec::new(),
+            root_moves_setup: Vec::new(),
             depth: 0,
             root_moves_considered: 0,
             root_moves_exact_score: 0,
             pv: LongVariation::empty(),
             history: History::new(0),
+            blue_setup_score: Score::DRAW,
         }
     }
 
@@ -600,7 +602,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
     ) -> Result<SearchResultInternal<V>, Timeout> {
         let position = eposition.position();
 
-        // ZFastest loss is at ply+2 if we are checkmated.
+        // Fastest loss is at ply+2 if we are checkmated.
         let mut result = SearchResultInternal {
             score: ScoreExpanded::Loss(position.ply() + 2).into(),
             depth: Depth::MAX,
@@ -923,18 +925,104 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         }
     }
 
-    fn try_search_position(
-        &mut self,
-        position: &Position,
-        depth: Depth,
-        alpha: Score,
-        beta: Score,
-        deadline: Option<Instant>,
-    ) -> Result<Score, Timeout> {
-        self.hard_deadline = deadline;
+    fn search_blue_setup(&mut self, position: &Position) -> SearchResultBlueSetup {
+        assert_eq!(position.stage(), Stage::Setup);
+        assert_eq!(position.to_move(), Color::Blue);
+        self.root_moves_setup = book::blue_setup_moves();
+        self.ttable.new_epoch();
+        self.pvtable.new_epoch();
+        self.history = History::new(position.ply());
         let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
-        let result = self.search_alpha_beta::<EmptyVariation>(&eposition, alpha, beta, depth)?;
-        Ok(result.score)
+        _ = self.blue_setup_iterative_deepening(&eposition);
+        SearchResultBlueSetup {
+            score: self.blue_setup_score,
+            mov: self.root_moves_setup[0],
+            pv: self.pv.clone(),
+            depth: self.depth,
+            root_moves_considered: self.root_moves_considered,
+            num_root_moves: self.root_moves_setup.len(),
+            nodes: self.nodes,
+        }
+    }
+
+    fn blue_setup_iterative_deepening(
+        &mut self,
+        eposition: &EvaluatedPosition<E>,
+    ) -> Result<(), Timeout> {
+        let hash = eposition.position().hash();
+        self.history.push(hash);
+        self.hard_deadline = self.deadlines.as_ref().map(|ds| ds.hard);
+        while self.depth < self.max_depth {
+            if let Some(ds) = self.deadlines.as_ref() {
+                if Instant::now() >= ds.start_next_depth {
+                    log::info!("ndto"); // next depth timeout
+                    break;
+                }
+            }
+            self.blue_setup_iterative_deepening_iteration(eposition)?;
+        }
+        self.history.pop();
+        Ok(())
+    }
+
+    fn blue_setup_iterative_deepening_iteration(
+        &mut self,
+        eposition: &EvaluatedPosition<E>,
+    ) -> Result<(), Timeout> {
+        // First move.
+        let next_depth = self.depth + DEPTH_INCREMENT;
+        let mov = self.root_moves_setup[0];
+        let epos2 = eposition.make_setup_move(mov).unwrap();
+        let result = self.search_alpha_beta::<LongVariation>(
+            &epos2,
+            -Score::INFINITE,
+            Score::INFINITE,
+            next_depth.saturating_sub(ONE_PLY),
+        )?;
+        self.depth = next_depth;
+        self.pv = result.pv;
+        self.blue_setup_score = -result.score;
+        self.root_moves_considered = 1;
+
+        while self.root_moves_considered < self.root_moves_setup.len() {
+            if let Some(ds) = self.deadlines.as_ref() {
+                if Instant::now() >= ds.soft {
+                    log::info!("sto"); // next depth timeout
+                    break;
+                }
+            }
+            let mov = self.root_moves_setup[self.root_moves_considered];
+            let epos2 = eposition.make_setup_move(mov).unwrap();
+            let alpha = self.blue_setup_score;
+            // Null window.
+            let result = self.search_alpha_beta::<EmptyVariation>(
+                &epos2,
+                -alpha.next(),
+                -alpha,
+                self.depth.saturating_sub(ONE_PLY),
+            )?;
+            let score = -result.score;
+            if score <= alpha {
+                self.root_moves_considered += 1;
+                continue;
+            }
+            // Full window search.
+            let result = self.search_alpha_beta::<LongVariation>(
+                &epos2,
+                -Score::INFINITE,
+                -alpha,
+                self.depth.saturating_sub(ONE_PLY),
+            )?;
+            let score = -result.score;
+            if score > alpha {
+                self.root_moves_setup[0..=self.root_moves_considered].rotate_right(1);
+                self.blue_setup_score = score;
+                self.pv = result.pv;
+            }
+            self.root_moves_considered += 1;
+        }
+        // Other moves.
+        Ok(())
     }
 }
 
@@ -943,6 +1031,16 @@ pub struct SearchResult {
     pub pv: LongVariation,
     // Only used for multi-move searches.
     pub top_moves: Vec<ScoredMove>,
+    pub depth: Depth,
+    pub root_moves_considered: usize,
+    pub num_root_moves: usize,
+    pub nodes: u64,
+}
+
+pub struct SearchResultBlueSetup {
+    pub score: Score,
+    pub mov: SetupMove,
+    pub pv: LongVariation,
     pub depth: Depth,
     pub root_moves_considered: usize,
     pub num_root_moves: usize,
@@ -990,4 +1088,4 @@ struct SearchResultQuiescence<V> {
 }
 
 #[derive(Debug)]
-pub struct Timeout;
+struct Timeout;

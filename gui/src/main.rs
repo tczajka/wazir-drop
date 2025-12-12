@@ -328,7 +328,29 @@ impl WazirDropApp {
                         let AnyMove::Setup(red) = history_first.unwrap().mov else {
                             panic!("bad first move");
                         };
-                        book::blue_setup(red, &mut search.lock().unwrap(), deadlines.hard).into()
+
+                        match book::blue_setup(red) {
+                            Some(mov) => mov.into(),
+                            None => {
+                                let result = search
+                                    .lock()
+                                    .unwrap()
+                                    .search_blue_setup(&position, deadlines);
+                                log::info!(
+                                    "depth {depth} score {score} \
+                                        root {root_moves_considered}/{root_all_moves} \
+                                        nodes {nodes} pv {mov} {pv}",
+                                    depth = result.depth,
+                                    score = result.score.to_relative(position.ply()),
+                                    root_moves_considered = result.root_moves_considered,
+                                    root_all_moves = result.num_root_moves,
+                                    nodes = result.nodes,
+                                    mov = result.mov,
+                                    pv = result.pv,
+                                );
+                                result.mov.into()
+                            }
+                        }
                     }
                 },
                 Stage::Regular => {

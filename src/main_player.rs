@@ -1,14 +1,11 @@
 use crate::{
     book,
     clock::Timer,
-    constants::{Hyperparameters, Ply, PLY_DRAW, TIME_MARGIN},
+    constants::{Hyperparameters, Ply, PLY_AFTER_SETUP, PLY_DRAW, TIME_MARGIN},
     log, AnyMove, Color, Deadlines, DefaultEvaluator, Evaluator, Player, PlayerFactory, Position,
     Search, SetupMove, Stage,
 };
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{sync::Arc, time::Duration};
 
 struct MainPlayer<E: Evaluator> {
     hyperparameters: Hyperparameters,
@@ -23,7 +20,9 @@ impl<E: Evaluator> MainPlayer<E> {
         let mut p = ply;
         while p < PLY_DRAW {
             total_weight += weight;
-            let reduction = if p < self.hyperparameters.late_ply {
+            let reduction = if p < PLY_AFTER_SETUP {
+                self.hyperparameters.time_reduction_per_setup_move
+            } else if p < self.hyperparameters.late_ply {
                 self.hyperparameters.time_reduction_per_move
             } else {
                 self.hyperparameters.time_reduction_per_late_move
@@ -50,13 +49,6 @@ impl<E: Evaluator> MainPlayer<E> {
                 .instant_at(time_left.saturating_sub(to_allocate.mul_f64(panic_soft_fraction))),
         }
     }
-
-    fn time_allocation_setup(&self, time_left: Duration, timer: &Timer) -> Instant {
-        let to_allocate = time_left.saturating_sub(TIME_MARGIN);
-        timer.instant_at(
-            time_left.saturating_sub(to_allocate.mul_f64(self.hyperparameters.time_setup)),
-        )
-    }
 }
 
 impl<E: Evaluator> Player for MainPlayer<E> {
@@ -70,19 +62,36 @@ impl<E: Evaluator> Player for MainPlayer<E> {
 
     fn make_move(&mut self, position: &Position, timer: &Timer) -> AnyMove {
         let time_left = timer.get();
+        let deadlines = self.time_allocation(position.ply(), time_left, timer);
         match position.stage() {
             Stage::Setup => {
-                let deadline = self.time_allocation_setup(time_left, timer);
                 let mov = match position.to_move() {
                     Color::Red => book::red_setup(),
-                    Color::Blue => {
-                        book::blue_setup(self.opp_red_setup.unwrap(), &mut self.search, deadline)
-                    }
+                    Color::Blue => match book::blue_setup(self.opp_red_setup.unwrap()) {
+                        Some(mov) => mov,
+                        None => {
+                            let result = self.search.search_blue_setup(position, deadlines);
+                            let elapsed = time_left.saturating_sub(timer.get());
+                            log::info!(
+                                "d={depth} {root_moves_considered}/{root_all_moves} \
+                                    s={score} n={nodes} knps={knps:.0} t={t}ms pv={setup} {pv}",
+                                depth = result.depth,
+                                root_moves_considered = result.root_moves_considered,
+                                root_all_moves = result.num_root_moves,
+                                score = result.score.to_relative(position.ply()),
+                                nodes = result.nodes,
+                                knps = result.nodes as f64 / elapsed.as_secs_f64() / 1000.0,
+                                setup = result.mov,
+                                t = elapsed.as_millis(),
+                                pv = result.pv,
+                            );
+                            result.mov
+                        }
+                    },
                 };
                 mov.into()
             }
             Stage::Regular => {
-                let deadlines = self.time_allocation(position.ply(), time_left, timer);
                 let result = self.search.search(
                     position,
                     None, /* max_depth */
@@ -93,13 +102,14 @@ impl<E: Evaluator> Player for MainPlayer<E> {
                 log::info!(
                     "d={depth} {root_moves_considered}/{root_all_moves} \
                         s={score} \
-                        n={nodes} knps={knps:.0} pv={pv}",
+                        n={nodes} knps={knps:.0} t={t}ms pv={pv}",
                     depth = result.depth,
                     root_moves_considered = result.root_moves_considered,
                     root_all_moves = result.num_root_moves,
                     score = result.score.to_relative(position.ply()),
                     nodes = result.nodes,
                     knps = result.nodes as f64 / elapsed.as_secs_f64() / 1000.0,
+                    t = elapsed.as_millis(),
                     pv = result.pv,
                 );
                 result.pv.moves[0].into()
