@@ -52,6 +52,18 @@ impl<E: Evaluator> Search<E> {
         let mut instance = SearchInstance::new(self, max_depth, deadlines, multi_move_threshold);
         instance.search(position)
     }
+
+    pub fn try_search_position(
+        &mut self,
+        position: &Position,
+        depth: Depth,
+        alpha: Score,
+        beta: Score,
+        deadline: Option<Instant>,
+    ) -> Result<Score, Timeout> {
+        let mut instance = SearchInstance::new(self, None, None, None);
+        instance.try_search_position(position, depth, alpha, beta, deadline)
+    }
 }
 
 /// This doesn't work for setup positions.
@@ -910,6 +922,20 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             )
         }
     }
+
+    fn try_search_position(
+        &mut self,
+        position: &Position,
+        depth: Depth,
+        alpha: Score,
+        beta: Score,
+        deadline: Option<Instant>,
+    ) -> Result<Score, Timeout> {
+        self.hard_deadline = deadline;
+        let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
+        let result = self.search_alpha_beta::<EmptyVariation>(&eposition, alpha, beta, depth)?;
+        Ok(result.score)
+    }
 }
 
 pub struct SearchResult {
@@ -964,4 +990,4 @@ struct SearchResultQuiescence<V> {
 }
 
 #[derive(Debug)]
-struct Timeout;
+pub struct Timeout;
