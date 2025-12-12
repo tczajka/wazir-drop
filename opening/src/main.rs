@@ -155,13 +155,13 @@ impl OpeningSolver {
     }
 
     fn all_openings(&mut self) {
-        log::info!("Generate all openings with dummy responses");
+        log::info!("Generate all openings");
         self.openings = movegen::setup_moves(Color::Red)
             .filter(|mov| Symmetry::normalize_red_setup(*mov).0 == Symmetry::Identity)
             .map(|red| Opening {
                 score: Score::DRAW,
                 red,
-                blue: self.blue_setups[0],
+                blue: None,
             })
             .collect();
         log::info!("Number of openings: {num}", num = self.openings.len());
@@ -193,7 +193,7 @@ impl OpeningSolver {
                 .par_iter()
                 .map(|&opening| {
                     match compute_opening(
-                        opening.red,
+                        opening,
                         &self.hyperparameters,
                         depth,
                         alpha,
@@ -243,7 +243,7 @@ impl OpeningSolver {
 
         for (index, opening) in self.openings.iter().enumerate() {
             let (symmetry, red_equivalent) =
-                Symmetry::normalize_red_setup(opening.blue.with_color(Color::Red));
+                Symmetry::normalize_red_setup(opening.blue.unwrap().with_color(Color::Red));
             let setup_number = setup_number_mapping
                 .get(&red_equivalent)
                 .copied()
@@ -254,7 +254,7 @@ impl OpeningSolver {
                 "{index}. {score} {red} {blue} ({setup_number}, {symmetry})",
                 score = opening.score,
                 red = opening.red,
-                blue = opening.blue,
+                blue = opening.blue.unwrap(),
             )?;
         }
         Ok(())
@@ -266,7 +266,7 @@ impl OpeningSolver {
         let mut encoder = Base128Encoder::new();
         for opening in &self.openings {
             encode_setup_move(&mut encoder, opening.red);
-            encode_setup_move(&mut encoder, opening.blue);
+            encode_setup_move(&mut encoder, opening.blue.unwrap());
         }
         let encoded = encoder.finish();
 
@@ -286,12 +286,12 @@ impl OpeningSolver {
 struct Opening {
     score: Score,
     red: SetupMove,
-    blue: SetupMove,
+    blue: Option<SetupMove>,
 }
 
 // Only return something if score > alpha.
 fn compute_opening(
-    red: SetupMove,
+    prev_opening: Opening,
     hyperparameters: &Hyperparameters,
     depth: Depth,
     alpha: Score,
@@ -299,13 +299,19 @@ fn compute_opening(
 ) -> Option<Opening> {
     let mut result = Opening {
         score: Score::INFINITE,
-        red,
-        blue: blue_setups[0],
+        red: prev_opening.red,
+        blue: None,
     };
     let pos0 = Position::initial();
-    let pos1 = pos0.make_setup_move(red).unwrap();
+    let pos1 = pos0.make_setup_move(prev_opening.red).unwrap();
     let mut search = Search::new(hyperparameters, &Arc::new(DefaultEvaluator::default()));
-    for &blue_setup in blue_setups {
+    let blue_iter = prev_opening.blue.into_iter().chain(
+        blue_setups
+            .iter()
+            .copied()
+            .filter(|&blue| prev_opening.blue != Some(blue)),
+    );
+    for blue_setup in blue_iter {
         let pos2 = pos1.make_setup_move(blue_setup).unwrap();
         let result2 = search.search(&pos2, Some(depth), None, None);
         if result2.score < result.score {
@@ -313,7 +319,7 @@ fn compute_opening(
                 return None;
             }
             result.score = result2.score;
-            result.blue = blue_setup;
+            result.blue = Some(blue_setup);
         }
     }
     Some(result)
