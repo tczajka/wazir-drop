@@ -178,6 +178,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             log::info!("only one choice");
             self.depth = 0;
             self.root_moves_considered = 1;
+            self.root_moves_exact_score = 1;
             self.pv = LongVariation::empty().add_front(self.root_moves[0].mov);
             return;
         }
