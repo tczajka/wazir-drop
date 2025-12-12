@@ -22,6 +22,8 @@ pub const NUM_KILLER_MOVES: usize = 2;
 pub const HISTORY_BLOOM_FILTER_LOG_SIZE: u32 = 14;
 pub const HISTORY_BLOOM_FILTER_NUM_HASHES: usize = 2;
 
+pub const RED_SETUP_INDEX: usize = 10;
+
 #[derive(Debug, Clone)]
 pub struct Hyperparameters {
     pub ttable_size: usize,

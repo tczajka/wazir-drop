@@ -1,14 +1,16 @@
 use crate::{
+    book,
     clock::Timer,
     constants::{Hyperparameters, Ply, PLY_DRAW, TIME_MARGIN},
     log, AnyMove, Color, Deadlines, DefaultEvaluator, Evaluator, Player, PlayerFactory, Position,
     Search, SetupMove, Stage,
 };
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 struct MainPlayer<E: Evaluator> {
     hyperparameters: Hyperparameters,
     search: Search<E>,
+    opp_red_setup: Option<SetupMove>,
 }
 
 impl<E: Evaluator> MainPlayer<E> {
@@ -48,16 +50,23 @@ impl<E: Evaluator> MainPlayer<E> {
 }
 
 impl<E: Evaluator> Player for MainPlayer<E> {
+    fn opponent_move(&mut self, _position: &Position, mov: AnyMove, _timer: &Timer) {
+        if let AnyMove::Setup(mov) = mov {
+            if mov.color == Color::Red {
+                self.opp_red_setup = Some(mov);
+            }
+        }
+    }
+
     fn make_move(&mut self, position: &Position, timer: &Timer) -> AnyMove {
         let time_left = timer.get();
         match position.stage() {
             Stage::Setup => {
-                let mov = SetupMove::from_str("AAAAAAWANDDDDFFA").unwrap();
-                SetupMove {
-                    color: position.to_move(),
-                    ..mov
-                }
-                .into()
+                let mov = match position.to_move() {
+                    Color::Red => book::red_setup(),
+                    Color::Blue => book::blue_setup(self.opp_red_setup.unwrap()),
+                };
+                mov.into()
             }
             Stage::Regular => {
                 let deadlines = self.time_allocation(position.ply(), time_left, timer);
@@ -122,6 +131,7 @@ impl<E: Evaluator> PlayerFactory for MainPlayerFactory<E> {
         Box::new(MainPlayer {
             hyperparameters: self.hyperparameters.clone(),
             search: Search::new(&self.hyperparameters, &self.evaluator),
+            opp_red_setup: None,
         })
     }
 }
