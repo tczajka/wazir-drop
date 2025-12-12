@@ -1,5 +1,5 @@
 pub mod arrays;
-pub mod base128_decoder;
+pub mod base128;
 pub mod clock;
 pub mod either;
 pub mod enums;
@@ -11,6 +11,7 @@ pub mod smallvec;
 
 mod bitboard;
 mod board;
+pub mod book;
 mod captured;
 mod cli;
 mod color;

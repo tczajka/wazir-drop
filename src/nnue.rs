@@ -1,5 +1,5 @@
 use crate::{
-    base128_decoder::Base128Decoder,
+    base128::Base128Decoder,
     constants::Eval,
     enums::EnumMap,
     nnue_weights::{EMBEDDING_SIZE, HIDDEN_SIZES, HIDDEN_WEIGHT_BITS, SCALE, WEIGHTS},

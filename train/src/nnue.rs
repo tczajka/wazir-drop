@@ -6,13 +6,12 @@ use std::{
 };
 
 use crate::model::{EvalModel, Export};
-use extra::base128_encoder::Base128Encoder;
 use serde::Deserialize;
 use tch::{
     Tensor,
     nn::{self, Module},
 };
-use wazir_drop::Features;
+use wazir_drop::{Features, base128::Base128Encoder};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]

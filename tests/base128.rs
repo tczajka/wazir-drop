@@ -1,6 +1,5 @@
-use extra::base128_encoder::Base128Encoder;
-use rand::{Rng, SeedableRng, rngs::StdRng};
-use wazir_drop::base128_decoder::Base128Decoder;
+use rand::{rngs::StdRng, Rng, SeedableRng};
+use wazir_drop::base128::{Base128Decoder, Base128Encoder};
 
 #[test]
 fn test_base128() {

@@ -1,5 +1,6 @@
 log = "logs/opening.log"
 openings_file = "data/openings.txt"
+export_book = "data/book_data.rs"
 cpus = 60
 seed = 1234
 blue_random_sample = 2000

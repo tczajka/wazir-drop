@@ -16,7 +16,7 @@ use std::{
 };
 use wazir_drop::{
     Color, DefaultEvaluator, EvaluatedPosition, Position, Score, ScoreExpanded, SetupMove,
-    Symmetry, movegen,
+    Symmetry, base128::Base128Encoder, book::encode_setup_move, movegen,
 };
 
 #[derive(Parser, Debug)]
@@ -29,6 +29,7 @@ struct Args {
 struct Config {
     log: PathBuf,
     openings_file: PathBuf,
+    export_book: PathBuf,
     cpus: usize,
     seed: u64,
     blue_random_sample: usize,
@@ -56,6 +57,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let config_dir = args.config_file.parent().unwrap();
     config.log = config_dir.join(&config.log);
     config.openings_file = config_dir.join(&config.openings_file);
+    config.export_book = config_dir.join(&config.export_book);
 
     let log_file = File::create(&config.log)?;
     CombinedLogger::init(vec![
@@ -110,6 +112,7 @@ impl OpeningSolver {
         log::info!("Truncate to {num} openings", num = self.config.openings);
         self.openings.truncate(self.config.openings);
         self.print_openings()?;
+        self.export_openings()?;
         Ok(())
     }
 
@@ -233,10 +236,28 @@ impl OpeningSolver {
         }
         Ok(())
     }
-}
 
-#[cfg(false)]
-fn run_with_config(config: &Config) -> Result<(), Box<dyn Error>> {}
+    fn export_openings(&self) -> Result<(), Box<dyn Error>> {
+        log::info!("Export openings to {}", self.config.export_book.display());
+
+        let mut encoder = Base128Encoder::new();
+        for opening in &self.openings {
+            encode_setup_move(&mut encoder, opening.red);
+            encode_setup_move(&mut encoder, opening.blue);
+        }
+        let encoded = encoder.finish();
+
+        let file = File::create(&self.config.export_book)?;
+        let mut writer = BufWriter::new(file);
+        writeln!(
+            writer,
+            "pub const NUM_OPENINGS: usize = {};",
+            self.openings.len()
+        )?;
+        writeln!(writer, "pub const OPENINGS: &str = r\"{}\";", encoded)?;
+        Ok(())
+    }
+}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 struct Opening {
