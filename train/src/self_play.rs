@@ -112,6 +112,7 @@ fn play_game<F: Features>(
     let hyperparameters = Hyperparameters {
         ttable_size: config.ttable_size_mb << 20,
         pvtable_size: config.pvtable_size_mb << 20,
+        contempt: 0.0,
         ..Hyperparameters::default()
     };
 
