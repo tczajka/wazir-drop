@@ -47,6 +47,7 @@ pub struct Hyperparameters {
     pub panic_eval_threshold: f64,
     pub panic_multiplier: f64,
     pub panic_max_remaining: f64,
+    pub contempt: f64,
 }
 
 impl Default for Hyperparameters {
@@ -67,6 +68,7 @@ impl Default for Hyperparameters {
             panic_eval_threshold: 0.1,
             panic_multiplier: 2.0,
             panic_max_remaining: 0.3,
+            contempt: 0.3,
         }
     }
 }

@@ -50,8 +50,9 @@ impl<E: Evaluator> Search<E> {
         multi_move_threshold: Option<i32>,
         is_score_important: bool,
     ) -> SearchResult {
-        let mut instance = SearchInstance::new(self, max_depth, deadlines, multi_move_threshold);
-        instance.search(position, is_score_important)
+        let mut instance =
+            SearchInstance::new(self, position, max_depth, deadlines, multi_move_threshold);
+        instance.search(is_score_important)
     }
 
     pub fn search_blue_setup(
@@ -61,8 +62,8 @@ impl<E: Evaluator> Search<E> {
         deadlines: Option<Deadlines>,
         possible_moves: &[SetupMove],
     ) -> SearchResultBlueSetup {
-        let mut instance = SearchInstance::new(self, max_depth, deadlines, None);
-        instance.search_blue_setup(position, possible_moves)
+        let mut instance = SearchInstance::new(self, position, max_depth, deadlines, None);
+        instance.search_blue_setup(possible_moves)
     }
 }
 
@@ -73,6 +74,7 @@ struct SearchInstance<'a, E: Evaluator> {
     ttable: &'a mut TTable,
     pvtable: &'a mut PVTable,
     killer_moves: &'a mut [[Option<Move>; NUM_KILLER_MOVES]],
+    root_position: Position,
     max_depth: Depth,
     deadlines: Option<Deadlines>,
     multi_move_threshold: Option<i32>,
@@ -86,22 +88,30 @@ struct SearchInstance<'a, E: Evaluator> {
     pv: LongVariation,
     history: History,
     blue_setup_score: Score,
+    red_contempt: Eval,
 }
 
 impl<'a, E: Evaluator> SearchInstance<'a, E> {
     fn new(
         search: &'a mut Search<E>,
+        position: &Position,
         max_depth: Option<Depth>,
         deadlines: Option<Deadlines>,
         multi_move_threshold: Option<i32>,
     ) -> Self {
         assert!(multi_move_threshold.is_none() || deadlines.is_none());
+        let contempt = (search.hyperparameters.contempt * search.evaluator.scale() as f64) as Eval;
+        let red_contempt = match position.to_move() {
+            Color::Red => contempt,
+            Color::Blue => -contempt,
+        };
         Self {
             hyperparameters: search.hyperparameters.clone(),
             evaluator: &search.evaluator,
             ttable: &mut search.ttable,
             pvtable: &mut search.pvtable,
             killer_moves: &mut search.killer_moves,
+            root_position: position.clone(),
             max_depth: max_depth.unwrap_or(MAX_SEARCH_DEPTH),
             deadlines,
             multi_move_threshold,
@@ -115,17 +125,18 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             pv: LongVariation::empty(),
             history: History::new(0),
             blue_setup_score: Score::DRAW,
+            red_contempt,
         }
     }
 
-    fn search(&mut self, position: &Position, is_score_important: bool) -> SearchResult {
-        let score = match position.stage() {
+    fn search(&mut self, is_score_important: bool) -> SearchResult {
+        let score = match self.root_position.stage() {
             Stage::Setup => panic!("SearchInstance::search does not support setup"),
             Stage::Regular => {
-                self.search_root(position, is_score_important);
+                self.search_root(is_score_important);
                 self.root_moves[0].score
             }
-            Stage::End(outcome) => outcome.to_score(position.ply()),
+            Stage::End(outcome) => outcome.to_score(self.root_position.ply()),
         };
 
         let top_moves = match self.multi_move_threshold {
@@ -154,18 +165,18 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         }
     }
 
-    fn search_root(&mut self, position: &Position, is_score_important: bool) {
-        self.generate_root_captures_of_wazir(position);
+    fn search_root(&mut self, is_score_important: bool) {
+        self.generate_root_captures_of_wazir();
         if let Some(root_move) = self.root_moves.first() {
             self.depth = Depth::MAX;
             self.pv = LongVariation::empty().add_front(root_move.mov);
             return;
         }
 
-        self.generate_root_moves(position);
+        self.generate_root_moves();
 
         if self.root_moves.is_empty() {
-            self.generate_root_suicides(position);
+            self.generate_root_suicides();
             let Some(root_move) = self.root_moves.first() else {
                 panic!("Stalemate");
             };
@@ -185,17 +196,17 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
 
         self.ttable.new_epoch();
         self.pvtable.new_epoch();
-        self.history = History::new(position.ply());
+        self.history = History::new(self.root_position.ply());
 
-        let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
+        let eposition = EvaluatedPosition::new(self.evaluator, self.root_position.clone());
 
         // Ignore timeout.
         _ = self.iterative_deepening(&eposition);
     }
 
-    fn generate_root_captures_of_wazir(&mut self, position: &Position) {
-        let score = ScoreExpanded::Win(position.ply() + 1).into();
-        for mov in movegen::captures_of_wazir(position) {
+    fn generate_root_captures_of_wazir(&mut self) {
+        let score = ScoreExpanded::Win(self.root_position.ply() + 1).into();
+        for mov in movegen::captures_of_wazir(&self.root_position) {
             self.root_moves.push(RootMove {
                 mov,
                 score,
@@ -206,10 +217,11 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         self.root_moves_exact_score = self.root_moves.len();
     }
 
-    fn generate_root_moves(&mut self, position: &Position) {
-        let in_check = movegen::in_check(position, position.to_move());
+    fn generate_root_moves(&mut self) {
+        let in_check = movegen::in_check(&self.root_position, self.root_position.to_move());
         let mut futile = false;
-        for move_candidate in self.generate_move_candidates(position, in_check, false, None, false)
+        for move_candidate in
+            self.generate_move_candidates(&self.root_position, in_check, false, None, false)
         {
             match move_candidate {
                 MoveCandidate::Move { mov, extra: _extra } => {
@@ -229,15 +241,15 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         }
     }
 
-    fn generate_root_suicides(&mut self, position: &Position) {
-        let loss_ply = position.ply() + 2;
+    fn generate_root_suicides(&mut self) {
+        let loss_ply = self.root_position.ply() + 2;
         let score = if loss_ply <= PLY_DRAW {
             ScoreExpanded::Loss(loss_ply).into()
         } else {
             Score::DRAW
         };
 
-        for mov in movegen::pseudomoves(position) {
+        for mov in movegen::pseudomoves(&self.root_position) {
             self.root_moves.push(RootMove {
                 mov,
                 score,
@@ -834,8 +846,13 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
 
             // Stand pat.
+            let contempt = match position.to_move() {
+                Color::Red => self.red_contempt,
+                Color::Blue => -self.red_contempt,
+            };
+            let eval = eposition.evaluate() + contempt;
             result = SearchResultQuiescence {
-                score: ScoreExpanded::Eval(eposition.evaluate()).into(),
+                score: ScoreExpanded::Eval(eval).into(),
                 pv: V::empty(),
             };
             if result.score >= beta {
@@ -936,18 +953,14 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         }
     }
 
-    fn search_blue_setup(
-        &mut self,
-        position: &Position,
-        possible_moves: &[SetupMove],
-    ) -> SearchResultBlueSetup {
-        assert_eq!(position.stage(), Stage::Setup);
-        assert_eq!(position.to_move(), Color::Blue);
+    fn search_blue_setup(&mut self, possible_moves: &[SetupMove]) -> SearchResultBlueSetup {
+        assert_eq!(self.root_position.stage(), Stage::Setup);
+        assert_eq!(self.root_position.to_move(), Color::Blue);
         self.root_moves_setup = possible_moves.to_vec();
         self.ttable.new_epoch();
         self.pvtable.new_epoch();
-        self.history = History::new(position.ply());
-        let eposition = EvaluatedPosition::new(self.evaluator, position.clone());
+        self.history = History::new(self.root_position.ply());
+        let eposition = EvaluatedPosition::new(self.evaluator, self.root_position.clone());
         _ = self.blue_setup_iterative_deepening(&eposition);
         SearchResultBlueSetup {
             score: self.blue_setup_score,
