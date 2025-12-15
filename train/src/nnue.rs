@@ -203,7 +203,7 @@ impl<F: Features> Export for NnueModel<F> {
         let mut f = BufWriter::new(File::create(output)?);
         writeln!(
             f,
-            "pub const SCALE: f32 = {scale:.1};",
+            "pub const SCALE: f64 = {scale:.1};",
             scale = self.config.value_scale
         )?;
         writeln!(

@@ -46,7 +46,7 @@ struct Config {
     book_size: usize,
     extra_depth_book_size: Vec<usize>,
     block: usize,
-    log_period_seconds: f32,
+    log_period_seconds: f64,
 }
 
 fn main() -> ExitCode {
@@ -190,7 +190,7 @@ impl OpeningSolver {
         let mut last_log_time = Instant::now();
         let mut new_openings: BTreeSet<Opening> = BTreeSet::new();
         for (block_index, block) in self.all_openings.chunks(self.config.block).enumerate() {
-            if last_log_time.elapsed().as_secs_f32() >= self.config.log_period_seconds {
+            if last_log_time.elapsed().as_secs_f64() >= self.config.log_period_seconds {
                 log::info!(
                     "Done {done} / {all}",
                     done = block_index * self.config.block,
@@ -226,7 +226,7 @@ impl OpeningSolver {
         log::info!("Build book openings: {n} depth {depth}");
         let mut last_log_time = Instant::now();
         for (block_index, block) in self.openings[..n].chunks_mut(self.config.block).enumerate() {
-            if last_log_time.elapsed().as_secs_f32() >= self.config.log_period_seconds {
+            if last_log_time.elapsed().as_secs_f64() >= self.config.log_period_seconds {
                 log::info!("Done {done} / {n}", done = block_index * self.config.block);
                 last_log_time = Instant::now();
             }

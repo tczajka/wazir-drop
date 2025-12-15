@@ -134,7 +134,7 @@ impl Evaluator for Nnue {
         dot_product(&self.final_layer_weights, &x, self.final_layer_bias)
     }
 
-    fn scale(&self) -> f32 {
+    fn scale(&self) -> f64 {
         SCALE
     }
 }

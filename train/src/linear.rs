@@ -100,7 +100,7 @@ impl Export for LinearModel<PSFeatures> {
         let to_move: i16 = to_move.try_into().expect("out of range");
         writeln!(
             f,
-            "pub static SCALE: f32 = {scale:.1};",
+            "pub static SCALE: f64 = {scale:.1};",
             scale = export_config.value_scale
         )?;
         writeln!(f, "pub static TO_MOVE: i16 = {to_move};")?;
@@ -153,7 +153,7 @@ impl Export for LinearModel<WPSFeatures> {
         let to_move: i16 = to_move.try_into().expect("out of range");
         writeln!(
             f,
-            "pub static SCALE: f32 = {scale:.1};",
+            "pub static SCALE: f64 = {scale:.1};",
             scale = export_config.value_scale
         )?;
         writeln!(f, "pub static TO_MOVE: i16 = {to_move};")?;

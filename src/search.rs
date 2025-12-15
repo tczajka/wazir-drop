@@ -100,7 +100,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         multi_move_threshold: Option<i32>,
     ) -> Self {
         assert!(multi_move_threshold.is_none() || deadlines.is_none());
-        let contempt = (search.hyperparameters.contempt * search.evaluator.scale() as f64) as Eval;
+        let contempt = (search.hyperparameters.contempt * search.evaluator.scale()) as Eval;
         let red_contempt = match position.to_move() {
             Color::Red => contempt,
             Color::Blue => -contempt,
@@ -323,8 +323,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             ScoreExpanded::Win(_) => Score::WIN_MAX_PLY,
             ScoreExpanded::Loss(_) => -Score::INFINITE,
             ScoreExpanded::Eval(eval) => ScoreExpanded::Eval(
-                eval - (self.evaluator.scale() as f64 * self.hyperparameters.panic_eval_threshold)
-                    as Eval,
+                eval - (self.evaluator.scale() * self.hyperparameters.panic_eval_threshold) as Eval,
             )
             .into(),
         };

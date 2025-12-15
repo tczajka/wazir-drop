@@ -1,4 +1,4 @@
-pub static SCALE: f32 = 1000.0;
+pub static SCALE: f64 = 1000.0;
 pub static TO_MOVE: i16 = 328;
 
 #[rustfmt::skip]

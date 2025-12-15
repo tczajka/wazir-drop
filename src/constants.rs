@@ -36,7 +36,7 @@ pub struct Hyperparameters {
     pub pvtable_size: usize,
     pub min_depth_ttable: Depth,
     pub reduction_null_move: Depth,
-    pub futility_margin: f32,
+    pub futility_margin: f64,
     pub late_move_reduction_start: usize,
     pub time_reduction_per_setup_move: f64,
     pub time_reduction_per_move: f64,

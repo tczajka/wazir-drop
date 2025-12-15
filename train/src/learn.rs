@@ -23,7 +23,7 @@ pub struct Config {
     model: ModelConfig,
     learning_rate: f64,
     epochs: u32,
-    log_period_seconds: f32,
+    log_period_seconds: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -81,7 +81,7 @@ fn run_with_model<M: EvalModel>(
         let mut dataset_iterator = DatasetIterator::new(&config.dataset)?;
         loop {
             let batch = dataset_iterator.next_batch()?;
-            if batch.is_none() || last_log_time.elapsed().as_secs_f32() >= config.log_period_seconds
+            if batch.is_none() || last_log_time.elapsed().as_secs_f64() >= config.log_period_seconds
             {
                 let elapsed_time = start_time.elapsed().as_secs_f64();
                 log::info!(

@@ -137,7 +137,7 @@ fn play_game<F: Features>(
                     &position,
                     Some(config.depth),
                     None, /* deadline */
-                    Some((config.temperature_cutoff * evaluator.scale() as f64) as Eval),
+                    Some((config.temperature_cutoff * evaluator.scale()) as Eval),
                     false, /* is_score_important */
                 );
                 assert!(!result.top_moves.is_empty());
@@ -168,7 +168,7 @@ fn play_game<F: Features>(
                 let (entropy, mov) = select_move(
                     &result.top_moves,
                     &mut rng,
-                    config.temperature * evaluator.scale() as f64,
+                    config.temperature * evaluator.scale(),
                 );
                 stats.entropy += entropy;
                 stats.moves += 1;
@@ -192,7 +192,7 @@ fn play_game<F: Features>(
         });
         let deep_value = match entry.deep_score.into() {
             ScoreExpanded::Win(_) => f32::INFINITY,
-            ScoreExpanded::Eval(eval) => eval as f32 / evaluator.scale(),
+            ScoreExpanded::Eval(eval) => eval as f32 / evaluator.scale() as f32,
             ScoreExpanded::Loss(_) => -f32::INFINITY,
         };
         let game_points = outcome.points(to_move);
