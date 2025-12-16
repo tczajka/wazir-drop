@@ -23,6 +23,7 @@ members = [
 
 [profile.release]
 panic = "abort"
+# debug = true
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

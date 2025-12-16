@@ -3,8 +3,8 @@ log = "logs/self_play.log"
 [[command]]
 type = "self_play"
 output = "data/x.data"
-num_cpus = 62
-num_games = 25000000
+num_cpus = 5
+num_games = 10000
 batch_size = 10000
 ttable_size_mb = 16
 pvtable_size_mb = 2
