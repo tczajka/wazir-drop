@@ -49,6 +49,7 @@ pub use cli::{run_cli, CliCommand};
 pub use color::Color;
 pub use eval::{EvaluatedPosition, Evaluator};
 pub use features::Features;
+pub use history::History;
 pub use main_player::MainPlayerFactory;
 pub use moves::{AnyMove, InvalidMove, Move, SetupMove, ShortMove, ShortMoveFrom};
 pub use nnue::Nnue;

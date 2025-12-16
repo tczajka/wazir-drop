@@ -49,20 +49,32 @@ impl<E: Evaluator> Search<E> {
         deadlines: Option<Deadlines>,
         multi_move_threshold: Option<i32>,
         is_score_important: bool,
+        history: &History,
     ) -> SearchResult {
-        let mut instance =
-            SearchInstance::new(self, position, max_depth, deadlines, multi_move_threshold);
+        let mut instance = SearchInstance::new(
+            self,
+            position,
+            max_depth,
+            deadlines,
+            multi_move_threshold,
+            history,
+        );
         instance.search(is_score_important)
     }
 
     pub fn search_blue_setup(
         &mut self,
-        position: &Position,
+        red: SetupMove,
         max_depth: Option<Depth>,
         deadlines: Option<Deadlines>,
         possible_moves: &[SetupMove],
     ) -> SearchResultBlueSetup {
-        let mut instance = SearchInstance::new(self, position, max_depth, deadlines, None);
+        let mut position = Position::initial();
+        let mut history = History::new(position.hash());
+        position = position.make_setup_move(red).unwrap();
+        history.push_irreversible(position.hash());
+        let mut instance =
+            SearchInstance::new(self, &position, max_depth, deadlines, None, &history);
         instance.search_blue_setup(possible_moves)
     }
 }
@@ -98,6 +110,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         max_depth: Option<Depth>,
         deadlines: Option<Deadlines>,
         multi_move_threshold: Option<i32>,
+        history: &History,
     ) -> Self {
         assert!(multi_move_threshold.is_none() || deadlines.is_none());
         let contempt = (search.hyperparameters.contempt * search.evaluator.scale()) as Eval;
@@ -123,7 +136,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             root_moves_considered: 0,
             root_moves_exact_score: 0,
             pv: LongVariation::empty(),
-            history: History::new(0),
+            history: history.clone(),
             blue_setup_score: Score::DRAW,
             red_contempt,
         }
@@ -196,7 +209,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
 
         self.ttable.new_epoch();
         self.pvtable.new_epoch();
-        self.history = History::new(self.root_position.ply());
 
         let eposition = EvaluatedPosition::new(self.evaluator, self.root_position.clone());
 
@@ -261,8 +273,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
     }
 
     fn iterative_deepening(&mut self, eposition: &EvaluatedPosition<E>) -> Result<(), Timeout> {
-        let hash = eposition.position().hash();
-        self.history.push(hash);
         // In case we can't finish quiescence search for a singl move, use the first generated move.
         self.pv = LongVariation::empty().add_front(self.root_moves[0].mov);
         self.search_shallow(eposition)?;
@@ -275,7 +285,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
             self.iterative_deepening_iteration(eposition)?;
         }
-        self.history.pop();
         Ok(())
     }
 
@@ -334,12 +343,14 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             let depth_diff = ONE_PLY;
             let mov = self.root_moves[0].mov;
             let epos2 = eposition.make_move(mov).unwrap();
+            self.history.push(epos2.position().hash());
             let result = self.search_alpha_beta::<LongVariation>(
                 &epos2,
                 -Score::INFINITE,
                 Score::INFINITE,
                 next_depth.saturating_sub(depth_diff),
             )?;
+            self.history.pop();
             self.depth = next_depth;
             self.pv = result.pv.add_front(mov);
             self.root_moves[0].score = -result.score;
@@ -364,6 +375,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
 
             let mov = self.root_moves[self.root_moves_considered].mov;
             let epos2 = eposition.make_move(mov).unwrap();
+            self.history.push(epos2.position().hash());
 
             let alpha = match self.multi_move_threshold {
                 Some(multi_move_threshold) => self.root_moves[0]
@@ -389,6 +401,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 if score <= alpha {
                     completed_depth = completed_depth.min(result.depth.saturating_add(depth_diff));
                     self.root_moves_considered += 1;
+                    self.history.pop();
                     continue;
                 }
             }
@@ -408,6 +421,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             if score <= alpha {
                 completed_depth = completed_depth.min(result.depth.saturating_add(depth_diff));
                 self.root_moves_considered += 1;
+                self.history.pop();
                 continue;
             }
 
@@ -418,6 +432,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 -alpha,
                 self.depth.saturating_sub(depth_diff),
             )?;
+            self.history.pop();
             let score = -result.score;
             self.root_moves[self.root_moves_considered].score = score;
             completed_depth = completed_depth.min(result.depth.saturating_add(depth_diff));
@@ -446,18 +461,13 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         depth: Depth,
     ) -> Result<SearchResultInternal<V>, Timeout> {
         if depth == 0 {
-            let result = self.quiescence_search::<V>(eposition, alpha, beta)?;
-            return Ok(SearchResultInternal {
-                score: result.score,
-                depth: 0,
-                pv: result.pv,
-                repetition_ply: Ply::MAX,
-            });
+            return self.quiescence_search::<V>(eposition, alpha, beta);
         }
 
         self.new_node()?;
         let position = eposition.position();
         let ply = position.ply();
+        assert_eq!(self.history.ply(), ply);
 
         // Prune guaranteed draws or endgames (including lower/upper bounds)
         let earliest_win = ply + 3; // if we deliver checkmate this move
@@ -498,8 +508,12 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         }
 
         // Check for repetition.
-        let hash = position.hash();
-        if let Some(repetition_ply) = self.history.find(hash) {
+        if let Some(repetition_ply) = self.history.find_repetition() {
+            let repetition_ply = if repetition_ply <= self.root_position.ply() {
+                Ply::MAX
+            } else {
+                repetition_ply
+            };
             return Ok(SearchResultInternal {
                 score: Score::DRAW,
                 depth: Depth::MAX,
@@ -510,6 +524,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
 
         // Transposition table lookup.
         let mut tt_move = None;
+        let hash = position.hash();
         if depth >= self.hyperparameters.min_depth_ttable {
             if let Some(ttentry) = self.ttable.get(hash) {
                 // Transposition table cutoff.
@@ -541,12 +556,10 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         }
 
         // Search deeper.
-        self.history.push(hash);
         // Search with V::Extended so that we have a TT move.
         let result = self.search_alpha_beta_deeper::<V::Extended>(
             eposition, alpha, beta, depth, in_check, tt_move,
         )?;
-        self.history.pop();
         let mov = result.pv.first();
         let pv = result.pv.truncate();
 
@@ -636,7 +649,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             position,
             in_check,
             depth >= self.hyperparameters.reduction_null_move
-                && self.history.last_cut() != Some(position.ply()),
+                && !self.history.last_move_irreversible(),
             tt_move,
             true,
         );
@@ -671,8 +684,8 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                         extra_moves.push(mov);
                     }
 
+                    self.history.push(epos2.position().hash());
                     move_index += 1;
-
                     let alpha2 = alpha.max(result.score);
 
                     // Try late move first.
@@ -692,6 +705,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                                 result.depth.min(result2.depth.saturating_add(depth_diff));
                             result.repetition_ply =
                                 result.repetition_ply.min(result2.repetition_ply);
+                            self.history.pop();
                             continue;
                         }
                     }
@@ -712,6 +726,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                                 result.depth.min(result2.depth.saturating_add(depth_diff));
                             result.repetition_ply =
                                 result.repetition_ply.min(result2.repetition_ply);
+                            self.history.pop();
                             continue;
                         }
                     };
@@ -719,6 +734,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     // Proper search.
                     let result2 =
                         self.search_alpha_beta::<V::Truncated>(&epos2, -beta, -alpha2, depth2)?;
+                    self.history.pop();
                     let score = -result2.score;
                     let depth_actual = result2.depth.saturating_add(depth_diff);
                     if score > result.score {
@@ -736,8 +752,8 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     result.repetition_ply = result.repetition_ply.min(result2.repetition_ply);
                 }
                 MoveCandidate::Null => {
-                    self.history.cut();
                     let epos2 = eposition.make_null_move().unwrap();
+                    self.history.push_irreversible(epos2.position().hash());
                     let depth_diff = ONE_PLY + self.hyperparameters.reduction_null_move;
                     let result2 = self.search_alpha_beta::<EmptyVariation>(
                         &epos2,
@@ -745,7 +761,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                         -beta.prev(),
                         depth.saturating_sub(depth_diff),
                     )?;
-                    self.history.uncut();
+                    self.history.pop();
                     if -result2.score >= beta {
                         return Ok(SearchResultInternal {
                             score: beta,
@@ -792,14 +808,16 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         eposition: &EvaluatedPosition<E>,
         alpha: Score,
         beta: Score,
-    ) -> Result<SearchResultQuiescence<V>, Timeout> {
+    ) -> Result<SearchResultInternal<V>, Timeout> {
         self.new_node()?;
 
         // Assume we're not going to checkmate the opponent in quiescence.
         if alpha >= Score::WIN_MAX_PLY {
-            return Ok(SearchResultQuiescence {
+            return Ok(SearchResultInternal {
                 score: Score::WIN_MAX_PLY,
+                depth: 0,
                 pv: V::empty_truncated(),
+                repetition_ply: Ply::MAX,
             });
         }
 
@@ -814,33 +832,41 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             // Fastest loss is at ply+2 if we are checkmated.
             // Fastest win is at ply+3 (checkmate in 1).
             if ply + 2 > PLY_DRAW || ply + 3 > PLY_DRAW && alpha >= Score::DRAW {
-                return Ok(SearchResultQuiescence {
+                return Ok(SearchResultInternal {
                     score: Score::DRAW,
+                    depth: 0,
                     pv: V::empty_truncated(),
+                    repetition_ply: Ply::MAX,
                 });
             }
 
             // If we are checkmated, we lose in 2 ply.
-            result = SearchResultQuiescence {
+            result = SearchResultInternal {
                 score: ScoreExpanded::Loss(position.ply() + 2).into(),
+                depth: 0,
                 pv: V::empty_truncated(),
+                repetition_ply: Ply::MAX,
             };
             moves = Either::Left(movegen::check_evasions(position));
         } else {
             // Fastest win is at ply+3 (checkmate in 1).
             // Fastest loss is at ply+4 (we get checkmated next move).
             if ply + 3 > PLY_DRAW || ply + 4 > PLY_DRAW && beta <= Score::DRAW {
-                return Ok(SearchResultQuiescence {
+                return Ok(SearchResultInternal {
                     score: Score::DRAW,
+                    depth: 0,
                     pv: V::empty_truncated(),
+                    repetition_ply: Ply::MAX,
                 });
             }
 
             // We can at least stand pat, no need to eval.
             if beta <= -Score::WIN_MAX_PLY {
-                return Ok(SearchResultQuiescence {
+                return Ok(SearchResultInternal {
                     score: -Score::WIN_MAX_PLY,
+                    depth: 0,
                     pv: V::empty_truncated(),
+                    repetition_ply: Ply::MAX,
                 });
             }
 
@@ -850,9 +876,11 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 Color::Blue => -self.red_contempt,
             };
             let eval = eposition.evaluate() + contempt;
-            result = SearchResultQuiescence {
+            result = SearchResultInternal {
                 score: ScoreExpanded::Eval(eval).into(),
+                depth: 0,
                 pv: V::empty(),
+                repetition_ply: Ply::MAX,
             };
             if result.score >= beta {
                 return Ok(result);
@@ -958,7 +986,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         self.root_moves_setup = possible_moves.to_vec();
         self.ttable.new_epoch();
         self.pvtable.new_epoch();
-        self.history = History::new(self.root_position.ply());
         let eposition = EvaluatedPosition::new(self.evaluator, self.root_position.clone());
         _ = self.blue_setup_iterative_deepening(&eposition);
         SearchResultBlueSetup {
@@ -976,8 +1003,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         &mut self,
         eposition: &EvaluatedPosition<E>,
     ) -> Result<(), Timeout> {
-        let hash = eposition.position().hash();
-        self.history.push(hash);
         self.hard_deadline = self.deadlines.as_ref().map(|ds| ds.hard);
         while self.depth < self.max_depth {
             if let Some(ds) = self.deadlines.as_ref() {
@@ -988,7 +1013,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
             self.blue_setup_iterative_deepening_iteration(eposition)?;
         }
-        self.history.pop();
         Ok(())
     }
 
@@ -1000,12 +1024,14 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         let next_depth = self.depth + DEPTH_INCREMENT;
         let mov = self.root_moves_setup[0];
         let epos2 = eposition.make_setup_move(mov).unwrap();
+        self.history.push_irreversible(epos2.position().hash());
         let result = self.search_alpha_beta::<LongVariation>(
             &epos2,
             -Score::INFINITE,
             Score::INFINITE,
             next_depth.saturating_sub(ONE_PLY),
         )?;
+        self.history.pop();
         self.depth = next_depth;
         self.pv = result.pv;
         self.blue_setup_score = -result.score;
@@ -1020,6 +1046,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
             let mov = self.root_moves_setup[self.root_moves_considered];
             let epos2 = eposition.make_setup_move(mov).unwrap();
+            self.history.push_irreversible(epos2.position().hash());
             let alpha = self.blue_setup_score;
             // Null window.
             let result = self.search_alpha_beta::<EmptyVariation>(
@@ -1031,6 +1058,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             let score = -result.score;
             if score <= alpha {
                 self.root_moves_considered += 1;
+                self.history.pop();
                 continue;
             }
             // Full window search.
@@ -1040,6 +1068,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 -alpha,
                 self.depth.saturating_sub(ONE_PLY),
             )?;
+            self.history.pop();
             let score = -result.score;
             if score > alpha {
                 self.root_moves_setup[0..=self.root_moves_considered].rotate_right(1);
@@ -1107,11 +1136,6 @@ struct SearchResultInternal<V> {
     pv: V,
     // Smallest ply when the position was repeated
     repetition_ply: Ply,
-}
-
-struct SearchResultQuiescence<V> {
-    score: Score,
-    pv: V,
 }
 
 #[derive(Debug)]

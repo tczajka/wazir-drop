@@ -1,24 +1,24 @@
+use crate::constants::{Ply, HISTORY_BLOOM_FILTER_LOG_SIZE, HISTORY_BLOOM_FILTER_NUM_HASHES};
 use std::iter;
 
-use crate::constants::{
-    Ply, HISTORY_BLOOM_FILTER_LOG_SIZE, HISTORY_BLOOM_FILTER_NUM_HASHES, PLY_DRAW,
-};
-
+#[derive(Clone, Debug)]
 pub struct History {
-    root_ply: Ply,
-    cuts: Vec<Ply>, // where to start searching for a repetition relative to root
+    irreversible: Vec<Ply>, // ply after an irreversible move
     hashes: Vec<u64>,
     bloom_filter: Vec<u8>,
 }
 
 impl History {
-    pub fn new(root_ply: Ply) -> Self {
+    pub fn new(hash: u64) -> Self {
         Self {
-            root_ply,
-            cuts: Vec::new(),
-            hashes: Vec::with_capacity(PLY_DRAW.into()),
+            irreversible: vec![0],
+            hashes: vec![hash],
             bloom_filter: vec![0; 1 << HISTORY_BLOOM_FILTER_LOG_SIZE],
         }
+    }
+
+    pub fn ply(&self) -> Ply {
+        (self.hashes.len() - 1) as Ply
     }
 
     pub fn push(&mut self, hash: u64) {
@@ -28,42 +28,42 @@ impl History {
         }
     }
 
+    pub fn push_irreversible(&mut self, hash: u64) {
+        self.irreversible.push(self.hashes.len() as Ply);
+        self.push(hash);
+    }
+
     pub fn pop(&mut self) {
         let hash = self.hashes.pop().unwrap();
         for index in Self::indices(hash) {
             self.bloom_filter[index] -= 1;
         }
+        assert!(!self.hashes.is_empty());
+        if *self.irreversible.last().unwrap() == self.hashes.len() as Ply {
+            _ = self.irreversible.pop();
+        }
     }
 
-    pub fn last_cut(&self) -> Option<Ply> {
-        Some(self.root_ply + *self.cuts.last()?)
-    }
-
-    pub fn cut(&mut self) {
-        self.cuts.push(self.hashes.len() as Ply);
-    }
-
-    pub fn uncut(&mut self) {
-        _ = self.cuts.pop();
-    }
-
-    pub fn find(&self, hash: u64) -> Option<Ply> {
+    pub fn find_repetition(&self) -> Option<Ply> {
+        let mut ply = self.hashes.len() - 1;
+        let hash = self.hashes[ply];
         for index in Self::indices(hash) {
-            if self.bloom_filter[index] == 0 {
+            if self.bloom_filter[index] < 2 {
                 return None;
             }
         }
-        let cut = self.cuts.last().copied().unwrap_or(0);
-        self.hashes
-            .iter()
-            .copied()
-            .enumerate()
-            .skip(cut.into())
-            .rev()
-            .skip(1)
-            .step_by(2)
-            .find(|&(_, h)| h == hash)
-            .map(|(ply, _)| self.root_ply + ply as Ply)
+        let start = *self.irreversible.last().unwrap() as usize;
+        while ply >= start + 2 {
+            ply -= 2;
+            if self.hashes[ply] == hash {
+                return Some(ply as Ply);
+            }
+        }
+        None
+    }
+
+    pub fn last_move_irreversible(&self) -> bool {
+        *self.irreversible.last().unwrap() as usize == self.hashes.len() - 1
     }
 
     fn indices(mut hash: u64) -> impl Iterator<Item = usize> {

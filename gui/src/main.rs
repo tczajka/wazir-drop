@@ -14,8 +14,8 @@ use std::{
     time::{Duration, Instant},
 };
 use wazir_drop::{
-    AnyMove, Color, ColoredPiece, Coord, Deadlines, DefaultEvaluator, Piece, Position, Search,
-    SetupMove, ShortMove, ShortMoveFrom, Square, Stage, Symmetry, book,
+    AnyMove, Color, ColoredPiece, Coord, Deadlines, DefaultEvaluator, History, Piece, Position,
+    Search, SetupMove, ShortMove, ShortMoveFrom, Square, Stage, Symmetry, book,
     constants::Hyperparameters,
     enums::{EnumMap, SimpleEnumExt},
     movegen,
@@ -60,26 +60,30 @@ struct WazirDropApp {
     tile_size: f32,
     position: Position,
     next_move_state: NextMoveState,
-    history: Vec<HistoryEntry>,
+    history_entries: Vec<HistoryEntry>,
     search: Arc<Mutex<Search<DefaultEvaluator>>>,
+    history: History,
 }
 
 impl WazirDropApp {
     fn new(ctx: &eframe::CreationContext) -> Self {
         egui_extras::install_image_loaders(&ctx.egui_ctx);
+        let position = Position::initial();
+        let history = History::new(position.hash());
         let mut app = Self {
             reverse: false,
             is_computer_player: EnumMap::from_fn(|_| false),
             time_limit_str: "1000".to_string(),
             piece_images: Self::piece_images(),
             tile_size: 0.0,
-            position: Position::initial(),
+            position,
             next_move_state: NextMoveState::EndOfGame, // temporary
-            history: Vec::new(),
+            history_entries: Vec::new(),
             search: Arc::new(Mutex::new(Search::new(
                 &Hyperparameters::default(),
                 &Arc::new(DefaultEvaluator::default()),
             ))),
+            history,
         };
         app.start_next_move(&ctx.egui_ctx);
         app
@@ -236,7 +240,7 @@ impl WazirDropApp {
                 } => swap_from == square,
                 _ => false,
             };
-            let is_last_move = match self.history.last() {
+            let is_last_move = match self.history_entries.last() {
                 Some(HistoryEntry {
                     mov: AnyMove::Regular(mov),
                     ..
@@ -310,7 +314,8 @@ impl WazirDropApp {
         let ctx = ctx.clone();
         let time_limit_ms = self.time_limit_str.parse::<u32>().unwrap_or(1000);
         let time_limit = Duration::from_millis(time_limit_ms.into());
-        let history_first = self.history.first().cloned();
+        let history_first = self.history_entries.first().cloned();
+        let history = self.history.clone();
 
         _ = thread::spawn(move || {
             let now = Instant::now();
@@ -333,7 +338,7 @@ impl WazirDropApp {
                             Some(mov) => mov.into(),
                             None => {
                                 let result = search.lock().unwrap().search_blue_setup(
-                                    &position,
+                                    red,
                                     None,
                                     Some(deadlines),
                                     &book::blue_setup_moves(),
@@ -362,6 +367,7 @@ impl WazirDropApp {
                         Some(deadlines),
                         None,  /* multi_move_threshold */
                         false, /* is_score_important */
+                        &history,
                     );
                     log::info!(
                         "depth {depth} score {score} \
@@ -429,7 +435,7 @@ impl WazirDropApp {
     fn draw_history(&self, ui: &mut Ui) {
         _ = ui.heading("Moves");
         _ = ScrollArea::vertical().show(ui, |ui| {
-            for (index, entry) in self.history.iter().enumerate() {
+            for (index, entry) in self.history_entries.iter().enumerate() {
                 _ = ui.label(format!("{}. {}", index + 1, entry.mov));
             }
         });
@@ -503,27 +509,37 @@ impl WazirDropApp {
     }
 
     fn make_move(&mut self, mov: AnyMove, ctx: &egui::Context) {
-        self.history.push(HistoryEntry {
+        self.history_entries.push(HistoryEntry {
             position: self.position.clone(),
             mov,
         });
         self.position = self.position.make_any_move(mov).expect("Invalid move");
+        match mov {
+            AnyMove::Setup(_) => {
+                self.history.push_irreversible(self.position.hash());
+            }
+            AnyMove::Regular(_) => {
+                self.history.push(self.position.hash());
+            }
+        }
         self.start_next_move(ctx);
     }
 
     fn new_game(&mut self, ctx: &egui::Context) {
         if !matches!(self.next_move_state, NextMoveState::Computer { .. }) {
             self.position = Position::initial();
-            self.history.clear();
+            self.history_entries.clear();
+            self.history = History::new(self.position.hash());
             self.start_next_move(ctx);
         }
     }
 
     fn undo(&mut self, ctx: &egui::Context) {
         if !matches!(self.next_move_state, NextMoveState::Computer { .. })
-            && let Some(entry) = self.history.pop()
+            && let Some(entry) = self.history_entries.pop()
         {
             self.position = entry.position;
+            self.history.pop();
             self.start_next_move(ctx);
         }
     }
@@ -569,7 +585,7 @@ impl App for WazirDropApp {
                     self.new_game(ctx);
                 }
 
-                if !self.history.is_empty() && ui.button("Undo").clicked() {
+                if !self.history_entries.is_empty() && ui.button("Undo").clicked() {
                     self.undo(ctx);
                 }
             }

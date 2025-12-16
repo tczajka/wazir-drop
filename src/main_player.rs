@@ -2,15 +2,17 @@ use crate::{
     book,
     clock::Timer,
     constants::{Hyperparameters, Ply, PLY_AFTER_SETUP, PLY_DRAW, TIME_MARGIN},
-    log, AnyMove, Color, Deadlines, DefaultEvaluator, Evaluator, Player, PlayerFactory, Position,
-    Search, SetupMove, Stage,
+    log, AnyMove, Color, Deadlines, DefaultEvaluator, Evaluator, History, Player, PlayerFactory,
+    Position, Search, SetupMove, Stage,
 };
 use std::{sync::Arc, time::Duration};
 
 struct MainPlayer<E: Evaluator> {
     hyperparameters: Hyperparameters,
     search: Search<E>,
-    opp_red_setup: Option<SetupMove>,
+    red_setup: Option<SetupMove>,
+    position: Position,
+    history: History,
 }
 
 impl<E: Evaluator> MainPlayer<E> {
@@ -49,31 +51,41 @@ impl<E: Evaluator> MainPlayer<E> {
                 .instant_at(time_left.saturating_sub(to_allocate.mul_f64(panic_soft_fraction))),
         }
     }
+
+    fn move_made(&mut self, mov: AnyMove) {
+        self.position = self.position.make_any_move(mov).expect("Invalid move");
+        match mov {
+            AnyMove::Setup(mov) => {
+                if mov.color == Color::Red {
+                    self.red_setup = Some(mov);
+                }
+                self.history.push_irreversible(self.position.hash());
+            }
+            AnyMove::Regular(_) => {
+                self.history.push(self.position.hash());
+            }
+        }
+    }
 }
 
 impl<E: Evaluator> Player for MainPlayer<E> {
     fn opponent_move(&mut self, _position: &Position, mov: AnyMove, _timer: &Timer) {
-        if let AnyMove::Setup(mov) = mov {
-            if mov.color == Color::Red {
-                self.opp_red_setup = Some(mov);
-            }
-        }
+        self.move_made(mov);
     }
 
     fn make_move(&mut self, position: &Position, timer: &Timer) -> AnyMove {
         let time_left = timer.get();
         let deadlines = self.time_allocation(position.ply(), time_left, timer);
-        match position.stage() {
+        let mov = match position.stage() {
             Stage::Setup => match position.to_move() {
                 Color::Red => book::red_setup().into(),
                 Color::Blue => {
-                    if let Some(opp_red_setup) = self.opp_red_setup {
-                        if let Some(mov) = book::blue_setup(opp_red_setup) {
-                            return mov.into();
-                        }
+                    let red_setup = self.red_setup.expect("Red setup not found");
+                    if let Some(mov) = book::blue_setup(red_setup) {
+                        return mov.into();
                     }
                     let result = self.search.search_blue_setup(
-                        position,
+                        red_setup,
                         None,
                         Some(deadlines),
                         &book::blue_setup_moves(),
@@ -102,6 +114,7 @@ impl<E: Evaluator> Player for MainPlayer<E> {
                     Some(deadlines),
                     None,  /* multi_move_threshold */
                     false, /* is_score_important */
+                    &self.history,
                 );
                 let elapsed = time_left.saturating_sub(timer.get());
                 log::info!(
@@ -120,7 +133,9 @@ impl<E: Evaluator> Player for MainPlayer<E> {
                 result.pv.moves[0].into()
             }
             Stage::End(_) => panic!("Game is over"),
-        }
+        };
+        self.move_made(mov);
+        mov
     }
 }
 
@@ -153,13 +168,21 @@ impl<E: Evaluator> PlayerFactory for MainPlayerFactory<E> {
         &self,
         _game_id: &str,
         _color: Color,
-        _opening: &[AnyMove],
+        opening: &[AnyMove],
         _time_limit: Option<Duration>,
     ) -> Box<dyn crate::Player> {
-        Box::new(MainPlayer {
+        let position = Position::initial();
+        let history = History::new(position.hash());
+        let mut player = MainPlayer {
             hyperparameters: self.hyperparameters.clone(),
             search: Search::new(&self.hyperparameters, &self.evaluator),
-            opp_red_setup: None,
-        })
+            red_setup: None,
+            position,
+            history,
+        };
+        for mov in opening {
+            player.move_made(*mov);
+        }
+        Box::new(player)
     }
 }

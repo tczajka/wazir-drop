@@ -13,7 +13,7 @@ use std::{
 };
 use threadpool::ThreadPool;
 use wazir_drop::{
-    DefaultEvaluator, Evaluator, Features, LongVariation, Move, Outcome, Position, Score,
+    DefaultEvaluator, Evaluator, Features, History, LongVariation, Move, Outcome, Position, Score,
     ScoreExpanded, ScoredMove, Search, Stage, WPSFeatures,
     constants::{Depth, Eval, Hyperparameters},
 };
@@ -108,6 +108,7 @@ fn play_game<F: Features>(
 ) -> Result<Stats, Box<dyn Error>> {
     let mut rng = StdRng::from_os_rng();
     let mut position = Position::initial();
+    let mut history = History::new(position.hash());
 
     let hyperparameters = Hyperparameters {
         ttable_size: config.ttable_size_mb << 20,
@@ -126,11 +127,13 @@ fn play_game<F: Features>(
     let mut entries: Vec<Entry> = Vec::new();
 
     let mut prev_pv_position_hash = 0;
+
     let outcome = loop {
         match position.stage() {
             Stage::Setup => {
                 let mov = moverand::random_setup(position.to_move(), &mut rng);
                 position = position.make_setup_move(mov).unwrap();
+                history.push_irreversible(position.hash());
             }
             Stage::Regular => {
                 let result = search.search(
@@ -139,10 +142,12 @@ fn play_game<F: Features>(
                     None, /* deadline */
                     Some((config.temperature_cutoff * evaluator.scale()) as Eval),
                     false, /* is_score_important */
+                    &history,
                 );
                 assert!(!result.top_moves.is_empty());
                 match calc_deep_score(
                     &position,
+                    &history,
                     result.score,
                     &result.pv,
                     &mut search,
@@ -173,6 +178,7 @@ fn play_game<F: Features>(
                 stats.entropy += entropy;
                 stats.moves += 1;
                 position = position.make_move(mov).unwrap();
+                history.push(position.hash());
             }
             Stage::End(o) => break o,
         }
@@ -217,6 +223,7 @@ enum DeepScoreImpossible {
 /// Returns the PV position and the deep score.
 fn calc_deep_score(
     position: &Position,
+    history: &History,
     score: Score,
     pv: &LongVariation,
     search: &mut Search<DefaultEvaluator>,
@@ -230,11 +237,13 @@ fn calc_deep_score(
         return Err(DeepScoreImpossible::PVTruncated);
     }
     let mut pv_position = position.clone();
+    let mut pv_history = history.clone();
     for &mov in pv.iter() {
         let Ok(p) = pv_position.make_move(mov) else {
             return Err(DeepScoreImpossible::InvalidPV);
         };
         pv_position = p;
+        pv_history.push(pv_position.hash());
     }
     let hash = pv_position.hash();
     if hash == *prev_pv_position_hash {
@@ -247,6 +256,7 @@ fn calc_deep_score(
         None, /* deadline */
         None, /* multi_move_threshold */
         true, /* is_score_important */
+        &pv_history,
     );
     Ok((pv_position, result.score))
 }

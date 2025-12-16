@@ -360,8 +360,7 @@ fn compute_opening_search(
     blue_setups: &[SetupMove],
 ) -> Opening {
     let mut search = Search::new(hyperparameters, evaluator);
-    let position = Position::initial().make_setup_move(red).unwrap();
-    let result = search.search_blue_setup(&position, Some(depth), None, blue_setups);
+    let result = search.search_blue_setup(red, Some(depth), None, blue_setups);
     Opening {
         score: -result.score,
         red,
