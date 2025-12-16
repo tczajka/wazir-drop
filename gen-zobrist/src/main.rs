@@ -1,5 +1,8 @@
 use rand::{Rng, SeedableRng, rngs::StdRng};
-use wazir_drop::{Color, ColoredPiece, NUM_CAPTURED_INDEXES, Square};
+use wazir_drop::{
+    Color, ColoredPiece, NUM_CAPTURED_INDEXES, Square,
+    constants::{PLY_AFTER_SETUP, PLY_DRAW},
+};
 
 fn main() {
     let mut rng = StdRng::from_os_rng();
@@ -32,6 +35,16 @@ fn main() {
         println!("    ],");
     }
     println!("]);");
+    println!();
+
+    println!("#[rustfmt::skip]");
+    println!("static NULL_MOVE_COUNTER: [u64; (PLY_DRAW - PLY_AFTER_SETUP + 1) as usize] = [");
+    generate(
+        "    ",
+        usize::from(PLY_DRAW - PLY_AFTER_SETUP + 1),
+        &mut rng,
+    );
+    println!("];");
 }
 
 fn generate(indent: &str, count: usize, rng: &mut StdRng) {

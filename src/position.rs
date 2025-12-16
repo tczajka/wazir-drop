@@ -99,6 +99,7 @@ pub struct Position {
     ply: Ply,
     board: Board,
     captured: Captured,
+    null_move_counter: u8,
 }
 
 impl Position {
@@ -108,6 +109,7 @@ impl Position {
             ply: 0,
             board: Board::empty(),
             captured: Captured::new(),
+            null_move_counter: 0,
         }
     }
 
@@ -145,13 +147,15 @@ impl Position {
 
     pub fn hash(&self) -> u64 {
         // stage is implied by board and captured
-        zobrist::TO_MOVE[self.to_move()] ^ self.board.hash() ^ self.captured.hash()
+        self.hash_ignoring_captured() ^ self.captured.hash()
     }
 
     pub fn hash_ignoring_captured(&self) -> u64 {
         // There is a collision because we ignore `stage`. Setup with blue on move may look identical as a red win.
         // We ignore it, it's rare and harmless.
-        zobrist::TO_MOVE[self.to_move()] ^ self.board.hash()
+        zobrist::TO_MOVE[self.to_move()]
+            ^ self.board.hash()
+            ^ zobrist::NULL_MOVE_COUNTER[usize::from(self.null_move_counter)]
     }
 
     pub fn parser() -> impl Parser<Output = Self> {
@@ -259,6 +263,7 @@ impl Position {
             ply,
             board,
             captured,
+            null_move_counter: 0,
         })
     }
 
@@ -346,6 +351,7 @@ impl Position {
         if new_position.ply() == PLY_DRAW {
             new_position.stage = Stage::End(Outcome::Draw);
         }
+        new_position.null_move_counter += 1;
         Ok(new_position)
     }
 }
