@@ -273,7 +273,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
     }
 
     fn iterative_deepening(&mut self, eposition: &EvaluatedPosition<E>) -> Result<(), Timeout> {
-        // In case we can't finish quiescence search for a singl move, use the first generated move.
+        // In case we can't finish depth 1 search for a single move, use the first generated move.
         self.pv = LongVariation::empty().add_front(self.root_moves[0].mov);
         self.search_shallow(eposition)?;
         while self.depth < self.max_depth {
@@ -302,8 +302,10 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
             let mov = self.root_moves[self.root_moves_considered].mov;
             let epos2 = eposition.make_move(mov).unwrap();
+            // self.history.push(epos2.position().hash());
             let result =
                 self.quiescence_search::<LongVariation>(&epos2, -Score::INFINITE, Score::INFINITE)?;
+            // self.history.pop();
             let score = -result.score;
             let root_move = &mut self.root_moves[self.root_moves_considered];
             root_move.score = score;
@@ -460,11 +462,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         beta: Score,
         depth: Depth,
     ) -> Result<SearchResultInternal<V>, Timeout> {
-        if depth == 0 {
-            return self.quiescence_search::<V>(eposition, alpha, beta);
-        }
-
-        self.new_node()?;
         let position = eposition.position();
         let ply = position.ply();
         assert_eq!(self.history.ply(), ply);
@@ -521,6 +518,12 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 repetition_ply,
             });
         }
+
+        if depth == 0 {
+            return self.quiescence_search::<V>(eposition, alpha, beta);
+        }
+
+        self.new_node()?;
 
         // Transposition table lookup.
         let mut tt_move = None;
