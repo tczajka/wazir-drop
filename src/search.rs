@@ -681,7 +681,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         let move_candidates = self.generate_move_candidates(
             position,
             in_check,
-            depth >= self.hyperparameters.reduction_null_move
+            depth >= self.hyperparameters.null_move_reduction
                 && !self.history.last_move_irreversible(),
             tt_move,
             true,
@@ -728,7 +728,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     if enable_late_move_reduction
                         && cur_move_index >= self.hyperparameters.late_move_reduction_start
                     {
-                        let depth_diff = 2 * ONE_PLY;
+                        let depth_diff = ONE_PLY + self.hyperparameters.late_move_reduction;
                         let depth2 = depth.saturating_sub(depth_diff);
                         let result2 = self.search_alpha_beta::<V::Truncated>(
                             &epos2,
@@ -818,7 +818,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     }
                     let epos2 = eposition.make_null_move().unwrap();
                     self.history.push_position_irreversible(epos2.position());
-                    let depth_diff = ONE_PLY + self.hyperparameters.reduction_null_move;
+                    let depth_diff = ONE_PLY + self.hyperparameters.null_move_reduction;
                     let result2 = self.search_alpha_beta::<EmptyVariation>(
                         &epos2,
                         -beta,
