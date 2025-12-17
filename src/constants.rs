@@ -52,6 +52,7 @@ pub struct Hyperparameters {
     pub contempt: f64,
     pub iid_min_depth: Depth,
     pub iid_reduction: Depth,
+    pub check_extension: Depth,
 }
 
 impl Default for Hyperparameters {
@@ -76,6 +77,7 @@ impl Default for Hyperparameters {
             contempt: 0.1,
             iid_min_depth: 4 * ONE_PLY,
             iid_reduction: 2 * ONE_PLY,
+            check_extension: ONE_PLY,
         }
     }
 }

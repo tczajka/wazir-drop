@@ -747,7 +747,10 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                         }
                     }
 
-                    let depth_diff = ONE_PLY;
+                    let mut depth_diff = ONE_PLY;
+                    if in_check {
+                        depth_diff -= self.hyperparameters.check_extension;
+                    }
                     let depth2 = depth.saturating_sub(depth_diff);
 
                     // Try null window.
