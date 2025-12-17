@@ -108,7 +108,7 @@ fn play_game<F: Features>(
 ) -> Result<Stats, Box<dyn Error>> {
     let mut rng = StdRng::from_os_rng();
     let mut position = Position::initial();
-    let mut history = History::new(position.hash());
+    let mut history = History::new_from_position(&position);
 
     let hyperparameters = Hyperparameters {
         ttable_size: config.ttable_size_mb << 20,
@@ -133,7 +133,7 @@ fn play_game<F: Features>(
             Stage::Setup => {
                 let mov = moverand::random_setup(position.to_move(), &mut rng);
                 position = position.make_setup_move(mov).unwrap();
-                history.push_irreversible(position.hash());
+                history.push_position_irreversible(&position);
             }
             Stage::Regular => {
                 let result = search.search(
@@ -178,7 +178,7 @@ fn play_game<F: Features>(
                 stats.entropy += entropy;
                 stats.moves += 1;
                 position = position.make_move(mov).unwrap();
-                history.push(position.hash());
+                history.push_position(&position);
             }
             Stage::End(o) => break o,
         }
@@ -243,7 +243,7 @@ fn calc_deep_score(
             return Err(DeepScoreImpossible::InvalidPV);
         };
         pv_position = p;
-        pv_history.push(pv_position.hash());
+        pv_history.push_position(&pv_position);
     }
     let hash = pv_position.hash();
     if hash == *prev_pv_position_hash {

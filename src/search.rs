@@ -71,9 +71,9 @@ impl<E: Evaluator> Search<E> {
         possible_moves: &[SetupMove],
     ) -> SearchResultBlueSetup {
         let mut position = Position::initial();
-        let mut history = History::new(position.hash());
+        let mut history = History::new_from_position(&position);
         position = position.make_setup_move(red).unwrap();
-        history.push_irreversible(position.hash());
+        history.push_position_irreversible(&position);
         let mut instance =
             SearchInstance::new(self, &position, max_depth, deadlines, None, &history);
         instance.search_blue_setup(possible_moves)
@@ -303,7 +303,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
             let mov = self.root_moves[self.root_moves_considered].mov;
             let epos2 = eposition.make_move(mov).unwrap();
-            self.history.push(epos2.position().hash());
+            self.history.push_position(epos2.position());
             let result = self.search_alpha_beta::<LongVariation>(
                 &epos2,
                 -Score::INFINITE,
@@ -351,7 +351,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             let depth_diff = ONE_PLY;
             let mov = self.root_moves[0].mov;
             let epos2 = eposition.make_move(mov).unwrap();
-            self.history.push(epos2.position().hash());
+            self.history.push_position(epos2.position());
             let result = self.search_alpha_beta::<LongVariation>(
                 &epos2,
                 -Score::INFINITE,
@@ -384,7 +384,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
 
             let mov = self.root_moves[self.root_moves_considered].mov;
             let epos2 = eposition.make_move(mov).unwrap();
-            self.history.push(epos2.position().hash());
+            self.history.push_position(epos2.position());
 
             let alpha = match self.multi_move_threshold {
                 Some(multi_move_threshold) => self.root_moves[0]
@@ -719,7 +719,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                         extra_moves.push(mov);
                     }
 
-                    self.history.push(epos2.position().hash());
+                    self.history.push_position(epos2.position());
                     let cur_move_index = move_index;
                     move_index += 1;
                     let alpha2 = alpha.max(result.score);
@@ -814,7 +814,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                         continue;
                     }
                     let epos2 = eposition.make_null_move().unwrap();
-                    self.history.push_irreversible(epos2.position().hash());
+                    self.history.push_position_irreversible(epos2.position());
                     let depth_diff = ONE_PLY + self.hyperparameters.reduction_null_move;
                     let result2 = self.search_alpha_beta::<EmptyVariation>(
                         &epos2,
@@ -1089,7 +1089,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         let next_depth = self.depth + DEPTH_INCREMENT;
         let mov = self.root_moves_setup[0];
         let epos2 = eposition.make_setup_move(mov).unwrap();
-        self.history.push_irreversible(epos2.position().hash());
+        self.history.push_position_irreversible(epos2.position());
         let result = self.search_alpha_beta::<LongVariation>(
             &epos2,
             -Score::INFINITE,
@@ -1112,7 +1112,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
             let mov = self.root_moves_setup[self.root_moves_considered];
             let epos2 = eposition.make_setup_move(mov).unwrap();
-            self.history.push_irreversible(epos2.position().hash());
+            self.history.push_position_irreversible(epos2.position());
             let alpha = self.blue_setup_score;
             // Null window.
             let result = self.search_alpha_beta::<EmptyVariation>(

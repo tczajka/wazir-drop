@@ -9,6 +9,7 @@ pub const CHECK_TIMEOUT_NODES: u64 = 256;
 pub type Ply = u8;
 pub const PLY_AFTER_SETUP: Ply = 2;
 pub const PLY_DRAW: Ply = 102;
+pub const PLY_DRAWISH: Ply = 90;
 
 pub type Depth = u16;
 pub const ONE_PLY: Depth = 100;

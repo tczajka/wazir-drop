@@ -1,4 +1,7 @@
-use crate::constants::{Ply, HISTORY_BLOOM_FILTER_LOG_SIZE, HISTORY_BLOOM_FILTER_NUM_HASHES};
+use crate::{
+    constants::{Ply, HISTORY_BLOOM_FILTER_LOG_SIZE, HISTORY_BLOOM_FILTER_NUM_HASHES},
+    Position,
+};
 use std::iter;
 
 #[derive(Clone, Debug)]
@@ -17,6 +20,10 @@ impl History {
         }
     }
 
+    pub fn new_from_position(position: &Position) -> Self {
+        Self::new(position.hash_for_repetition())
+    }
+
     pub fn ply(&self) -> Ply {
         (self.hashes.len() - 1) as Ply
     }
@@ -31,6 +38,14 @@ impl History {
     pub fn push_irreversible(&mut self, hash: u64) {
         self.irreversible.push(self.hashes.len() as Ply);
         self.push(hash);
+    }
+
+    pub fn push_position(&mut self, position: &Position) {
+        self.push(position.hash_for_repetition());
+    }
+
+    pub fn push_position_irreversible(&mut self, position: &Position) {
+        self.push_irreversible(position.hash_for_repetition());
     }
 
     pub fn pop(&mut self) {

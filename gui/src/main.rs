@@ -69,7 +69,7 @@ impl WazirDropApp {
     fn new(ctx: &eframe::CreationContext) -> Self {
         egui_extras::install_image_loaders(&ctx.egui_ctx);
         let position = Position::initial();
-        let history = History::new(position.hash());
+        let history = History::new_from_position(&position);
         let mut app = Self {
             reverse: false,
             is_computer_player: EnumMap::from_fn(|_| false),
@@ -516,10 +516,10 @@ impl WazirDropApp {
         self.position = self.position.make_any_move(mov).expect("Invalid move");
         match mov {
             AnyMove::Setup(_) => {
-                self.history.push_irreversible(self.position.hash());
+                self.history.push_position_irreversible(&self.position);
             }
             AnyMove::Regular(_) => {
-                self.history.push(self.position.hash());
+                self.history.push_position(&self.position);
             }
         }
         self.start_next_move(ctx);
@@ -529,7 +529,7 @@ impl WazirDropApp {
         if !matches!(self.next_move_state, NextMoveState::Computer { .. }) {
             self.position = Position::initial();
             self.history_entries.clear();
-            self.history = History::new(self.position.hash());
+            self.history = History::new_from_position(&self.position);
             self.start_next_move(ctx);
         }
     }

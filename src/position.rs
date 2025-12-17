@@ -1,5 +1,5 @@
 use crate::{
-    constants::{Ply, PLY_AFTER_SETUP, PLY_DRAW},
+    constants::{Ply, PLY_AFTER_SETUP, PLY_DRAW, PLY_DRAWISH},
     enums::SimpleEnumExt,
     error::Invalid,
     impl_from_str_for_parsable, movegen,
@@ -146,11 +146,19 @@ impl Position {
     }
 
     pub fn hash(&self) -> u64 {
-        // stage is implied by board and captured
-        self.hash_ignoring_captured() ^ self.captured.hash()
+        let mut res = self.hash_for_repetition();
+        let ply = self.ply();
+        if ply >= PLY_DRAWISH {
+            res ^= zobrist::PLY[usize::from(ply)];
+        }
+        res
     }
 
-    pub fn hash_ignoring_captured(&self) -> u64 {
+    pub fn hash_for_repetition(&self) -> u64 {
+        self.hash_for_repetition_ignoring_captured() ^ self.captured.hash()
+    }
+
+    pub fn hash_for_repetition_ignoring_captured(&self) -> u64 {
         // There is a collision because we ignore `stage`. Setup with blue on move may look identical as a red win.
         // We ignore it, it's rare and harmless.
         zobrist::TO_MOVE[self.to_move()]

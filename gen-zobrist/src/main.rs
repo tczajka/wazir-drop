@@ -38,13 +38,20 @@ fn main() {
     println!();
 
     println!("#[rustfmt::skip]");
-    println!("static NULL_MOVE_COUNTER: [u64; (PLY_DRAW - PLY_AFTER_SETUP + 1) as usize] = [");
+    println!("pub static NULL_MOVE_COUNTER: [u64; (PLY_DRAW - PLY_AFTER_SETUP + 1) as usize] = [");
     generate(
         "    ",
         usize::from(PLY_DRAW - PLY_AFTER_SETUP + 1),
         &mut rng,
     );
     println!("];");
+    println!();
+
+    println!("#[rustfmt::skip]");
+    println!("pub static PLY: [u64; (PLY_DRAW + 1) as usize] = [");
+    generate("    ", usize::from(PLY_DRAW + 1), &mut rng);
+    println!("];");
+    println!();
 }
 
 fn generate(indent: &str, count: usize, rng: &mut StdRng) {

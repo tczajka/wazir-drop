@@ -59,10 +59,10 @@ impl<E: Evaluator> MainPlayer<E> {
                 if mov.color == Color::Red {
                     self.red_setup = Some(mov);
                 }
-                self.history.push_irreversible(self.position.hash());
+                self.history.push_position_irreversible(&self.position);
             }
             AnyMove::Regular(_) => {
-                self.history.push(self.position.hash());
+                self.history.push_position(&self.position);
             }
         }
     }
@@ -172,7 +172,7 @@ impl<E: Evaluator> PlayerFactory for MainPlayerFactory<E> {
         _time_limit: Option<Duration>,
     ) -> Box<dyn crate::Player> {
         let position = Position::initial();
-        let history = History::new(position.hash());
+        let history = History::new_from_position(&position);
         let mut player = MainPlayer {
             hyperparameters: self.hyperparameters.clone(),
             search: Search::new(&self.hyperparameters, &self.evaluator),
