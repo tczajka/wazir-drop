@@ -48,6 +48,7 @@ pub struct Hyperparameters {
     pub panic_multiplier: f64,
     pub panic_max_remaining: f64,
     pub contempt: f64,
+    pub null_move_margin: f64,
 }
 
 impl Default for Hyperparameters {
@@ -69,6 +70,7 @@ impl Default for Hyperparameters {
             panic_multiplier: 2.0,
             panic_max_remaining: 0.3,
             contempt: 0.1,
+            null_move_margin: 0.0,
         }
     }
 }

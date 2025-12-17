@@ -666,6 +666,8 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         let mut move_index = 0;
         let mut enable_late_move_reduction = false;
 
+        let mut lazy_eval: Option<Eval> = None;
+
         for move_candidate in move_candidates {
             match move_candidate {
                 MoveCandidate::Move { mov, extra } => {
@@ -759,6 +761,23 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     result.repetition_ply = result.repetition_ply.min(result2.repetition_ply);
                 }
                 MoveCandidate::Null => {
+                    let do_null_move = match ScoreExpanded::from(beta) {
+                        ScoreExpanded::Win(_) => false,
+                        ScoreExpanded::Loss(_) => true,
+                        ScoreExpanded::Eval(beta_eval) => {
+                            if lazy_eval.is_none() {
+                                lazy_eval = Some(eposition.evaluate());
+                            }
+                            lazy_eval.unwrap()
+                                >= beta_eval
+                                    + (self.hyperparameters.null_move_margin
+                                        * self.evaluator.scale())
+                                        as Eval
+                        }
+                    };
+                    if !do_null_move {
+                        continue;
+                    }
                     let epos2 = eposition.make_null_move().unwrap();
                     self.history.push_irreversible(epos2.position().hash());
                     let depth_diff = ONE_PLY + self.hyperparameters.reduction_null_move;
@@ -785,10 +804,13 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                             ScoreExpanded::Win(_) => true,
                             ScoreExpanded::Loss(_) => false,
                             ScoreExpanded::Eval(alpha_eval) => {
+                                if lazy_eval.is_none() {
+                                    lazy_eval = Some(eposition.evaluate());
+                                }
                                 let margin = (self.hyperparameters.futility_margin
                                     * self.evaluator.scale())
                                     as Eval;
-                                eposition.evaluate() <= alpha_eval - margin
+                                lazy_eval.unwrap() <= alpha_eval - margin
                             }
                         };
                         if futile {
