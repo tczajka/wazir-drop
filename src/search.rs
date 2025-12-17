@@ -10,7 +10,8 @@ use crate::{
     ttable::{TTable, TTableEntry, TTableScoreType},
     variation::LongVariation,
     Color, EmptyVariation, EvaluatedPosition, Evaluator, ExtendableVariation, Move,
-    NonEmptyVariation, PVTable, Position, Score, ScoreExpanded, SetupMove, Stage, Variation,
+    NonEmptyVariation, OneMoveVariation, PVTable, Position, Score, ScoreExpanded, SetupMove, Stage,
+    Variation,
 };
 use std::{cmp::Reverse, iter, sync::Arc, time::Instant};
 
@@ -308,6 +309,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 -Score::INFINITE,
                 Score::INFINITE,
                 0,
+                NodeType::PV,
             )?;
             self.history.pop();
             let score = -result.score;
@@ -355,6 +357,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 -Score::INFINITE,
                 Score::INFINITE,
                 next_depth.saturating_sub(depth_diff),
+                NodeType::PV,
             )?;
             self.history.pop();
             self.depth = next_depth;
@@ -401,6 +404,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     -alpha.next(),
                     -alpha,
                     self.depth.saturating_sub(depth_diff),
+                    NodeType::Cut,
                 )?;
                 let score = -result.score;
                 self.root_moves[self.root_moves_considered].score = score;
@@ -420,6 +424,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 -alpha.next(),
                 -alpha,
                 self.depth.saturating_sub(depth_diff),
+                NodeType::Cut,
             )?;
             let score = -result.score;
             self.root_moves[self.root_moves_considered].score = score;
@@ -437,6 +442,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 -Score::INFINITE,
                 -alpha,
                 self.depth.saturating_sub(depth_diff),
+                NodeType::PV,
             )?;
             self.history.pop();
             let score = -result.score;
@@ -465,6 +471,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         alpha: Score,
         beta: Score,
         depth: Depth,
+        node_type: NodeType,
     ) -> Result<SearchResultInternal<V>, Timeout> {
         let position = eposition.position();
         let ply = position.ply();
@@ -565,7 +572,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         // Search deeper.
         // Search with V::Extended so that we have a TT move.
         let result = self.search_alpha_beta_deeper::<V::Extended>(
-            eposition, alpha, beta, depth, in_check, tt_move,
+            eposition, alpha, beta, depth, in_check, tt_move, node_type,
         )?;
         let mov = result.pv.first();
         let pv = result.pv.truncate();
@@ -633,6 +640,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
     }
 
     // No early cutoff, we have search deeper.
+    #[allow(clippy::too_many_arguments)]
     fn search_alpha_beta_deeper<V: NonEmptyVariation>(
         &mut self,
         eposition: &EvaluatedPosition<E>,
@@ -640,7 +648,8 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         beta: Score,
         depth: Depth,
         in_check: bool,
-        tt_move: Option<Move>,
+        mut tt_move: Option<Move>,
+        node_type: NodeType,
     ) -> Result<SearchResultInternal<V>, Timeout> {
         let position = eposition.position();
 
@@ -651,6 +660,23 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             pv: V::empty_truncated(),
             repetition_ply: Ply::MAX,
         };
+
+        // Internal iterative deepening.
+        if node_type == NodeType::PV
+            && tt_move.is_none()
+            && depth >= self.hyperparameters.iid_min_depth
+        {
+            let result = self.search_alpha_beta_deeper::<OneMoveVariation>(
+                eposition,
+                alpha,
+                beta,
+                depth - self.hyperparameters.iid_reduction,
+                in_check,
+                None,
+                node_type,
+            )?;
+            tt_move = result.pv.first();
+        }
 
         let move_candidates = self.generate_move_candidates(
             position,
@@ -694,12 +720,13 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     }
 
                     self.history.push(epos2.position().hash());
+                    let cur_move_index = move_index;
                     move_index += 1;
                     let alpha2 = alpha.max(result.score);
 
                     // Try late move first.
                     if enable_late_move_reduction
-                        && move_index > self.hyperparameters.late_move_reduction_start
+                        && cur_move_index >= self.hyperparameters.late_move_reduction_start
                     {
                         let depth_diff = 2 * ONE_PLY;
                         let depth2 = depth.saturating_sub(depth_diff);
@@ -708,6 +735,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                             -alpha2.next(),
                             -alpha2,
                             depth2,
+                            NodeType::Cut,
                         )?;
                         if -result2.score <= alpha2 {
                             result.depth =
@@ -723,12 +751,13 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     let depth2 = depth.saturating_sub(depth_diff);
 
                     // Try null window.
-                    if beta > alpha2.next() {
+                    if node_type == NodeType::PV && cur_move_index != 0 {
                         let result2 = self.search_alpha_beta::<EmptyVariation>(
                             &epos2,
                             -alpha2.next(),
                             -alpha2,
                             depth2,
+                            NodeType::Cut,
                         )?;
                         if -result2.score <= alpha2 {
                             result.depth =
@@ -741,8 +770,14 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     };
 
                     // Proper search.
-                    let result2 =
-                        self.search_alpha_beta::<V::Truncated>(&epos2, -beta, -alpha2, depth2)?;
+                    let node_type2 = match node_type {
+                        NodeType::PV => NodeType::PV,
+                        NodeType::Cut if cur_move_index == 0 => NodeType::All,
+                        _ => NodeType::Cut,
+                    };
+                    let result2 = self.search_alpha_beta::<V::Truncated>(
+                        &epos2, -beta, -alpha2, depth2, node_type2,
+                    )?;
                     self.history.pop();
                     let score = -result2.score;
                     let depth_actual = result2.depth.saturating_add(depth_diff);
@@ -786,6 +821,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                         -beta,
                         -beta.prev(),
                         depth.saturating_sub(depth_diff),
+                        NodeType::Cut,
                     )?;
                     self.history.pop();
                     if -result2.score >= beta {
@@ -1059,6 +1095,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             -Score::INFINITE,
             Score::INFINITE,
             next_depth.saturating_sub(ONE_PLY),
+            NodeType::PV,
         )?;
         self.history.pop();
         self.depth = next_depth;
@@ -1083,6 +1120,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 -alpha.next(),
                 -alpha,
                 self.depth.saturating_sub(ONE_PLY),
+                NodeType::Cut,
             )?;
             let score = -result.score;
             if score <= alpha {
@@ -1096,6 +1134,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 -Score::INFINITE,
                 -alpha,
                 self.depth.saturating_sub(ONE_PLY),
+                NodeType::PV,
             )?;
             self.history.pop();
             let score = -result.score;
@@ -1169,3 +1208,10 @@ struct SearchResultInternal<V> {
 
 #[derive(Debug)]
 struct Timeout;
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum NodeType {
+    PV,
+    Cut,
+    All,
+}

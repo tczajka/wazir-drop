@@ -36,6 +36,7 @@ pub struct Hyperparameters {
     pub pvtable_size: usize,
     pub min_depth_ttable: Depth,
     pub reduction_null_move: Depth,
+    pub null_move_margin: f64,
     pub futility_margin: f64,
     pub late_move_reduction_start: usize,
     pub time_reduction_per_setup_move: f64,
@@ -48,7 +49,8 @@ pub struct Hyperparameters {
     pub panic_multiplier: f64,
     pub panic_max_remaining: f64,
     pub contempt: f64,
-    pub null_move_margin: f64,
+    pub iid_min_depth: Depth,
+    pub iid_reduction: Depth,
 }
 
 impl Default for Hyperparameters {
@@ -58,6 +60,7 @@ impl Default for Hyperparameters {
             pvtable_size: 16 << 20,
             min_depth_ttable: 2 * ONE_PLY,
             reduction_null_move: ONE_PLY,
+            null_move_margin: 0.0,
             futility_margin: 0.8,
             late_move_reduction_start: 5,
             time_reduction_per_setup_move: 0.5,
@@ -70,7 +73,8 @@ impl Default for Hyperparameters {
             panic_multiplier: 2.0,
             panic_max_remaining: 0.3,
             contempt: 0.1,
-            null_move_margin: 0.0,
+            iid_min_depth: Depth::MAX, // 3 * ONE_PLY,
+            iid_reduction: ONE_PLY,
         }
     }
 }
