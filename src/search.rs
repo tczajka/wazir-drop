@@ -302,10 +302,14 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
             let mov = self.root_moves[self.root_moves_considered].mov;
             let epos2 = eposition.make_move(mov).unwrap();
-            // self.history.push(epos2.position().hash());
-            let result =
-                self.quiescence_search::<LongVariation>(&epos2, -Score::INFINITE, Score::INFINITE)?;
-            // self.history.pop();
+            self.history.push(epos2.position().hash());
+            let result = self.search_alpha_beta::<LongVariation>(
+                &epos2,
+                -Score::INFINITE,
+                Score::INFINITE,
+                0,
+            )?;
+            self.history.pop();
             let score = -result.score;
             let root_move = &mut self.root_moves[self.root_moves_considered];
             root_move.score = score;
