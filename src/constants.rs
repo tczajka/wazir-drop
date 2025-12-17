@@ -73,8 +73,8 @@ impl Default for Hyperparameters {
             panic_multiplier: 2.0,
             panic_max_remaining: 0.3,
             contempt: 0.1,
-            iid_min_depth: Depth::MAX, // 3 * ONE_PLY,
-            iid_reduction: ONE_PLY,
+            iid_min_depth: 4 * ONE_PLY,
+            iid_reduction: 2 * ONE_PLY,
         }
     }
 }

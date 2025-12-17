@@ -662,9 +662,9 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         };
 
         // Internal iterative deepening.
-        if node_type == NodeType::PV
+        if depth >= self.hyperparameters.iid_min_depth
+            && matches!(node_type, NodeType::PV | NodeType::Cut)
             && tt_move.is_none()
-            && depth >= self.hyperparameters.iid_min_depth
         {
             let result = self.search_alpha_beta_deeper::<OneMoveVariation>(
                 eposition,
