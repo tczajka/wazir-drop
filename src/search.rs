@@ -678,14 +678,8 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             tt_move = result.pv.first();
         }
 
-        let move_candidates = self.generate_move_candidates(
-            position,
-            in_check,
-            depth >= self.hyperparameters.null_move_reduction
-                && !self.history.last_move_irreversible(),
-            tt_move,
-            true,
-        );
+        let move_candidates =
+            self.generate_move_candidates(position, in_check, true, tt_move, true);
 
         let mut extra_moves = SmallVec::<Move, { 1 + NUM_KILLER_MOVES }>::new();
 
@@ -799,6 +793,11 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     result.repetition_ply = result.repetition_ply.min(result2.repetition_ply);
                 }
                 MoveCandidate::Null => {
+                    let depth_diff = ONE_PLY + self.hyperparameters.null_move_reduction;
+                    if depth < depth_diff || self.history.last_move_irreversible() {
+                        continue;
+                    }
+
                     let do_null_move = match ScoreExpanded::from(beta) {
                         ScoreExpanded::Win(_) => false,
                         ScoreExpanded::Loss(_) => true,
@@ -818,7 +817,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     }
                     let epos2 = eposition.make_null_move().unwrap();
                     self.history.push_position_irreversible(epos2.position());
-                    let depth_diff = ONE_PLY + self.hyperparameters.null_move_reduction;
                     let result2 = self.search_alpha_beta::<EmptyVariation>(
                         &epos2,
                         -beta,
