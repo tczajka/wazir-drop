@@ -62,7 +62,7 @@ impl Default for Hyperparameters {
             ttable_size: 256 << 20,
             pvtable_size: 16 << 20,
             min_depth_ttable: ONE_PLY,
-            null_move_reduction: ONE_PLY,
+            null_move_reduction: 2 * ONE_PLY,
             late_move_reduction: ONE_PLY,
             late_move_reduction_start: 5,
             iid_min_depth: 4 * ONE_PLY,
