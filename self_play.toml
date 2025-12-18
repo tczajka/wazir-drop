@@ -3,13 +3,13 @@ log = "logs/self_play.log"
 [[command]]
 type = "self_play"
 output = "data/x.data"
-num_cpus = 5
+num_cpus = 60
 num_games = 10000
 batch_size = 10000
 ttable_size_mb = 16
 pvtable_size_mb = 2
-depth = 200
-extra_depth = 200
+depth = 300
+extra_depth = 300
 temperature = 0.03
 temperature_cutoff = 0.06
 features = "WPS"

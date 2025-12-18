@@ -35,10 +35,11 @@ const _ASSERT_RED_SETUP_INDEX_VALID: () = assert!(
 pub struct Hyperparameters {
     pub ttable_size: usize,
     pub pvtable_size: usize,
+    pub contempt: f64,
     pub min_depth_ttable: Depth,
     pub null_move_reduction: Depth,
-    pub late_move_reduction: Depth,
     pub late_move_reduction_start: usize,
+    pub late_move_reduction_start_2: usize,
     pub iid_min_depth: Depth,
     pub iid_reduction: Depth,
     pub check_extension: Depth,
@@ -53,7 +54,6 @@ pub struct Hyperparameters {
     pub panic_eval_threshold: f64,
     pub panic_multiplier: f64,
     pub panic_max_remaining: f64,
-    pub contempt: f64,
 }
 
 impl Default for Hyperparameters {
@@ -61,10 +61,11 @@ impl Default for Hyperparameters {
         Self {
             ttable_size: 256 << 20,
             pvtable_size: 16 << 20,
+            contempt: 0.1,
             min_depth_ttable: ONE_PLY,
             null_move_reduction: 2 * ONE_PLY,
-            late_move_reduction: ONE_PLY,
             late_move_reduction_start: 5,
+            late_move_reduction_start_2: 10,
             iid_min_depth: 4 * ONE_PLY,
             iid_reduction: 2 * ONE_PLY,
             check_extension: ONE_PLY,
@@ -79,7 +80,6 @@ impl Default for Hyperparameters {
             panic_eval_threshold: 0.1,
             panic_multiplier: 2.0,
             panic_max_remaining: 0.3,
-            contempt: 0.1,
         }
     }
 }

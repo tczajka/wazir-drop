@@ -722,7 +722,10 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     if enable_late_move_reduction
                         && cur_move_index >= self.hyperparameters.late_move_reduction_start
                     {
-                        let depth_diff = ONE_PLY + self.hyperparameters.late_move_reduction;
+                        let mut depth_diff = 2 * ONE_PLY;
+                        if cur_move_index >= self.hyperparameters.late_move_reduction_start_2 {
+                            depth_diff += ONE_PLY;
+                        }
                         let depth2 = depth.saturating_sub(depth_diff);
                         let result2 = self.search_alpha_beta::<V::Truncated>(
                             &epos2,
