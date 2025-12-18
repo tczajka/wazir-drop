@@ -174,7 +174,7 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
                     opp_time = opp_stopwatch.get();
                 }
                 log::info!(
-                    "{ply}. opp {mov} {t} ms",
+                    "{ply}. o {mov} {t}ms",
                     ply = position.ply() + 1,
                     t = opp_time.as_millis()
                 );
@@ -207,7 +207,7 @@ fn run_internal(player_factory: &dyn PlayerFactory) -> Result<(), CliError> {
             .map_err(|_| CliError::InvalidPlayerMove(mov))?;
         timer.stop();
         log::info!(
-            "{ply}. {mov} {t} ms",
+            "{ply}. {mov} {t}ms",
             ply = position.ply(),
             t = timer.get().as_millis()
         );
