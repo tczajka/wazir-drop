@@ -61,7 +61,7 @@ impl Default for Hyperparameters {
         Self {
             ttable_size: 256 << 20,
             pvtable_size: 16 << 20,
-            min_depth_ttable: 2 * ONE_PLY,
+            min_depth_ttable: ONE_PLY,
             null_move_reduction: ONE_PLY,
             late_move_reduction: ONE_PLY,
             late_move_reduction_start: 5,
