@@ -2,9 +2,8 @@ log = "logs/learn.log"
 
 [[command]]
 type = "learn"
-load_weights = "data/nnue5_128_16_partial.weights"
-save_weights = "data/nnue5_128_16.weights"
-learning_rate = 1e-5
+save_weights = "data/nnue5a_128_16_partial.weights"
+learning_rate = 1e-4
 epochs = 3
 log_period_seconds = 60
 
@@ -13,7 +12,7 @@ file = "data/train5.data"
 features = "WPS"
 chunk_size = 4194304
 batch_size = 8192
-outcome_weight = 0.2
+outcome_weight = 0.1
 
 #[command.model.linear.learn]
 #max_weight = 3.0
