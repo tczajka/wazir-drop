@@ -386,22 +386,44 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             let epos2 = eposition.make_move(mov).unwrap();
             self.history.push_position(epos2.position());
 
-            let alpha = match self.multi_move_threshold {
-                Some(multi_move_threshold) => self.root_moves[0]
-                    .score
-                    .offset(-multi_move_threshold)
-                    .prev(),
-                None => self.root_moves[0].score,
-            };
+            'consider_move: {
+                let alpha = match self.multi_move_threshold {
+                    Some(multi_move_threshold) => self.root_moves[0]
+                        .score
+                        .offset(-multi_move_threshold)
+                        .prev(),
+                    None => self.root_moves[0].score,
+                };
 
-            // Late move reduction.
-            if self.root_moves_considered >= self.hyperparameters.late_move_reduction_start
-                && self.root_moves[self.root_moves_considered].futile
-            {
-                let mut depth_diff = 2 * ONE_PLY;
-                if self.root_moves_considered >= self.hyperparameters.late_move_reduction_start_2 {
-                    depth_diff += ONE_PLY;
+                // Late move reduction.
+                if self.root_moves_considered >= self.hyperparameters.late_move_reduction_start
+                    && self.root_moves[self.root_moves_considered].futile
+                {
+                    let mut depth_diff = 2 * ONE_PLY;
+                    if self.root_moves_considered
+                        >= self.hyperparameters.late_move_reduction_start_2
+                    {
+                        depth_diff += ONE_PLY;
+                    }
+                    let result = self.search_alpha_beta::<EmptyVariation>(
+                        &epos2,
+                        -alpha.next(),
+                        -alpha,
+                        self.depth.saturating_sub(depth_diff),
+                        NodeType::Cut,
+                    )?;
+                    let score = -result.score;
+                    self.root_moves[self.root_moves_considered].score = score;
+                    if score <= alpha {
+                        completed_depth =
+                            completed_depth.min(result.depth.saturating_add(depth_diff));
+                        break 'consider_move;
+                    }
                 }
+
+                let depth_diff = ONE_PLY;
+
+                // Null window.
                 let result = self.search_alpha_beta::<EmptyVariation>(
                     &epos2,
                     -alpha.next(),
@@ -411,55 +433,34 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 )?;
                 let score = -result.score;
                 self.root_moves[self.root_moves_considered].score = score;
+
                 if score <= alpha {
                     completed_depth = completed_depth.min(result.depth.saturating_add(depth_diff));
-                    self.root_moves_considered += 1;
-                    self.history.pop();
-                    continue;
+                    break 'consider_move;
                 }
-            }
 
-            let depth_diff = ONE_PLY;
-
-            // Null window.
-            let result = self.search_alpha_beta::<EmptyVariation>(
-                &epos2,
-                -alpha.next(),
-                -alpha,
-                self.depth.saturating_sub(depth_diff),
-                NodeType::Cut,
-            )?;
-            let score = -result.score;
-            self.root_moves[self.root_moves_considered].score = score;
-
-            if score <= alpha {
+                // Full window search.
+                let result = self.search_alpha_beta::<LongVariation>(
+                    &epos2,
+                    -Score::INFINITE,
+                    -alpha,
+                    self.depth.saturating_sub(depth_diff),
+                    NodeType::PV,
+                )?;
+                let score = -result.score;
+                self.root_moves[self.root_moves_considered].score = score;
                 completed_depth = completed_depth.min(result.depth.saturating_add(depth_diff));
-                self.root_moves_considered += 1;
-                self.history.pop();
-                continue;
-            }
-
-            // Full window search.
-            let result = self.search_alpha_beta::<LongVariation>(
-                &epos2,
-                -Score::INFINITE,
-                -alpha,
-                self.depth.saturating_sub(depth_diff),
-                NodeType::PV,
-            )?;
-            self.history.pop();
-            let score = -result.score;
-            self.root_moves[self.root_moves_considered].score = score;
-            completed_depth = completed_depth.min(result.depth.saturating_add(depth_diff));
-            if score > alpha {
-                self.root_moves[self.root_moves_exact_score..=self.root_moves_considered]
-                    .rotate_right(1);
-                self.root_moves_exact_score += 1;
-                if score > self.root_moves[0].score {
-                    self.root_moves[0..self.root_moves_exact_score].rotate_right(1);
-                    self.pv = result.pv.add_front(mov);
+                if score > alpha {
+                    self.root_moves[self.root_moves_exact_score..=self.root_moves_considered]
+                        .rotate_right(1);
+                    self.root_moves_exact_score += 1;
+                    if score > self.root_moves[0].score {
+                        self.root_moves[0..self.root_moves_exact_score].rotate_right(1);
+                        self.pv = result.pv.add_front(mov);
+                    }
                 }
             }
+            self.history.pop();
             self.root_moves_considered += 1;
         }
         self.depth = completed_depth;
@@ -1120,36 +1121,58 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             let mov = self.root_moves_setup[self.root_moves_considered];
             let epos2 = eposition.make_setup_move(mov).unwrap();
             self.history.push_position_irreversible(epos2.position());
-            let alpha = self.blue_setup_score;
-            // Null window.
-            let result = self.search_alpha_beta::<EmptyVariation>(
-                &epos2,
-                -alpha.next(),
-                -alpha,
-                self.depth.saturating_sub(ONE_PLY),
-                NodeType::Cut,
-            )?;
-            let score = -result.score;
-            if score <= alpha {
-                self.root_moves_considered += 1;
-                self.history.pop();
-                continue;
+
+            'consider_move: {
+                let alpha = self.blue_setup_score;
+                // Late move reduction.
+                if self.root_moves_considered
+                    >= self.hyperparameters.blue_setup_late_move_reduction_start
+                {
+                    let mut depth_diff = 2 * ONE_PLY;
+                    if self.root_moves_considered
+                        >= self.hyperparameters.blue_setup_late_move_reduction_start_2
+                    {
+                        depth_diff += ONE_PLY;
+                    }
+                    let result = self.search_alpha_beta::<EmptyVariation>(
+                        &epos2,
+                        -alpha.next(),
+                        -alpha,
+                        self.depth.saturating_sub(depth_diff),
+                        NodeType::Cut,
+                    )?;
+                    if -result.score <= alpha {
+                        break 'consider_move;
+                    }
+                }
+                let depth_diff = ONE_PLY;
+                // Null window.
+                let result = self.search_alpha_beta::<EmptyVariation>(
+                    &epos2,
+                    -alpha.next(),
+                    -alpha,
+                    self.depth.saturating_sub(depth_diff),
+                    NodeType::Cut,
+                )?;
+                if -result.score <= alpha {
+                    break 'consider_move;
+                }
+                // Full window search.
+                let result = self.search_alpha_beta::<LongVariation>(
+                    &epos2,
+                    -Score::INFINITE,
+                    -alpha,
+                    self.depth.saturating_sub(depth_diff),
+                    NodeType::PV,
+                )?;
+                let score = -result.score;
+                if score > alpha {
+                    self.root_moves_setup[0..=self.root_moves_considered].rotate_right(1);
+                    self.blue_setup_score = score;
+                    self.pv = result.pv;
+                }
             }
-            // Full window search.
-            let result = self.search_alpha_beta::<LongVariation>(
-                &epos2,
-                -Score::INFINITE,
-                -alpha,
-                self.depth.saturating_sub(ONE_PLY),
-                NodeType::PV,
-            )?;
             self.history.pop();
-            let score = -result.score;
-            if score > alpha {
-                self.root_moves_setup[0..=self.root_moves_considered].rotate_right(1);
-                self.blue_setup_score = score;
-                self.pv = result.pv;
-            }
             self.root_moves_considered += 1;
         }
         // Other moves.
