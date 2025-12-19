@@ -398,7 +398,10 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             if self.root_moves_considered >= self.hyperparameters.late_move_reduction_start
                 && self.root_moves[self.root_moves_considered].futile
             {
-                let depth_diff = 2 * ONE_PLY;
+                let mut depth_diff = 2 * ONE_PLY;
+                if self.root_moves_considered >= self.hyperparameters.late_move_reduction_start_2 {
+                    depth_diff += ONE_PLY;
+                }
                 let result = self.search_alpha_beta::<EmptyVariation>(
                     &epos2,
                     -alpha.next(),
