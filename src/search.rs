@@ -682,7 +682,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             tt_move = result.pv.first();
         }
 
-        let move_candidates =
+        let mut move_candidates =
             self.generate_move_candidates(position, in_check, true, tt_move, true);
 
         let mut extra_moves = SmallVec::<Move, { 1 + NUM_KILLER_MOVES }>::new();
@@ -905,7 +905,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         let in_check = movegen::in_check(position, position.to_move());
 
         let mut result;
-        let moves;
+        let mut moves;
 
         if in_check {
             // Fastest loss is at ply+2 if we are checkmated.
@@ -1036,15 +1036,17 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             let futility = iter::once(MoveCandidate::Futility);
 
             let killers = if use_killers {
-                Either::Case0(
+                Some(
                     self.killer_moves[position.ply() as usize]
                         .into_iter()
                         .flatten()
                         .map(MoveCandidate::extra),
                 )
             } else {
-                Either::Case1(iter::empty())
-            };
+                None
+            }
+            .into_iter()
+            .flatten();
 
             let checks = movegen::jumps_checks(position)
                 .chain(movegen::drops_checks(position))

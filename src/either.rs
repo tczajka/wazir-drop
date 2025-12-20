@@ -5,11 +5,11 @@ pub enum Either<T0, T1> {
 }
 
 impl<T0: Iterator, T1: Iterator<Item = T0::Item>> Either<T0, T1> {
-    pub fn try_for_each_result<E, F>(mut self, f: F) -> Result<(), E>
+    pub fn try_for_each_result<E, F>(&mut self, f: F) -> Result<(), E>
     where
         F: FnMut(T0::Item) -> Result<(), E>,
     {
-        match &mut self {
+        match self {
             Either::Case0(a) => a.try_for_each(f),
             Either::Case1(b) => b.try_for_each(f),
         }
