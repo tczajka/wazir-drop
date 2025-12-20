@@ -19,10 +19,10 @@ pub trait Features: Debug + Copy + Send + Sync + 'static {
         match mov {
             AnyMove::Setup(mov) => self
                 .diff_setup(mov, new_position, color)
-                .map(|(added, removed)| (Either::Left(added), Either::Left(removed))),
+                .map(|(added, removed)| (Either::Case0(added), Either::Case0(removed))),
             AnyMove::Regular(mov) => self
                 .diff(mov, new_position, color)
-                .map(|(added, removed)| (Either::Right(added), Either::Right(removed))),
+                .map(|(added, removed)| (Either::Case1(added), Either::Case1(removed))),
         }
     }
 

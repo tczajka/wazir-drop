@@ -218,8 +218,8 @@ pub fn in_check(position: &Position, color: Color) -> bool {
 
 pub fn any_pseudomoves<'a>(position: &'a Position) -> impl Iterator<Item = AnyMove> + 'a {
     match position.stage() {
-        Stage::Setup => Either::Left(setup_moves(position.to_move()).map(AnyMove::Setup)),
-        Stage::Regular => Either::Right(pseudomoves(position).map(AnyMove::Regular)),
+        Stage::Setup => Either::Case0(setup_moves(position.to_move()).map(AnyMove::Setup)),
+        Stage::Regular => Either::Case1(pseudomoves(position).map(AnyMove::Regular)),
         Stage::End(_) => panic!("End of game"),
     }
 }
@@ -235,9 +235,9 @@ pub fn pseudomoves<'a>(position: &'a Position) -> impl Iterator<Item = Move> + '
 /// Generate all moves except suicides.
 pub fn moves<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     if in_check(position, position.to_move()) {
-        Either::Left(check_evasions(position))
+        Either::Case0(check_evasions(position))
     } else {
-        Either::Right(moves_not_in_check(position))
+        Either::Case1(moves_not_in_check(position))
     }
 }
 

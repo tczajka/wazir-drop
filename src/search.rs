@@ -692,18 +692,18 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
 
         let mut lazy_eval: Option<Eval> = None;
 
-        for move_candidate in move_candidates {
+        let iteration_result = move_candidates.try_for_each_result(|move_candidate| {
             match move_candidate {
                 MoveCandidate::Move { mov, extra } => {
                     if extra_moves.contains(&mov) {
-                        continue;
+                        return Ok(());
                     }
 
                     let Ok(epos2) = eposition.make_move(mov) else {
                         // Illegal move. Could be a hash collision in the transposition table
                         // or invalid killer move.
                         if extra {
-                            continue;
+                            return Ok(());
                         } else {
                             panic!("Illegal move in search_alpha_beta_deeper");
                         }
@@ -712,7 +712,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     if extra {
                         if movegen::in_check(epos2.position(), position.to_move()) {
                             // Skip suicide move.
-                            continue;
+                            return Ok(());
                         }
                         extra_moves.push(mov);
                     }
@@ -744,7 +744,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                             result.repetition_ply =
                                 result.repetition_ply.min(result2.repetition_ply);
                             self.history.pop();
-                            continue;
+                            return Ok(());
                         }
                     }
 
@@ -769,9 +769,9 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                             result.repetition_ply =
                                 result.repetition_ply.min(result2.repetition_ply);
                             self.history.pop();
-                            continue;
+                            return Ok(());
                         }
-                    };
+                    }
 
                     // Proper search.
                     let node_type2 = match node_type {
@@ -793,7 +793,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                         if score >= beta {
                             result.depth = depth_actual;
                             result.repetition_ply = result2.repetition_ply;
-                            break;
+                            return Err(TimeoutOrBreak::Break);
                         }
                     }
                     result.depth = result.depth.min(depth_actual);
@@ -802,7 +802,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 MoveCandidate::Null => {
                     let depth_diff = ONE_PLY + self.hyperparameters.null_move_reduction;
                     if depth < depth_diff || self.history.last_move_irreversible() {
-                        continue;
+                        return Ok(());
                     }
 
                     let do_null_move = match ScoreExpanded::from(beta) {
@@ -820,7 +820,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                         }
                     };
                     if !do_null_move {
-                        continue;
+                        return Ok(());
                     }
                     let epos2 = eposition.make_null_move().unwrap();
                     self.history.push_position_irreversible(epos2.position());
@@ -833,13 +833,14 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     )?;
                     self.history.pop();
                     if -result2.score >= beta {
-                        return Ok(SearchResultInternal {
+                        result = SearchResultInternal {
                             score: beta,
                             depth: result2.depth.saturating_add(depth_diff),
                             pv: V::empty_truncated(),
                             // Repetitions don't count accross null move.
                             repetition_ply: Ply::MAX,
-                        });
+                        };
+                        return Err(TimeoutOrBreak::Break);
                     }
                 }
                 MoveCandidate::Futility => {
@@ -858,18 +859,23 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                             }
                         };
                         if futile {
-                            return Ok(SearchResultInternal {
+                            result = SearchResultInternal {
                                 score: alpha,
                                 depth,
                                 pv: V::empty_truncated(),
                                 repetition_ply: Ply::MAX,
-                            });
+                            };
+                            return Err(TimeoutOrBreak::Break);
                         }
                     } else {
                         enable_late_move_reduction = true;
                     }
                 }
             }
+            Ok(())
+        });
+        if let Err(TimeoutOrBreak::Timeout) = iteration_result {
+            return Err(Timeout);
         }
 
         Ok(result)
@@ -920,7 +926,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 pv: V::empty_truncated(),
                 repetition_ply: Ply::MAX,
             };
-            moves = Either::Left(movegen::check_evasions(position));
+            moves = Either::Case0(movegen::check_evasions(position));
         } else {
             // Fastest win is at ply+3 (checkmate in 1).
             // Fastest loss is at ply+4 (we get checkmated next move).
@@ -958,7 +964,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             if result.score >= beta {
                 return Ok(result);
             }
-            moves = Either::Right(
+            moves = Either::Case1(
                 movegen::captures_checks(eposition.position())
                     .chain(movegen::captures_non_checks(eposition.position())),
             );
@@ -1008,10 +1014,13 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         use_null_move: bool,
         tt_move: Option<Move>,
         use_killers: bool,
-    ) -> impl Iterator<Item = MoveCandidate> + 'pos {
+    ) -> Either<
+        impl Iterator<Item = MoveCandidate> + 'pos,
+        impl Iterator<Item = MoveCandidate> + 'pos,
+    > {
         let tt_move = tt_move.into_iter().map(MoveCandidate::extra);
         if in_check {
-            Either::Left(tt_move.chain(movegen::check_evasions(position).map(MoveCandidate::new)))
+            Either::Case0(tt_move.chain(movegen::check_evasions(position).map(MoveCandidate::new)))
         } else {
             let null_move = if use_null_move {
                 Some(MoveCandidate::Null)
@@ -1027,14 +1036,14 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             let futility = iter::once(MoveCandidate::Futility);
 
             let killers = if use_killers {
-                Either::Left(
+                Either::Case0(
                     self.killer_moves[position.ply() as usize]
                         .into_iter()
                         .flatten()
                         .map(MoveCandidate::extra),
                 )
             } else {
-                Either::Right(iter::empty())
+                Either::Case1(iter::empty())
             };
 
             let checks = movegen::jumps_checks(position)
@@ -1045,7 +1054,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 .chain(movegen::drops_non_checks(position))
                 .map(MoveCandidate::new);
 
-            Either::Right(
+            Either::Case1(
                 null_move
                     .chain(tt_move)
                     .chain(captures)

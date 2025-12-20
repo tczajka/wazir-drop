@@ -1,28 +1,28 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Either<A, B> {
-    Left(A),
-    Right(B),
+pub enum Either<T0, T1> {
+    Case0(T0),
+    Case1(T1),
 }
 
-impl<A: Iterator, B: Iterator<Item = A::Item>> Either<A, B> {
+impl<T0: Iterator, T1: Iterator<Item = T0::Item>> Either<T0, T1> {
     pub fn try_for_each_result<E, F>(mut self, f: F) -> Result<(), E>
     where
-        F: FnMut(A::Item) -> Result<(), E>,
+        F: FnMut(T0::Item) -> Result<(), E>,
     {
         match &mut self {
-            Either::Left(a) => a.try_for_each(f),
-            Either::Right(b) => b.try_for_each(f),
+            Either::Case0(a) => a.try_for_each(f),
+            Either::Case1(b) => b.try_for_each(f),
         }
     }
 }
 
-impl<A: Iterator, B: Iterator<Item = A::Item>> Iterator for Either<A, B> {
-    type Item = A::Item;
+impl<T0: Iterator, T1: Iterator<Item = T0::Item>> Iterator for Either<T0, T1> {
+    type Item = T0::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Either::Left(a) => a.next(),
-            Either::Right(b) => b.next(),
+            Either::Case0(a) => a.next(),
+            Either::Case1(b) => b.next(),
         }
     }
 
@@ -31,8 +31,8 @@ impl<A: Iterator, B: Iterator<Item = A::Item>> Iterator for Either<A, B> {
         F: FnMut(Acc, Self::Item) -> Acc,
     {
         match self {
-            Either::Left(a) => a.fold(init, f),
-            Either::Right(b) => b.fold(init, f),
+            Either::Case0(a) => a.fold(init, f),
+            Either::Case1(b) => b.fold(init, f),
         }
     }
 }
