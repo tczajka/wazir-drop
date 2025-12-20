@@ -96,9 +96,12 @@ impl<'a, E: Evaluator> EvaluatedPosition<'a, E> {
 
 fn refresh<E: Evaluator>(evaluator: &E, position: &Position, color: Color) -> E::Accumulator {
     let mut acc = evaluator.new_accumulator();
-    for feature in evaluator.features().all(position, color) {
-        evaluator.add_feature(&mut acc, feature);
-    }
+    evaluator
+        .features()
+        .all(position, color)
+        .for_each(|feature| {
+            evaluator.add_feature(&mut acc, feature);
+        });
     acc
 }
 
@@ -116,12 +119,8 @@ where
     match diff {
         Some((added, removed)) => {
             let mut accumulator = accumulator.clone();
-            for feature in removed {
-                evaluator.remove_feature(&mut accumulator, feature);
-            }
-            for feature in added {
-                evaluator.add_feature(&mut accumulator, feature);
-            }
+            removed.for_each(|feature| evaluator.remove_feature(&mut accumulator, feature));
+            added.for_each(|feature| evaluator.add_feature(&mut accumulator, feature));
             accumulator
         }
         None => refresh(evaluator, new_position, color),
