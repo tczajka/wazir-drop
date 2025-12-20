@@ -964,7 +964,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             );
         }
 
-        for mov in moves {
+        let iteration_result = moves.try_for_each_result(|mov| {
             let epos2 = eposition
                 .make_move(mov)
                 .expect("Illegal move in quiescence search");
@@ -978,9 +978,13 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     result.pv = result2.pv.add_front(mov).truncate();
                 }
                 if score >= beta {
-                    break;
+                    return Err(TimeoutOrBreak::Break);
                 }
             }
+            Ok(())
+        });
+        if let Err(TimeoutOrBreak::Timeout) = iteration_result {
+            return Err(Timeout);
         }
 
         Ok(result)
@@ -1244,4 +1248,16 @@ enum NodeType {
     PV,
     Cut,
     All,
+}
+
+#[derive(Debug, Copy, Clone)]
+enum TimeoutOrBreak {
+    Timeout,
+    Break,
+}
+
+impl From<Timeout> for TimeoutOrBreak {
+    fn from(_timeout: Timeout) -> Self {
+        Self::Timeout
+    }
 }
