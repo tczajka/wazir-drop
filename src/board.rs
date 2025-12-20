@@ -3,7 +3,7 @@ use crate::{
     error::Invalid,
     impl_from_str_for_parsable,
     parser::{self, Parser, ParserExt},
-    zobrist, Bitboard, Color, ColoredPiece, Coord, Square,
+    zobrist, Bitboard, Color, ColoredPiece, Coord, Piece, Square,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -41,6 +41,11 @@ impl Board {
 
     pub fn occupied_by_piece(&self, cpiece: ColoredPiece) -> Bitboard {
         self.occupied_by_piece[cpiece]
+    }
+
+    pub fn wazir_square(&self, color: Color) -> Option<Square> {
+        self.occupied_by_piece(Piece::Wazir.with_color(color))
+            .first()
     }
 
     pub fn hash(&self) -> u64 {

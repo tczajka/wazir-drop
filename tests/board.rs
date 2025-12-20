@@ -178,6 +178,26 @@ add.w..a
 }
 
 #[test]
+fn test_wazir_square() {
+    let board = Board::from_str(
+        "\
+.W.A.D.D
+AaFA.DDA
+..A.A.A.
+......A.
+...a.a.d
+..d..nN.
+a.a...f.
+add.w..a
+",
+    )
+    .unwrap();
+
+    assert_eq!(board.wazir_square(Color::Red), Some(Square::A2));
+    assert_eq!(board.wazir_square(Color::Blue), Some(Square::H5));
+}
+
+#[test]
 fn test_hash() {
     let mut board = Board::empty();
     board

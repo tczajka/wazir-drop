@@ -141,6 +141,10 @@ impl Position {
         self.board.occupied_by_piece(cpiece)
     }
 
+    pub fn wazir_square(&self, color: Color) -> Option<Square> {
+        self.board.wazir_square(color)
+    }
+
     pub fn num_captured(&self, cpiece: ColoredPiece) -> usize {
         self.captured.get(cpiece)
     }

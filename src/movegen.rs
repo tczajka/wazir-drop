@@ -210,10 +210,7 @@ pub fn is_attacked_by(position: &Position, square: Square, color: Color) -> bool
 }
 
 pub fn in_check(position: &Position, color: Color) -> bool {
-    let Some(wazir_square) = position
-        .occupied_by_piece(Piece::Wazir.with_color(color))
-        .first()
-    else {
+    let Some(wazir_square) = position.wazir_square(color) else {
         return false;
     };
     is_attacked_by(position, wazir_square, color.opposite())
@@ -276,10 +273,7 @@ pub fn captures<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
 pub fn captures_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     let me = position.to_move();
     let opp = me.opposite();
-    let wazir_square = position
-        .occupied_by_piece(Piece::Wazir.with_color(opp))
-        .first()
-        .unwrap();
+    let wazir_square = position.wazir_square(opp).unwrap();
     Piece::all_non_wazir().flat_map(move |piece| {
         let colored_piece = piece.with_color(me);
         let from_bitboard =
@@ -305,11 +299,8 @@ pub fn captures_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move>
 
 /// Must not be in check. Generates all captures that are not checks and not suicides.
 pub fn captures_non_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
-    let me = position.to_move();
-    let opp = me.opposite();
     let wazir_square = position
-        .occupied_by_piece(Piece::Wazir.with_color(opp))
-        .first()
+        .wazir_square(position.to_move().opposite())
         .unwrap();
     Piece::all_non_wazir()
         .flat_map(move |piece| {
@@ -360,11 +351,8 @@ fn pseudocaptures_by_piece_to_mask<'a>(
 // Generates all captures of the wazir, i.e. final moves of the game.
 pub fn captures_of_wazir<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     assert!(position.stage() == Stage::Regular);
-    let me = position.to_move();
-    let opp = me.opposite();
     let wazir_square = position
-        .occupied_by_piece(Piece::Wazir.with_color(opp))
-        .first()
+        .wazir_square(position.to_move().opposite())
         .unwrap();
     pseudocaptures_of_square(position, wazir_square)
 }
@@ -377,10 +365,7 @@ pub fn check_evasions_capture_attacker<'a>(
     assert!(position.stage() == Stage::Regular);
     let me = position.to_move();
     let opp = me.opposite();
-    let wazir_square = position
-        .occupied_by_piece(Piece::Wazir.with_color(me))
-        .first()
-        .unwrap();
+    let wazir_square = position.wazir_square(me).unwrap();
     let checked_by = attacked_by(position, wazir_square, opp);
     let mut checked_by_iter = checked_by.into_iter();
     let mut only_checked_by = Some(checked_by_iter.next().expect("Not in check"));
@@ -435,10 +420,7 @@ pub fn jumps<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
 pub fn jumps_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     let me = position.to_move();
     let opp = me.opposite();
-    let wazir_square = position
-        .occupied_by_piece(Piece::Wazir.with_color(opp))
-        .first()
-        .unwrap();
+    let wazir_square = position.wazir_square(opp).unwrap();
     Piece::all_non_wazir().flat_map(move |piece| {
         let colored_piece = piece.with_color(me);
         let from_bitboard =
@@ -459,11 +441,8 @@ pub fn jumps_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 
 
 /// Must not be in check. Generates all jumps that are not checks and not suicides.
 pub fn jumps_non_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
-    let me = position.to_move();
-    let opp = me.opposite();
     let wazir_square = position
-        .occupied_by_piece(Piece::Wazir.with_color(opp))
-        .first()
+        .wazir_square(position.to_move().opposite())
         .unwrap();
     Piece::all_non_wazir()
         .flat_map(move |piece| {
@@ -522,11 +501,8 @@ pub fn drops<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
 /// If in check, these are non-escapes.
 pub fn drops_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     assert!(position.stage() == Stage::Regular);
-    let me = position.to_move();
-    let opp = me.opposite();
     let wazir_square = position
-        .occupied_by_piece(Piece::Wazir.with_color(opp))
-        .first()
+        .wazir_square(position.to_move().opposite())
         .unwrap();
     Piece::all_non_wazir().flat_map(move |piece| {
         drops_piece_to_mask(position, piece, move_bitboard(piece, wazir_square))
@@ -537,11 +513,8 @@ pub fn drops_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 
 /// If in check, these are non-escapes.
 pub fn drops_non_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     assert!(position.stage() == Stage::Regular);
-    let me = position.to_move();
-    let opp = me.opposite();
     let wazir_square = position
-        .occupied_by_piece(Piece::Wazir.with_color(opp))
-        .first()
+        .wazir_square(position.to_move().opposite())
         .unwrap();
     Piece::all_non_wazir().flat_map(move |piece| {
         drops_piece_to_mask(position, piece, !move_bitboard(piece, wazir_square))
