@@ -2,9 +2,9 @@ log = "logs/self_play.log"
 
 [[command]]
 type = "self_play"
-output = "data/x.data"
+output = "data/train6_0.data"
 num_cpus = 60
-num_games = 35_000_000
+num_games = 10_000_000
 batch_size = 10_000
 ttable_size_mb = 16
 pvtable_size_mb = 2
@@ -16,14 +16,70 @@ features = "WPS"
 
 [[command]]
 type = "self_play"
-output = "data/x.data"
+output = "data/train6_1.data"
 num_cpus = 60
-num_games = 1_000_000
+num_games = 10_000_000
 batch_size = 10_000
 ttable_size_mb = 16
 pvtable_size_mb = 2
-depth = 200
-extra_depth = 200
+depth = 300
+extra_depth = 300
+temperature = 0.03
+temperature_cutoff = 0.06
+features = "WPS"
+
+[[command]]
+type = "self_play"
+output = "data/train6_2.data"
+num_cpus = 60
+num_games = 10_000_000
+batch_size = 10_000
+ttable_size_mb = 16
+pvtable_size_mb = 2
+depth = 300
+extra_depth = 300
+temperature = 0.03
+temperature_cutoff = 0.06
+features = "WPS"
+
+[[command]]
+type = "self_play"
+output = "data/train6_3.data"
+num_cpus = 60
+num_games = 10_000_000
+batch_size = 10_000
+ttable_size_mb = 16
+pvtable_size_mb = 2
+depth = 300
+extra_depth = 300
+temperature = 0.03
+temperature_cutoff = 0.06
+features = "WPS"
+
+[[command]]
+type = "self_play"
+output = "data/train6_4.data"
+num_cpus = 60
+num_games = 10_000_000
+batch_size = 10_000
+ttable_size_mb = 16
+pvtable_size_mb = 2
+depth = 300
+extra_depth = 300
+temperature = 0.03
+temperature_cutoff = 0.06
+features = "WPS"
+
+[[command]]
+type = "self_play"
+output = "data/test6.data"
+num_cpus = 60
+num_games = 2_000_000
+batch_size = 10_000
+ttable_size_mb = 16
+pvtable_size_mb = 2
+depth = 300
+extra_depth = 300
 temperature = 0.03
 temperature_cutoff = 0.06
 features = "WPS"
