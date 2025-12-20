@@ -57,7 +57,7 @@ pub trait SimpleEnumExt: SimpleEnum {
 
 impl<T: SimpleEnum> SimpleEnumExt for T {}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct EnumMap<K: SimpleEnum, V> {
     array: K::Array<V>,

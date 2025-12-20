@@ -93,7 +93,7 @@ impl Display for Stage {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Position {
     stage: Stage,
     ply: Ply,
@@ -292,7 +292,7 @@ impl Position {
             return Err(InvalidMove);
         }
         mov.validate_pieces()?;
-        let mut new_position = self.clone();
+        let mut new_position = *self;
         let symmetry = Symmetry::pov(me).inverse();
         for (i, &piece) in mov.pieces.iter().enumerate() {
             let square = symmetry.apply(Square::from_index(i));
@@ -314,7 +314,7 @@ impl Position {
         if self.stage != Stage::Regular || mov.colored_piece.color() != me {
             return Err(InvalidMove);
         }
-        let mut new_position = self.clone();
+        let mut new_position = *self;
         match mov.from {
             None => {
                 new_position
@@ -358,7 +358,7 @@ impl Position {
         if self.stage != Stage::Regular {
             return Err(InvalidMove);
         }
-        let mut new_position = self.clone();
+        let mut new_position = *self;
         new_position.ply += 1;
         if new_position.ply() == PLY_DRAW {
             new_position.stage = Stage::End(Outcome::Draw);

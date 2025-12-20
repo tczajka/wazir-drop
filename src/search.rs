@@ -125,7 +125,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             ttable: &mut search.ttable,
             pvtable: &mut search.pvtable,
             killer_moves: &mut search.killer_moves,
-            root_position: position.clone(),
+            root_position: *position,
             max_depth: max_depth.unwrap_or(MAX_SEARCH_DEPTH),
             deadlines,
             multi_move_threshold,
@@ -211,7 +211,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         self.ttable.new_epoch();
         self.pvtable.new_epoch();
 
-        let eposition = EvaluatedPosition::new(self.evaluator, self.root_position.clone());
+        let eposition = EvaluatedPosition::new(self.evaluator, self.root_position);
 
         // Ignore timeout.
         _ = self.iterative_deepening(&eposition);
@@ -1074,7 +1074,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         self.root_moves_setup = possible_moves.to_vec();
         self.ttable.new_epoch();
         self.pvtable.new_epoch();
-        let eposition = EvaluatedPosition::new(self.evaluator, self.root_position.clone());
+        let eposition = EvaluatedPosition::new(self.evaluator, self.root_position);
         _ = self.blue_setup_iterative_deepening(&eposition);
         SearchResultBlueSetup {
             score: self.blue_setup_score,

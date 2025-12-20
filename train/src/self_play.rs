@@ -236,7 +236,7 @@ fn calc_deep_score(
     if pv.truncated {
         return Err(DeepScoreImpossible::PVTruncated);
     }
-    let mut pv_position = position.clone();
+    let mut pv_position = *position;
     let mut pv_history = history.clone();
     for &mov in pv.iter() {
         let Ok(p) = pv_position.make_move(mov) else {

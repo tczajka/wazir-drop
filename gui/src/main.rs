@@ -220,7 +220,7 @@ impl WazirDropApp {
                 .position
                 .make_setup_move(setup)
                 .expect("Invalid setup move"),
-            _ => self.position.clone(),
+            _ => self.position,
         };
 
         for square in Square::all() {
@@ -309,7 +309,7 @@ impl WazirDropApp {
     }
 
     fn launch_computer_thread(&mut self, ctx: &egui::Context, result: Arc<Mutex<Option<AnyMove>>>) {
-        let position = self.position.clone();
+        let position = self.position;
         let search = self.search.clone();
         let ctx = ctx.clone();
         let time_limit_ms = self.time_limit_str.parse::<u32>().unwrap_or(1000);
@@ -510,7 +510,7 @@ impl WazirDropApp {
 
     fn make_move(&mut self, mov: AnyMove, ctx: &egui::Context) {
         self.history_entries.push(HistoryEntry {
-            position: self.position.clone(),
+            position: self.position,
             mov,
         });
         self.position = self.position.make_any_move(mov).expect("Invalid move");

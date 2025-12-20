@@ -4,7 +4,7 @@ use crate::{
 };
 
 pub trait Evaluator: Send + Sync + 'static {
-    type Accumulator: Clone;
+    type Accumulator: Copy;
     type Features: Features;
 
     fn features(&self) -> Self::Features;
@@ -15,7 +15,7 @@ pub trait Evaluator: Send + Sync + 'static {
     fn scale(&self) -> f64;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct EvaluatedPosition<'a, E: Evaluator> {
     evaluator: &'a E,
     position: Position,
@@ -84,7 +84,7 @@ impl<'a, E: Evaluator> EvaluatedPosition<'a, E> {
         Ok(Self {
             evaluator: self.evaluator,
             position,
-            accumulators: self.accumulators.clone(),
+            accumulators: self.accumulators,
         })
     }
 
@@ -118,7 +118,7 @@ where
 {
     match diff {
         Some((added, removed)) => {
-            let mut accumulator = accumulator.clone();
+            let mut accumulator = *accumulator;
             removed.for_each(|feature| evaluator.remove_feature(&mut accumulator, feature));
             added.for_each(|feature| evaluator.add_feature(&mut accumulator, feature));
             accumulator

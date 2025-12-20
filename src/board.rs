@@ -7,7 +7,7 @@ use crate::{
 };
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Board {
     squares: EnumMap<Square, Option<ColoredPiece>>,
     occupied_by: EnumMap<Color, Bitboard>,
