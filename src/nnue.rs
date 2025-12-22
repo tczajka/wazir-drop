@@ -23,7 +23,9 @@ pub struct Nnue {
     embedding_bias: EmbeddingVector,
     hidden_0_weights: [Vector8<{ 2 * exact_div(EMBEDDING_SIZE, 16) }>; HIDDEN_SIZES[0]],
     hidden_0_bias: Vector32<{ exact_div(HIDDEN_SIZES[0], 4) }>,
-    final_layer_weights: Vector8<{ exact_div(HIDDEN_SIZES[0], 16) }>,
+    hidden_1_weights: [Vector8<{ exact_div(HIDDEN_SIZES[0], 16) }>; HIDDEN_SIZES[1]],
+    hidden_1_bias: Vector32<{ exact_div(HIDDEN_SIZES[1], 4) }>,
+    final_layer_weights: Vector8<{ exact_div(HIDDEN_SIZES[1], 16) }>,
     final_layer_bias: i32,
 }
 
@@ -49,9 +51,18 @@ impl Nnue {
             { HIDDEN_SIZES[0] },
             { exact_div(HIDDEN_SIZES[0], 4) },
         >(&mut decoder);
+        let hidden_1_weights = array::from_fn(|_| {
+            Self::decode_vector8::<{ HIDDEN_SIZES[0] }, { exact_div(HIDDEN_SIZES[0], 16) }>(
+                &mut decoder,
+            )
+        });
+        let hidden_1_bias = Self::decode_vector32::<
+            { HIDDEN_SIZES[1] },
+            { exact_div(HIDDEN_SIZES[1], 4) },
+        >(&mut decoder);
         let final_layer_weights = Self::decode_vector8::<
-            { HIDDEN_SIZES[0] },
-            { exact_div(HIDDEN_SIZES[0], 16) },
+            { HIDDEN_SIZES[1] },
+            { exact_div(HIDDEN_SIZES[1], 16) },
         >(&mut decoder);
         let final_layer_bias = decoder.decode_varint();
 
@@ -63,6 +74,8 @@ impl Nnue {
             embedding_bias,
             hidden_0_weights,
             hidden_0_bias,
+            hidden_1_weights,
+            hidden_1_bias,
             final_layer_weights,
             final_layer_bias,
         }
@@ -123,13 +136,20 @@ impl Evaluator for Nnue {
         let x: EnumMap<Color, Vector8<{ exact_div(EMBEDDING_SIZE, 16) }>> =
             EnumMap::from_fn(|color| crelu16(&accumulators[color]));
         let x = vector_concat(&x[to_move], &x[to_move.opposite()]);
-        assert_eq!(HIDDEN_SIZES.len(), 1);
+        assert_eq!(HIDDEN_SIZES.len(), 2);
         let x = mul_add::<
             { HIDDEN_SIZES[0] },
             { exact_div(HIDDEN_SIZES[0], 4) },
             { 2 * exact_div(EMBEDDING_SIZE, 16) },
             { HIDDEN_WEIGHT_BITS[0] },
         >(&self.hidden_0_weights, &x, &self.hidden_0_bias);
+        let x = crelu32(&x);
+        let x = mul_add::<
+            { HIDDEN_SIZES[1] },
+            { exact_div(HIDDEN_SIZES[1], 4) },
+            { exact_div(HIDDEN_SIZES[0], 16) },
+            { HIDDEN_WEIGHT_BITS[1] },
+        >(&self.hidden_1_weights, &x, &self.hidden_1_bias);
         let x = crelu32(&x);
         dot_product(&self.final_layer_weights, &x, self.final_layer_bias)
     }
