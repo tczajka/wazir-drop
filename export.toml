@@ -9,5 +9,5 @@ features = "WPS"
 [command.model.nnue.config]
 embedding_size = 128
 hidden_sizes = [16]
-hidden_weight_bits = 8
+hidden_weight_bits = [8]
 value_scale = 10000
