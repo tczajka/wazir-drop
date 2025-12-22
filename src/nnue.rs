@@ -128,7 +128,7 @@ impl Evaluator for Nnue {
             { HIDDEN_SIZES[0] },
             { exact_div(HIDDEN_SIZES[0], 4) },
             { 2 * exact_div(EMBEDDING_SIZE, 16) },
-            HIDDEN_WEIGHT_BITS,
+            { HIDDEN_WEIGHT_BITS[0] },
         >(&self.hidden_0_weights, &x, &self.hidden_0_bias);
         let x = crelu32(&x);
         dot_product(&self.final_layer_weights, &x, self.final_layer_bias)

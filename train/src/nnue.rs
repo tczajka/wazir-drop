@@ -18,7 +18,7 @@ use wazir_drop::{Features, base128::Base128Encoder};
 pub struct Config {
     embedding_size: i64,
     hidden_sizes: Vec<i64>,
-    hidden_weight_bits: u32,
+    hidden_weight_bits: Vec<u32>,
     value_scale: f64,
 }
 
@@ -36,7 +36,7 @@ pub struct NnueModel<F: Features> {
     embedding_bias: Tensor,
     hidden: Vec<nn::Linear>,
     final_layer: nn::Linear,
-    max_hidden_weight: f64,
+    max_hidden_weight: Vec<f64>,
     max_last_layer_weight: f64,
     activations: Vec<Tensor>,
 }
@@ -109,7 +109,11 @@ impl<F: Features> EvalModel for NnueModel<F> {
             },
         );
 
-        let max_hidden_weight = 127.0 / (1u32 << config.hidden_weight_bits) as f64;
+        let max_hidden_weight = config
+            .hidden_weight_bits
+            .iter()
+            .map(|&h| 127.0 / (1u32 << h) as f64)
+            .collect();
         let max_last_layer_weight = 127.0 * 127.0 / config.value_scale;
 
         Self {
@@ -161,10 +165,10 @@ impl<F: Features> EvalModel for NnueModel<F> {
             .embedding_weights
             .clamp_(-learn_config.max_embedding, learn_config.max_embedding);
 
-        for hidden in &mut self.hidden {
+        for (i, hidden) in self.hidden.iter_mut().enumerate() {
             _ = hidden
                 .ws
-                .clamp_(-self.max_hidden_weight, self.max_hidden_weight);
+                .clamp_(-self.max_hidden_weight[i], self.max_hidden_weight[i]);
         }
 
         _ = self
@@ -222,14 +226,18 @@ impl<F: Features> Export for NnueModel<F> {
         writeln!(f, "];")?;
         writeln!(
             f,
-            "pub const HIDDEN_WEIGHT_BITS: i32 = {};",
-            self.config.hidden_weight_bits
+            "pub const HIDDEN_WEIGHT_BITS: [i32; {}] = [",
+            self.config.hidden_weight_bits.len()
         )?;
+        for &bits in &self.config.hidden_weight_bits {
+            write!(f, "{bits}, ")?;
+        }
+        writeln!(f, "];")?;
         let mut encoder = Base128Encoder::new();
         self.encode_tensor(&mut encoder, &self.embedding_weights, 127.0);
         self.encode_tensor(&mut encoder, &self.embedding_bias, 127.0);
-        let weight_multiplier = f64::from(1u32 << self.config.hidden_weight_bits);
-        for hidden in &self.hidden {
+        for (i, hidden) in self.hidden.iter().enumerate() {
+            let weight_multiplier = f64::from(1u32 << self.config.hidden_weight_bits[i]);
             self.encode_tensor(&mut encoder, &hidden.ws, weight_multiplier);
             self.encode_tensor(
                 &mut encoder,
