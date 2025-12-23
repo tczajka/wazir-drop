@@ -646,8 +646,9 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         let position = eposition.position();
 
         // Fastest loss is at ply+2 if we are checkmated.
+        let immediately_checkmated = ScoreExpanded::Loss(position.ply() + 2).into();
         let mut result = SearchResultInternal {
-            score: ScoreExpanded::Loss(position.ply() + 2).into(),
+            score: immediately_checkmated,
             depth: Depth::MAX,
             pv: V::empty_truncated(),
             repetition_ply: Ply::MAX,
@@ -743,7 +744,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     let depth2 = depth.saturating_sub(depth_diff);
 
                     // Try null window.
-                    if node_type == NodeType::PV && cur_move_index != 0 {
+                    if beta > alpha2.next() {
                         let result2 = self.search_alpha_beta::<EmptyVariation>(
                             &epos2,
                             -alpha2.next(),
