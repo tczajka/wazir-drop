@@ -224,7 +224,7 @@ impl<F: Features> Export for NnueModel<F> {
             write!(f, "{size}, ")?;
         }
         writeln!(f, "];")?;
-        writeln!(
+        write!(
             f,
             "pub const HIDDEN_WEIGHT_BITS: [i32; {}] = [",
             self.config.hidden_weight_bits.len()
