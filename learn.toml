@@ -77,7 +77,7 @@ max_embedding = 1
 type = "learn"
 load_weights = "data/nnue6_128_16_64_p.weights"
 save_weights = "data/nnue6_128_16_64.weights"
-learning_rate = 1e-4
+learning_rate = 1e-5
 epochs = 5
 log_period_seconds = 60
 
