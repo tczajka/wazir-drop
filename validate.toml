@@ -2,7 +2,7 @@ log = "logs/validate.log"
 
 [[command]]
 type = "validate"
-weights = "data/nnue6_128_16_32.weights"
+weights = "data/nnue6_128_16_64.weights"
 graph_dir = "data"
 
 [command.dataset]
@@ -16,6 +16,6 @@ outcome_weight = 0.1
 
 [command.model.nnue.config]
 embedding_size = 128
-hidden_sizes = [16, 32]
-hidden_weight_bits = 6
+hidden_sizes = [16, 64]
+hidden_weight_bits = [8, 6]
 value_scale = 10000
