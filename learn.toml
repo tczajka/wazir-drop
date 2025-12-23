@@ -1,8 +1,8 @@
-log = "logs/learn6.log"
+log = "data/learn6a.log"
 
 [[command]]
 type = "learn"
-save_weights = "data/nnue6_128_16_p.weights"
+save_weights = "data/nnue6a_128_16_32_p.weights"
 learning_rate = 1e-4
 epochs = 3
 log_period_seconds = 60
@@ -16,17 +16,18 @@ outcome_weight = 0.1
 
 [command.model.nnue.config]
 embedding_size = 128
-hidden_sizes = [16]
-hidden_weight_bits = 8
+hidden_sizes = [16, 32]
+hidden_weight_bits = [8, 6]
 value_scale = 10000
 
 [command.model.nnue.learn]
 max_embedding = 1
 
+
 [[command]]
 type = "learn"
-load_weights = "data/nnue6_128_16_p.weights"
-save_weights = "data/nnue6_128_16.weights"
+load_weights = "data/nnue6a_128_16_32_p.weights"
+save_weights = "data/nnue6a_128_16_32.weights"
 learning_rate = 1e-5
 epochs = 5
 log_period_seconds = 60
@@ -40,9 +41,59 @@ outcome_weight = 0.1
 
 [command.model.nnue.config]
 embedding_size = 128
-hidden_sizes = [16]
-hidden_weight_bits = 8
+hidden_sizes = [16, 32]
+hidden_weight_bits = [8, 6]
 value_scale = 10000
 
 [command.model.nnue.learn]
 max_embedding = 1
+
+
+[[command]]
+type = "learn"
+save_weights = "data/nnue6_128_16_64_p.weights"
+learning_rate = 1e-4
+epochs = 3
+log_period_seconds = 60
+
+[command.dataset]
+file = "data/train6.data"
+features = "WPS"
+chunk_size = 4194304
+batch_size = 8192
+outcome_weight = 0.1
+
+[command.model.nnue.config]
+embedding_size = 128
+hidden_sizes = [16, 64]
+hidden_weight_bits = [8, 6]
+value_scale = 10000
+
+[command.model.nnue.learn]
+max_embedding = 1
+
+
+[[command]]
+type = "learn"
+load_weights = "data/nnue6_128_16_64_p.weights"
+save_weights = "data/nnue6_128_16_64.weights"
+learning_rate = 1e-4
+epochs = 5
+log_period_seconds = 60
+
+[command.dataset]
+file = "data/train6.data"
+features = "WPS"
+chunk_size = 4194304
+batch_size = 8192
+outcome_weight = 0.1
+
+[command.model.nnue.config]
+embedding_size = 128
+hidden_sizes = [16, 64]
+hidden_weight_bits = [8, 6]
+value_scale = 10000
+
+[command.model.nnue.learn]
+max_embedding = 1
+
