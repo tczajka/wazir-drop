@@ -335,7 +335,6 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         &mut self,
         eposition: &EvaluatedPosition<E>,
     ) -> Result<(), Timeout> {
-        let mut completed_depth;
         let panic_threshold = match ScoreExpanded::from(self.root_moves[0].score) {
             ScoreExpanded::Win(_) => Score::WIN_MAX_PLY,
             ScoreExpanded::Loss(_) => -Score::INFINITE,
@@ -344,36 +343,17 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             )
             .into(),
         };
-        // First move.
-        {
-            self.hard_deadline = self.deadlines.as_ref().map(|ds| ds.hard);
-            let next_depth = self.depth + DEPTH_INCREMENT;
-            let depth_diff = ONE_PLY;
-            let mov = self.root_moves[0].mov;
-            let epos2 = eposition.make_move(mov).unwrap();
-            self.history.push_position(epos2.position());
-            let result = self.search_alpha_beta::<LongVariation>(
-                &epos2,
-                -Score::INFINITE,
-                Score::INFINITE,
-                next_depth.saturating_sub(depth_diff),
-                NodeType::PV,
-            )?;
-            self.history.pop();
-            self.depth = next_depth;
-            self.pv = result.pv.add_front(mov);
-            self.root_moves[0].score = -result.score;
-            completed_depth = result.depth.saturating_add(depth_diff);
-            self.root_moves_considered = 1;
-            self.root_moves_exact_score = 1;
-        }
+        self.depth += DEPTH_INCREMENT;
+        self.root_moves_considered = 0;
+        self.root_moves_exact_score = 0;
+        let mut completed_depth = Depth::MAX;
 
-        // Other moves.
         while self.root_moves_considered < self.root_moves.len() {
             if let Some(ds) = self.deadlines.as_ref() {
-                let is_panic = self.root_moves[0].score < panic_threshold;
+                let is_panic =
+                    self.root_moves_considered != 0 && self.root_moves[0].score < panic_threshold;
                 let soft_deadline = if is_panic { ds.panic_soft } else { ds.soft };
-                if Instant::now() >= soft_deadline {
+                if self.root_moves_considered != 0 && Instant::now() >= soft_deadline {
                     log::info!("sto"); // soft timeout
                     return Err(Timeout);
                 }
@@ -387,16 +367,21 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             self.history.push_position(epos2.position());
 
             'consider_move: {
-                let alpha = match self.multi_move_threshold {
-                    Some(multi_move_threshold) => self.root_moves[0]
-                        .score
-                        .offset(-multi_move_threshold)
-                        .prev(),
-                    None => self.root_moves[0].score,
+                let alpha = if self.root_moves_considered == 0 {
+                    -Score::INFINITE
+                } else {
+                    match self.multi_move_threshold {
+                        Some(multi_move_threshold) => self.root_moves[0]
+                            .score
+                            .offset(-multi_move_threshold)
+                            .prev(),
+                        None => self.root_moves[0].score,
+                    }
                 };
 
                 // Late move reduction.
-                if self.root_moves_considered >= self.hyperparameters.late_move_reduction_start
+                if alpha != -Score::INFINITE
+                    && self.root_moves_considered >= self.hyperparameters.late_move_reduction_start
                     && self.root_moves[self.root_moves_considered].futile
                 {
                     let mut depth_diff = 2 * ONE_PLY;
@@ -413,8 +398,8 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                         NodeType::Cut,
                     )?;
                     let score = -result.score;
-                    self.root_moves[self.root_moves_considered].score = score;
                     if score <= alpha {
+                        self.root_moves[self.root_moves_considered].score = score;
                         completed_depth =
                             completed_depth.min(result.depth.saturating_add(depth_diff));
                         break 'consider_move;
@@ -424,19 +409,22 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 let depth_diff = ONE_PLY;
 
                 // Null window.
-                let result = self.search_alpha_beta::<EmptyVariation>(
-                    &epos2,
-                    -alpha.next(),
-                    -alpha,
-                    self.depth.saturating_sub(depth_diff),
-                    NodeType::Cut,
-                )?;
-                let score = -result.score;
-                self.root_moves[self.root_moves_considered].score = score;
+                if alpha != -Score::INFINITE {
+                    let result = self.search_alpha_beta::<EmptyVariation>(
+                        &epos2,
+                        -alpha.next(),
+                        -alpha,
+                        self.depth.saturating_sub(depth_diff),
+                        NodeType::Cut,
+                    )?;
+                    let score = -result.score;
 
-                if score <= alpha {
-                    completed_depth = completed_depth.min(result.depth.saturating_add(depth_diff));
-                    break 'consider_move;
+                    if score <= alpha {
+                        self.root_moves[self.root_moves_considered].score = score;
+                        completed_depth =
+                            completed_depth.min(result.depth.saturating_add(depth_diff));
+                        break 'consider_move;
+                    }
                 }
 
                 // Full window search.
@@ -1109,28 +1097,14 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         eposition: &EvaluatedPosition<E>,
     ) -> Result<(), Timeout> {
         // First move.
-        let next_depth = self.depth + DEPTH_INCREMENT;
-        let mov = self.root_moves_setup[0];
-        let epos2 = eposition.make_setup_move(mov).unwrap();
-        self.history.push_position_irreversible(epos2.position());
-        let result = self.search_alpha_beta::<LongVariation>(
-            &epos2,
-            -Score::INFINITE,
-            Score::INFINITE,
-            next_depth.saturating_sub(ONE_PLY),
-            NodeType::PV,
-        )?;
-        self.history.pop();
-        self.depth = next_depth;
-        self.pv = result.pv;
-        self.blue_setup_score = -result.score;
-        self.root_moves_considered = 1;
+        self.depth += DEPTH_INCREMENT;
+        self.root_moves_considered = 0;
 
         while self.root_moves_considered < self.root_moves_setup.len() {
             if let Some(ds) = self.deadlines.as_ref() {
-                if Instant::now() >= ds.soft {
+                if self.root_moves_considered != 0 && Instant::now() >= ds.soft {
                     log::info!("sto"); // next depth timeout
-                    break;
+                    return Err(Timeout);
                 }
             }
             let mov = self.root_moves_setup[self.root_moves_considered];
@@ -1138,10 +1112,15 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             self.history.push_position_irreversible(epos2.position());
 
             'consider_move: {
-                let alpha = self.blue_setup_score;
+                let alpha = if self.root_moves_considered == 0 {
+                    -Score::INFINITE
+                } else {
+                    self.blue_setup_score
+                };
                 // Late move reduction.
-                if self.root_moves_considered
-                    >= self.hyperparameters.blue_setup_late_move_reduction_start
+                if alpha != -Score::INFINITE
+                    && self.root_moves_considered
+                        >= self.hyperparameters.blue_setup_late_move_reduction_start
                 {
                     let mut depth_diff = 2 * ONE_PLY;
                     if self.root_moves_considered
@@ -1162,15 +1141,17 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 }
                 let depth_diff = ONE_PLY;
                 // Null window.
-                let result = self.search_alpha_beta::<EmptyVariation>(
-                    &epos2,
-                    -alpha.next(),
-                    -alpha,
-                    self.depth.saturating_sub(depth_diff),
-                    NodeType::Cut,
-                )?;
-                if -result.score <= alpha {
-                    break 'consider_move;
+                if alpha != -Score::INFINITE {
+                    let result = self.search_alpha_beta::<EmptyVariation>(
+                        &epos2,
+                        -alpha.next(),
+                        -alpha,
+                        self.depth.saturating_sub(depth_diff),
+                        NodeType::Cut,
+                    )?;
+                    if -result.score <= alpha {
+                        break 'consider_move;
+                    }
                 }
                 // Full window search.
                 let result = self.search_alpha_beta::<LongVariation>(
