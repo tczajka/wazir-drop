@@ -713,6 +713,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
 
                     // Try late move first.
                     if enable_late_move_reduction
+                        && alpha2 > immediately_checkmated
                         && cur_move_index >= self.hyperparameters.late_move_reduction_start
                     {
                         let mut depth_diff = 2 * ONE_PLY;
@@ -744,7 +745,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                     let depth2 = depth.saturating_sub(depth_diff);
 
                     // Try null window.
-                    if beta > alpha2.next() {
+                    if alpha2 > immediately_checkmated && beta > alpha2.next() {
                         let result2 = self.search_alpha_beta::<EmptyVariation>(
                             &epos2,
                             -alpha2.next(),
