@@ -17,8 +17,7 @@ fn test_evaluator<E: Evaluator>(evaluator: &E) {
             let mov = moverand::random_move(position.position(), &mut rng);
             position = position.make_any_move(mov).unwrap();
             let value = position.evaluate();
-            let fresh_value =
-                EvaluatedPosition::new(evaluator, position.position().clone()).evaluate();
+            let fresh_value = EvaluatedPosition::new(evaluator, *position.position()).evaluate();
             assert_eq!(value, fresh_value);
         }
     }
