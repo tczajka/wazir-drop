@@ -102,6 +102,9 @@ struct SearchInstance<'a, E: Evaluator> {
     history: History,
     blue_setup_score: Score,
     red_contempt: Eval,
+    panic_eval_threshold: Eval,
+    null_move_margin: Eval,
+    futility_margin: Eval,
 }
 
 impl<'a, E: Evaluator> SearchInstance<'a, E> {
@@ -140,6 +143,12 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             history: history.clone(),
             blue_setup_score: Score::DRAW,
             red_contempt,
+            panic_eval_threshold: (search.hyperparameters.panic_eval_threshold
+                * search.evaluator.scale()) as Eval,
+            null_move_margin: (search.hyperparameters.null_move_margin * search.evaluator.scale())
+                as Eval,
+            futility_margin: (search.hyperparameters.futility_margin * search.evaluator.scale())
+                as Eval,
         }
     }
 
@@ -338,10 +347,9 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         let panic_threshold = match ScoreExpanded::from(self.root_moves[0].score) {
             ScoreExpanded::Win(_) => Score::WIN_MAX_PLY,
             ScoreExpanded::Loss(_) => -Score::INFINITE,
-            ScoreExpanded::Eval(eval) => ScoreExpanded::Eval(
-                eval - (self.evaluator.scale() * self.hyperparameters.panic_eval_threshold) as Eval,
-            )
-            .into(),
+            ScoreExpanded::Eval(eval) => {
+                ScoreExpanded::Eval(eval - self.panic_eval_threshold).into()
+            }
         };
         self.depth += DEPTH_INCREMENT;
         self.root_moves_considered = 0;
@@ -802,11 +810,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                             if lazy_eval.is_none() {
                                 lazy_eval = Some(eposition.evaluate());
                             }
-                            lazy_eval.unwrap()
-                                >= beta_eval
-                                    + (self.hyperparameters.null_move_margin
-                                        * self.evaluator.scale())
-                                        as Eval
+                            lazy_eval.unwrap() >= beta_eval + self.null_move_margin
                         }
                     };
                     if !do_null_move {
@@ -842,10 +846,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                                 if lazy_eval.is_none() {
                                     lazy_eval = Some(eposition.evaluate());
                                 }
-                                let margin = (self.hyperparameters.futility_margin
-                                    * self.evaluator.scale())
-                                    as Eval;
-                                lazy_eval.unwrap() <= alpha_eval - margin
+                                lazy_eval.unwrap() <= alpha_eval - self.futility_margin
                             }
                         };
                         if futile {
