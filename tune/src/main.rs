@@ -162,6 +162,8 @@ fn from_hyperparameters(config: &Config, hyperparameters: &Hyperparameters) -> P
 }
 
 fn to_hyperparameters(config: &Config, parameters: &Parameters) -> Hyperparameters {
+    let mut parameters = *parameters;
+    clamp_parameters(&mut parameters, config);
     let unnormalized: [f64; NUM_PARAMETERS] =
         array::from_fn(|i| unnormalize(&config.parameter[i], parameters[i]));
     Hyperparameters {
@@ -226,6 +228,10 @@ fn run_batch(
     for gradient in &gradients {
         *parameters = add_parameters(parameters, &mul_parameters(learning_rate, gradient));
     }
+    clamp_parameters(&mut *parameters, config);
+}
+
+fn clamp_parameters(parameters: &mut Parameters, config: &Config) {
     for (i, p) in parameters.iter_mut().enumerate() {
         let c = &config.parameter[i];
         if let Some(min) = c.min {
