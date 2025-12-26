@@ -1,2 +1,61 @@
 log = "logs/tune.log"
 cpus = 30
+rounds = 1000
+batch = 100
+skip_rounds = 100
+initial_delta = 1.0
+initial_learning_rate = 0.001
+delta_exponent = 0.75
+learning_rate_exponent = 0.15
+time_limit_ms = 4000
+
+[[parameter]]
+name = "null_move_margin"
+transform = "identity"
+scale = 1
+
+[[parameter]]
+name = "futility_margin"
+transform = "identity"
+scale = 1
+
+[[parameter]]
+name = "time_reduction_per_move"
+transform = "exp"
+scale = 1
+max = 1
+
+[[parameter]]
+name = "time_reduction_per_late_move"
+transform = "exp"
+scale = 1
+max = 1
+
+[[parameter]]
+name = "soft_time_fraction"
+transform = "exp"
+scale = 1
+max = 1
+
+[[parameter]]
+name = "start_next_depth_fraction"
+transform = "exp"
+scale = 1
+max = 1
+
+[[parameter]]
+name = "panic_eval_threshold"
+transform = "exp"
+scale = 1
+
+[[parameter]]
+name = "panic_multiplier"
+transform = "exp"
+scale = 1
+min = 1
+
+[[parameter]]
+name = "panic_max_remaining"
+transform = "exp"
+scale = 1
+max = 1
