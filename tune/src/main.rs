@@ -100,7 +100,7 @@ fn run_tune(config: &Config) {
     let mut num_rounds = 0;
     let evaluator = Arc::new(DefaultEvaluator::default());
     let start_time = Instant::now();
-    log_parameters(&config, &parameters);
+    log_parameters(config, &parameters);
     while num_rounds < config.rounds {
         let next_num_rounds = (num_rounds + config.batch).min(config.rounds);
         // 1 = skip rounds
@@ -124,7 +124,7 @@ fn run_tune(config: &Config) {
             config_rounds = config.rounds,
             rounds_per_second = num_rounds as f64 / start_time.elapsed().as_secs_f64(),
         );
-        log_parameters(&config, &parameters);
+        log_parameters(config, &parameters);
     }
     log::info!("Results");
     for (i, &param) in parameters.iter().enumerate() {
