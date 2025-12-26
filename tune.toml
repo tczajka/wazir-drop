@@ -1,5 +1,5 @@
 log = "logs/tune.log"
-cpus = 30
+cpus = 31
 rounds = 125_000
 skip_rounds = 1000
 batch = 1000
