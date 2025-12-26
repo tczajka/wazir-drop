@@ -15,12 +15,12 @@ time_limit_ms = 4000
 [[parameter]]
 name = "null_move_margin"
 transform = "identity"
-scale = 1
+scale = 0.3
 
 [[parameter]]
 name = "futility_margin"
 transform = "identity"
-scale = 1
+scale = 0.3
 
 [[parameter]]
 name = "time_reduction_per_move"
