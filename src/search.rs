@@ -1082,7 +1082,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         &mut self,
         eposition: &EvaluatedPosition<E>,
     ) -> Result<(), Timeout> {
-        self.hard_deadline = self.deadlines.as_ref().map(|ds| ds.hard);
+        self.blue_setup_score = Score::DRAW;
         while self.depth < self.max_depth {
             if let Some(ds) = self.deadlines.as_ref() {
                 if Instant::now() >= ds.start_next_depth {
@@ -1099,16 +1099,29 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
         &mut self,
         eposition: &EvaluatedPosition<E>,
     ) -> Result<(), Timeout> {
+        let panic_threshold = match ScoreExpanded::from(self.blue_setup_score) {
+            ScoreExpanded::Win(_) => Score::WIN_MAX_PLY,
+            ScoreExpanded::Loss(_) => -Score::INFINITE,
+            ScoreExpanded::Eval(eval) => {
+                ScoreExpanded::Eval(eval - self.panic_eval_threshold).into()
+            }
+        };
         // First move.
         self.depth += DEPTH_INCREMENT;
         self.root_moves_considered = 0;
 
         while self.root_moves_considered < self.root_moves_setup.len() {
             if let Some(ds) = self.deadlines.as_ref() {
-                if self.root_moves_considered != 0 && Instant::now() >= ds.soft {
-                    log::info!("sto"); // next depth timeout
+                let is_panic =
+                    self.root_moves_considered != 0 && self.blue_setup_score < panic_threshold;
+                let soft_deadline = if is_panic { ds.panic_soft } else { ds.soft };
+                if self.root_moves_considered != 0 && Instant::now() >= soft_deadline {
+                    log::info!("sto"); // soft timeout
                     return Err(Timeout);
                 }
+                self.hard_deadline = Some(if is_panic { ds.panic_hard } else { ds.hard });
+            } else {
+                self.hard_deadline = None;
             }
             let mov = self.root_moves_setup[self.root_moves_considered];
             let epos2 = eposition.make_setup_move(mov).unwrap();
