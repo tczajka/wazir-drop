@@ -1,0 +1,16 @@
+[package]
+name = "tune"
+edition = "2024"
+
+[dependencies]
+wazir-drop = { path = ".." }
+
+clap = { version = "4.5.50", features = ["derive"] }
+log = "0.4.28"
+rayon = "1.11.0"
+serde = { version = "1.0.228", features = ["derive"] }
+simplelog = "0.12.2"
+toml = "0.9.8"
+
+[lints]
+workspace = true
