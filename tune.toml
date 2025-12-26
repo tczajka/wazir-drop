@@ -1,9 +1,9 @@
 log = "logs/tune.log"
 cpus = 30
-rounds = 10000
-batch = 500
-skip_rounds = 100
-initial_delta = 0.3
+rounds = 150_000
+skip_rounds = 1000
+batch = 1000
+initial_delta = 0.1
 initial_learning_rate = 0.001
 delta_exponent = 0.15
 learning_rate_exponent = 0.75

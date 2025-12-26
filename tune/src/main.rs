@@ -100,6 +100,7 @@ fn run_tune(config: &Config) {
     let mut num_rounds = 0;
     let evaluator = Arc::new(DefaultEvaluator::default());
     let start_time = Instant::now();
+    log_parameters(&config, &parameters);
     while num_rounds < config.rounds {
         let next_num_rounds = (num_rounds + config.batch).min(config.rounds);
         // 1 = skip rounds
@@ -118,18 +119,12 @@ fn run_tune(config: &Config) {
         );
         num_rounds = next_num_rounds;
 
-        let mut param_str = String::new();
-        for (i, &param) in parameters.iter().enumerate() {
-            let x = unnormalize(&config.parameter[i], param);
-            param_str.push_str(&format!("{x:.6}, "));
-        }
-
         log::info!(
             "Rounds: {num_rounds}/{config_rounds} rounds/s={rounds_per_second:.3}",
             config_rounds = config.rounds,
             rounds_per_second = num_rounds as f64 / start_time.elapsed().as_secs_f64(),
         );
-        log::info!("Parameters: {param_str}");
+        log_parameters(&config, &parameters);
     }
     log::info!("Results");
     for (i, &param) in parameters.iter().enumerate() {
@@ -137,6 +132,15 @@ fn run_tune(config: &Config) {
         let value = unnormalize(c, param);
         log::info!("{name}: {value:.6}", name = c.name, value = value);
     }
+}
+
+fn log_parameters(config: &Config, parameters: &Parameters) {
+    let mut param_str = String::new();
+    for (i, &param) in parameters.iter().enumerate() {
+        let x = unnormalize(&config.parameter[i], param);
+        param_str.push_str(&format!("{x:.6}, "));
+    }
+    log::info!("Parameters: {param_str}");
 }
 
 const NUM_PARAMETERS: usize = 9;
