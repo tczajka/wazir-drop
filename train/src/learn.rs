@@ -64,7 +64,10 @@ fn run_with_model<M: EvalModel>(
     model_learn_config: &M::LearnConfig,
 ) -> Result<(), Box<dyn Error>> {
     let device = Device::cuda_if_available();
-    log::info!("Learning using device: {device:?}");
+    log::info!(
+        "Learning file={filename} using device: {device:?}",
+        filename = config.save_weights.display()
+    );
     let mut vs = nn::VarStore::new(device);
     let mut model = M::new(features, vs.root(), model_config);
     if let Some(load_parameters) = &config.load_weights {
