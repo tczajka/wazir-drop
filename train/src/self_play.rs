@@ -49,8 +49,9 @@ fn run_games<F: Features>(config: &Config, features: F) -> Result<(), Box<dyn Er
     let stats = Arc::new(Mutex::new(Stats::new()));
     let start_time = Instant::now();
     log::info!(
-        "Starting self-play: games={num_games}",
-        num_games = config.num_games
+        "Starting self-play file={output} games={num_games}",
+        num_games = config.num_games,
+        output = config.output.display(),
     );
     loop {
         let cur_games = {
