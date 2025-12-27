@@ -25,7 +25,7 @@ pub const HISTORY_BLOOM_FILTER_LOG_SIZE: u32 = 14;
 pub const HISTORY_BLOOM_FILTER_NUM_HASHES: usize = 2;
 
 pub const RED_SETUP_INDEX_BEGIN: usize = 10;
-pub const RED_SETUP_INDEX_END: usize = 50;
+pub const RED_SETUP_INDEX_END: usize = 60;
 
 const _ASSERT_RED_SETUP_INDEX_VALID: () = assert!(
     RED_SETUP_INDEX_BEGIN < RED_SETUP_INDEX_END && RED_SETUP_INDEX_END < book_data::NUM_OPENINGS
