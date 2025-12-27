@@ -82,29 +82,30 @@ impl<E: Evaluator> Player for MainPlayer<E> {
                 Color::Blue => {
                     let red_setup = self.red_setup.expect("Red setup not found");
                     if let Some(mov) = book::blue_setup(red_setup) {
-                        return mov.into();
+                        mov.into()
+                    } else {
+                        let result = self.search.search_blue_setup(
+                            red_setup,
+                            None,
+                            Some(deadlines),
+                            &book::blue_setup_moves(),
+                        );
+                        let elapsed = time_left.saturating_sub(timer.get());
+                        log::info!(
+                            "d={depth} {root_moves_considered}/{root_all_moves} \
+                                    s={score} n={knodes}k kns={knps:.0} t={t}ms pv={setup} {pv}",
+                            depth = result.depth,
+                            root_moves_considered = result.root_moves_considered,
+                            root_all_moves = result.num_root_moves,
+                            score = result.score.to_relative(position.ply()),
+                            knodes = result.nodes / 1000,
+                            knps = result.nodes as f64 / elapsed.as_secs_f64() / 1000.0,
+                            setup = result.mov,
+                            t = elapsed.as_millis(),
+                            pv = result.pv,
+                        );
+                        result.mov.into()
                     }
-                    let result = self.search.search_blue_setup(
-                        red_setup,
-                        None,
-                        Some(deadlines),
-                        &book::blue_setup_moves(),
-                    );
-                    let elapsed = time_left.saturating_sub(timer.get());
-                    log::info!(
-                        "d={depth} {root_moves_considered}/{root_all_moves} \
-                                s={score} n={knodes}k kns={knps:.0} t={t}ms pv={setup} {pv}",
-                        depth = result.depth,
-                        root_moves_considered = result.root_moves_considered,
-                        root_all_moves = result.num_root_moves,
-                        score = result.score.to_relative(position.ply()),
-                        knodes = result.nodes / 1000,
-                        knps = result.nodes as f64 / elapsed.as_secs_f64() / 1000.0,
-                        setup = result.mov,
-                        t = elapsed.as_millis(),
-                        pv = result.pv,
-                    );
-                    result.mov.into()
                 }
             },
             Stage::Regular => {
