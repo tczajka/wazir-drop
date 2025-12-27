@@ -67,7 +67,10 @@ fn run_with_model<M: EvalModel>(
     model_config: &M::Config,
 ) -> Result<(), Box<dyn Error>> {
     let device = Device::cuda_if_available();
-    log::info!("Validating using device: {device:?}");
+    log::info!(
+        "Validating file={filename} using device: {device:?}",
+        filename = config.weights.display()
+    );
     let mut vs = nn::VarStore::new(device);
     let mut model = M::new(features, vs.root(), model_config);
     vs.load(&config.weights)?;
