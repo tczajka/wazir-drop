@@ -319,6 +319,20 @@ pub fn captures_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move>
     })
 }
 
+/// Must not be in check.
+/// Generates all captures that are not checks, and not suicides.
+pub fn captures_non_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
+    let wazir_square = position
+        .wazir_square(position.to_move().opposite())
+        .unwrap();
+    Piece::all_non_wazir()
+        .flat_map(move |piece| {
+            let to_mask = !move_bitboard(piece, wazir_square);
+            pseudocaptures_by_piece_masks(position, piece, Bitboard::ALL, to_mask)
+        })
+        .chain(captures_by_wazir(position))
+}
+
 /// Must not be in check. Generates all captures that are check threats.
 pub fn captures_check_threats<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     let opp = position.to_move().opposite();

@@ -957,8 +957,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             }
             moves = Either::Case1(
                 movegen::captures_checks(eposition.position())
-                    .chain(movegen::captures_check_threats(eposition.position()))
-                    .chain(movegen::captures_boring(eposition.position())),
+                    .chain(movegen::captures_non_checks(eposition.position())),
             );
         }
 
@@ -1022,8 +1021,7 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             .into_iter();
 
             let captures = movegen::captures_checks(position)
-                .chain(movegen::captures_check_threats(position))
-                .chain(movegen::captures_boring(position))
+                .chain(movegen::captures_non_checks(position))
                 .map(MoveCandidate::new);
 
             let futility = iter::once(MoveCandidate::Futility);

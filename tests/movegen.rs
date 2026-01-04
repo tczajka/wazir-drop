@@ -3,10 +3,10 @@ use std::str::FromStr;
 use wazir_drop::{
     movegen::{
         any_move_from_short_move, attacked_by, captures, captures_boring, captures_check_threats,
-        captures_checks, captures_of_wazir, check_evasions_capture_attacker, double_move_bitboard,
-        drops, drops_boring, drops_check_threats, drops_checks, in_check, jumps, jumps_boring,
-        jumps_check_threats, jumps_checks, move_bitboard, pseudocaptures, pseudojumps, setup_moves,
-        triple_move_bitboard, validate_from_to,
+        captures_checks, captures_non_checks, captures_of_wazir, check_evasions_capture_attacker,
+        double_move_bitboard, drops, drops_boring, drops_check_threats, drops_checks, in_check,
+        jumps, jumps_boring, jumps_check_threats, jumps_checks, move_bitboard, pseudocaptures,
+        pseudojumps, setup_moves, triple_move_bitboard, validate_from_to,
     },
     Color, Move, Piece, Position, ShortMove, Square,
 };
@@ -250,6 +250,11 @@ add.w..a
         .map(|mov| mov.to_string())
         .collect();
     assert_eq!(&moves, &["Ne6xag7"]);
+
+    let moves: Vec<String> = captures_non_checks(&position)
+        .map(|mov| mov.to_string())
+        .collect();
+    assert_eq!(&moves, &["Ab7xdd5", "Ac5xae7"]);
 
     let moves: Vec<String> = captures_check_threats(&position)
         .map(|mov| mov.to_string())
