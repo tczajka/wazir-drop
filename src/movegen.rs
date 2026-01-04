@@ -453,35 +453,36 @@ pub fn jumps<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
 
 /// Must not be in check. Generates all jumps that are checks and not suicides.
 pub fn jumps_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
-    let me = position.to_move();
-    let opp = me.opposite();
+    let opp = position.to_move().opposite();
     let wazir_square = position.wazir_square(opp).unwrap();
     Piece::all_non_wazir().flat_map(move |piece| {
-        let colored_piece = piece.with_color(me);
-        let from_bitboard =
-            double_move_bitboard(piece, wazir_square) & position.occupied_by_piece(colored_piece);
-        from_bitboard.into_iter().flat_map(move |from| {
-            let to_bitboard = move_bitboard(piece, from)
-                & move_bitboard(piece, wazir_square)
-                & position.empty_squares();
-            to_bitboard.into_iter().map(move |to| Move {
-                colored_piece,
-                from: Some(from),
-                captured: None,
-                to,
-            })
-        })
+        let from_mask = double_move_bitboard(piece, wazir_square);
+        let to_mask = move_bitboard(piece, wazir_square);
+        pseudojumps_by_piece_masks(position, piece, from_mask, to_mask)
     })
 }
 
-/// Must not be in check. Generates all jumps that are not checks and not suicides.
-pub fn jumps_non_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
-    let wazir_square = position
-        .wazir_square(position.to_move().opposite())
-        .unwrap();
+/// Must not be in check. Generates all jumps that are check threats and not suicides.
+pub fn jumps_check_threats<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
+    let opp = position.to_move().opposite();
+    let wazir_square = position.wazir_square(opp).unwrap();
+    Piece::all_non_wazir().flat_map(move |piece| {
+        let from_mask = triple_move_bitboard(piece, wazir_square);
+        let to_mask = double_move_bitboard(piece, wazir_square);
+        pseudojumps_by_piece_masks(position, piece, from_mask, to_mask)
+    })
+}
+
+/// Must not be in check.
+/// Generates all jumps that are not checks and not check threats and not suicides.
+pub fn jumps_boring<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
+    let opp = position.to_move().opposite();
+    let wazir_square = position.wazir_square(opp).unwrap();
     Piece::all_non_wazir()
         .flat_map(move |piece| {
-            pseudojumps_by_piece_to_mask(position, piece, !move_bitboard(piece, wazir_square))
+            let to_mask =
+                !(move_bitboard(piece, wazir_square) | double_move_bitboard(piece, wazir_square));
+            pseudojumps_by_piece_masks(position, piece, Bitboard::ALL, to_mask)
         })
         .chain(jumps_by_wazir(position))
 }
@@ -490,31 +491,30 @@ fn pseudojumps_by_piece<'a>(
     position: &'a Position,
     piece: Piece,
 ) -> impl Iterator<Item = Move> + 'a {
-    pseudojumps_by_piece_to_mask(position, piece, !Bitboard::EMPTY)
+    pseudojumps_by_piece_masks(position, piece, Bitboard::ALL, Bitboard::ALL)
 }
 
-fn pseudojumps_by_piece_to_mask<'a>(
+fn pseudojumps_by_piece_masks<'a>(
     position: &'a Position,
     piece: Piece,
+    from_mask: Bitboard,
     to_mask: Bitboard,
 ) -> impl Iterator<Item = Move> + 'a {
     assert!(position.stage() == Stage::Regular);
     let me = position.to_move();
-    let empty = position.empty_squares() & to_mask;
     let colored_piece = piece.with_color(me);
-    position
-        .occupied_by_piece(colored_piece)
-        .into_iter()
-        .flat_map(move |from| {
-            (move_bitboard(piece, from) & empty)
-                .into_iter()
-                .map(move |to| Move {
-                    colored_piece,
-                    from: Some(from),
-                    captured: None,
-                    to,
-                })
-        })
+    let from_mask = from_mask & position.occupied_by_piece(colored_piece);
+    let to_mask = to_mask & position.empty_squares();
+    from_mask.into_iter().flat_map(move |from| {
+        (move_bitboard(piece, from) & to_mask)
+            .into_iter()
+            .map(move |to| Move {
+                colored_piece,
+                from: Some(from),
+                captured: None,
+                to,
+            })
+    })
 }
 
 // Generates all Wazir jumps that are not suicides.

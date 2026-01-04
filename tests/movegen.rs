@@ -4,9 +4,9 @@ use wazir_drop::{
     movegen::{
         any_move_from_short_move, attacked_by, captures, captures_boring, captures_check_threats,
         captures_checks, captures_of_wazir, check_evasions_capture_attacker, double_move_bitboard,
-        drops, drops_checks, drops_non_checks, in_check, jumps, jumps_checks, jumps_non_checks,
-        move_bitboard, pseudocaptures, pseudojumps, setup_moves, triple_move_bitboard,
-        validate_from_to,
+        drops, drops_checks, drops_non_checks, in_check, jumps, jumps_boring, jumps_check_threats,
+        jumps_checks, move_bitboard, pseudocaptures, pseudojumps, setup_moves,
+        triple_move_bitboard, validate_from_to,
     },
     Color, Move, Piece, Position, ShortMove, Square,
 };
@@ -340,8 +340,8 @@ fn test_jumps() {
 regular
 4
 AAAAAAAAddFf
-.W...DD.
-..Ff....
+.W...D..
+..Ff..D.
 ......A.
 ........
 ...a..ad
@@ -356,9 +356,9 @@ add...wa
     assert_eq!(
         &moves,
         &[
-            "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Da7-a5", "Fb3-a4", "Fb3-c2",
-            "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-g5", "Nf7-h6", "Wa2-a1", "Wa2-a3",
-            "Wa2-b2",
+            "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Db7-b5", "Db7-d7", "Fb3-a4",
+            "Fb3-c2", "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-g5", "Nf7-h6", "Wa2-a1",
+            "Wa2-a3", "Wa2-b2",
         ]
     );
 
@@ -366,21 +366,25 @@ add...wa
     assert_eq!(
         &moves,
         &[
-            "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Da7-a5", "Fb3-a4", "Fb3-c2",
-            "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-g5", "Nf7-h6", "Wa2-a1", "Wa2-b2",
+            "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Db7-b5", "Db7-d7", "Fb3-a4",
+            "Fb3-c2", "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-g5", "Nf7-h6", "Wa2-a1",
+            "Wa2-b2",
         ]
     );
 
     let moves: Vec<String> = jumps_checks(&position).map(|mov| mov.to_string()).collect();
     assert_eq!(&moves, &["Nf7-g5"]);
 
-    let moves: Vec<String> = jumps_non_checks(&position)
+    let moves: Vec<String> = jumps_check_threats(&position)
         .map(|mov| mov.to_string())
         .collect();
+    assert_eq!(&moves, &["Db7-d7"]);
+
+    let moves: Vec<String> = jumps_boring(&position).map(|mov| mov.to_string()).collect();
     assert_eq!(
         &moves,
         &[
-            "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Da7-a5", "Fb3-a4", "Fb3-c2",
+            "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Db7-b5", "Fb3-a4", "Fb3-c2",
             "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-h6", "Wa2-a1", "Wa2-b2",
         ]
     );
