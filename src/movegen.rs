@@ -89,6 +89,44 @@ const fn calc_double_move_bitboard(piece: Piece, square: Square) -> Bitboard {
     bitboard
 }
 
+/// Includes single moves.
+pub fn triple_move_bitboard(piece: Piece, square: Square) -> Bitboard {
+    TRIPLE_MOVE_BITBOARD_TABLE[piece][square]
+}
+
+static TRIPLE_MOVE_BITBOARD_TABLE: EnumMap<Piece, EnumMap<Square, Bitboard>> = {
+    let mut table = [EnumMap::from_array([Bitboard::EMPTY; Square::COUNT]); Piece::COUNT];
+    let mut piece_idx = 0;
+    while piece_idx != Piece::COUNT {
+        table[piece_idx] = calc_triple_move_bitboard_table_for_piece(Piece::from_index(piece_idx));
+        piece_idx += 1;
+    }
+    EnumMap::from_array(table)
+};
+
+const fn calc_triple_move_bitboard_table_for_piece(piece: Piece) -> EnumMap<Square, Bitboard> {
+    let mut table = [Bitboard::EMPTY; Square::COUNT];
+    let mut square_idx = 0;
+    while square_idx != Square::COUNT {
+        table[square_idx] = calc_triple_move_bitboard(piece, Square::from_index(square_idx));
+        square_idx += 1;
+    }
+    EnumMap::from_array(table)
+}
+
+const fn calc_triple_move_bitboard(piece: Piece, square: Square) -> Bitboard {
+    let mut bitboard = Bitboard::EMPTY;
+    let directions = piece.directions();
+    let mut i = 0;
+    while i != directions.len() {
+        if let Some(square2) = square.add(directions[i]) {
+            bitboard = bitboard.union(calc_double_move_bitboard(piece, square2));
+        }
+        i += 1;
+    }
+    bitboard
+}
+
 pub fn any_move_from_short_move(
     position: &Position,
     short_move: ShortMove,
@@ -297,14 +335,45 @@ pub fn captures_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move>
     })
 }
 
-/// Must not be in check. Generates all captures that are not checks and not suicides.
-pub fn captures_non_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
+/// Must not be in check. Generates all captures that are check threats.
+pub fn captures_check_threats<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
+    let me = position.to_move();
+    let opp = me.opposite();
+    let wazir_square = position.wazir_square(opp).unwrap();
+    Piece::all_non_wazir().flat_map(move |piece| {
+        let colored_piece = piece.with_color(me);
+        let from_bitboard =
+            triple_move_bitboard(piece, wazir_square) & position.occupied_by_piece(colored_piece);
+        from_bitboard.into_iter().flat_map(move |from| {
+            let to_bitboard = move_bitboard(piece, from)
+                & double_move_bitboard(piece, wazir_square)
+                & position.occupied_by(opp);
+            to_bitboard.into_iter().map(move |to| {
+                let captured = position.square(to).unwrap();
+                assert_eq!(captured.color(), opp);
+                let captured = captured.piece();
+                Move {
+                    colored_piece,
+                    from: Some(from),
+                    captured: Some(captured),
+                    to,
+                }
+            })
+        })
+    })
+}
+
+/// Must not be in check.
+/// Generates all captures that are not checks, not check threats, and not suicides.
+pub fn captures_boring<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     let wazir_square = position
         .wazir_square(position.to_move().opposite())
         .unwrap();
     Piece::all_non_wazir()
         .flat_map(move |piece| {
-            pseudocaptures_by_piece_to_mask(position, piece, !move_bitboard(piece, wazir_square))
+            let to_mask =
+                !(move_bitboard(piece, wazir_square) | double_move_bitboard(piece, wazir_square));
+            pseudocaptures_by_piece_to_mask(position, piece, to_mask)
         })
         .chain(captures_by_wazir(position))
 }

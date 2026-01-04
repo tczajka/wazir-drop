@@ -2,10 +2,11 @@ use std::str::FromStr;
 
 use wazir_drop::{
     movegen::{
-        any_move_from_short_move, attacked_by, captures, captures_checks, captures_non_checks,
-        captures_of_wazir, check_evasions_capture_attacker, double_move_bitboard, drops,
-        drops_checks, drops_non_checks, in_check, jumps, jumps_checks, jumps_non_checks,
-        move_bitboard, pseudocaptures, pseudojumps, setup_moves, validate_from_to,
+        any_move_from_short_move, attacked_by, captures, captures_boring, captures_check_threats,
+        captures_checks, captures_of_wazir, check_evasions_capture_attacker, double_move_bitboard,
+        drops, drops_checks, drops_non_checks, in_check, jumps, jumps_checks, jumps_non_checks,
+        move_bitboard, pseudocaptures, pseudojumps, setup_moves, triple_move_bitboard,
+        validate_from_to,
     },
     Color, Move, Piece, Position, ShortMove, Square,
 };
@@ -117,6 +118,24 @@ x.x.x.x.
 }
 
 #[test]
+fn test_triple_move_bitboard() {
+    // From a corner.
+    assert_eq!(
+        triple_move_bitboard(Piece::Ferz, Square::E4).to_string(),
+        "\
+........
+x.x.x.x.
+........
+x.x.x.x.
+........
+x.x.x.x.
+........
+x.x.x.x.
+"
+    );
+}
+
+#[test]
 fn test_validate_from_to() {
     assert!(validate_from_to(Piece::Alfil, Square::D4, Square::F6).is_ok());
     assert!(validate_from_to(Piece::Alfil, Square::D4, Square::D5).is_err());
@@ -208,11 +227,11 @@ regular
 4
 AF
 .W.A.D.D
-AfFA.DDA
+AfFA.DAD
 f.A.A.A.
-......A.
+....d.A.
 ...a.Nad
-..d..n..
+.....n..
 a.a...a.
 add.w..a
 ",
@@ -222,17 +241,22 @@ add.w..a
     let moves: Vec<String> = pseudocaptures(&position)
         .map(|mov| mov.to_string())
         .collect();
-    assert_eq!(&moves, &["Ac5xae7", "Ne6xag7", "Wa2xfb2"]);
+    assert_eq!(&moves, &["Ab7xdd5", "Ac5xae7", "Ne6xag7", "Wa2xfb2"]);
 
     let moves: Vec<String> = captures(&position).map(|mov| mov.to_string()).collect();
-    assert_eq!(&moves, &["Ac5xae7", "Ne6xag7"]);
+    assert_eq!(&moves, &["Ab7xdd5", "Ac5xae7", "Ne6xag7"]);
 
     let moves: Vec<String> = captures_checks(&position)
         .map(|mov| mov.to_string())
         .collect();
     assert_eq!(&moves, &["Ne6xag7"]);
 
-    let moves: Vec<String> = captures_non_checks(&position)
+    let moves: Vec<String> = captures_check_threats(&position)
+        .map(|mov| mov.to_string())
+        .collect();
+    assert_eq!(&moves, &["Ab7xdd5"]);
+
+    let moves: Vec<String> = captures_boring(&position)
         .map(|mov| mov.to_string())
         .collect();
     assert_eq!(&moves, &["Ac5xae7"]);
