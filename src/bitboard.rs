@@ -9,6 +9,7 @@ pub struct Bitboard(u64);
 
 impl Bitboard {
     pub const EMPTY: Self = Self(0);
+    pub const ALL: Self = Self(!0);
 
     pub fn from_bits(bits: u64) -> Self {
         Self(bits)

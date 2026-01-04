@@ -313,53 +313,20 @@ pub fn captures_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move>
     let opp = me.opposite();
     let wazir_square = position.wazir_square(opp).unwrap();
     Piece::all_non_wazir().flat_map(move |piece| {
-        let colored_piece = piece.with_color(me);
-        let from_bitboard =
-            double_move_bitboard(piece, wazir_square) & position.occupied_by_piece(colored_piece);
-        from_bitboard.into_iter().flat_map(move |from| {
-            let to_bitboard = move_bitboard(piece, from)
-                & move_bitboard(piece, wazir_square)
-                & position.occupied_by(opp);
-            to_bitboard.into_iter().map(move |to| {
-                let captured = position.square(to).unwrap();
-                assert_eq!(captured.color(), opp);
-                let captured = captured.piece();
-                Move {
-                    colored_piece,
-                    from: Some(from),
-                    captured: Some(captured),
-                    to,
-                }
-            })
-        })
+        let from_mask = double_move_bitboard(piece, wazir_square);
+        let to_mask = move_bitboard(piece, wazir_square);
+        pseudocaptures_by_piece_masks(position, piece, from_mask, to_mask)
     })
 }
 
 /// Must not be in check. Generates all captures that are check threats.
 pub fn captures_check_threats<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
-    let me = position.to_move();
-    let opp = me.opposite();
+    let opp = position.to_move().opposite();
     let wazir_square = position.wazir_square(opp).unwrap();
     Piece::all_non_wazir().flat_map(move |piece| {
-        let colored_piece = piece.with_color(me);
-        let from_bitboard =
-            triple_move_bitboard(piece, wazir_square) & position.occupied_by_piece(colored_piece);
-        from_bitboard.into_iter().flat_map(move |from| {
-            let to_bitboard = move_bitboard(piece, from)
-                & double_move_bitboard(piece, wazir_square)
-                & position.occupied_by(opp);
-            to_bitboard.into_iter().map(move |to| {
-                let captured = position.square(to).unwrap();
-                assert_eq!(captured.color(), opp);
-                let captured = captured.piece();
-                Move {
-                    colored_piece,
-                    from: Some(from),
-                    captured: Some(captured),
-                    to,
-                }
-            })
-        })
+        let from_mask = triple_move_bitboard(piece, wazir_square);
+        let to_mask = double_move_bitboard(piece, wazir_square);
+        pseudocaptures_by_piece_masks(position, piece, from_mask, to_mask)
     })
 }
 
@@ -373,7 +340,7 @@ pub fn captures_boring<'a>(position: &'a Position) -> impl Iterator<Item = Move>
         .flat_map(move |piece| {
             let to_mask =
                 !(move_bitboard(piece, wazir_square) | double_move_bitboard(piece, wazir_square));
-            pseudocaptures_by_piece_to_mask(position, piece, to_mask)
+            pseudocaptures_by_piece_masks(position, piece, Bitboard::ALL, to_mask)
         })
         .chain(captures_by_wazir(position))
 }
@@ -389,32 +356,31 @@ fn pseudocaptures_by_piece<'a>(
     position: &'a Position,
     piece: Piece,
 ) -> impl Iterator<Item = Move> + 'a {
-    pseudocaptures_by_piece_to_mask(position, piece, !Bitboard::EMPTY)
+    pseudocaptures_by_piece_masks(position, piece, Bitboard::ALL, Bitboard::ALL)
 }
 
-fn pseudocaptures_by_piece_to_mask<'a>(
+fn pseudocaptures_by_piece_masks<'a>(
     position: &'a Position,
     piece: Piece,
+    from_mask: Bitboard,
     to_mask: Bitboard,
 ) -> impl Iterator<Item = Move> + 'a {
     assert!(position.stage() == Stage::Regular);
     let me = position.to_move();
     let opp = me.opposite();
-    let opp_mask = position.occupied_by(opp) & to_mask;
     let colored_piece = piece.with_color(me);
-    position
-        .occupied_by_piece(colored_piece)
-        .into_iter()
-        .flat_map(move |from| {
-            (move_bitboard(piece, from) & opp_mask)
-                .into_iter()
-                .map(move |to| Move {
-                    colored_piece,
-                    from: Some(from),
-                    captured: Some(position.square(to).unwrap().piece()),
-                    to,
-                })
-        })
+    let from_mask = from_mask & position.occupied_by_piece(colored_piece);
+    let to_mask = to_mask & position.occupied_by(opp);
+    from_mask.into_iter().flat_map(move |from| {
+        (move_bitboard(piece, from) & to_mask)
+            .into_iter()
+            .map(move |to| Move {
+                colored_piece,
+                from: Some(from),
+                captured: Some(position.square(to).unwrap().piece()),
+                to,
+            })
+    })
 }
 
 // Generates all captures of the wazir, i.e. final moves of the game.
