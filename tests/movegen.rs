@@ -4,8 +4,8 @@ use wazir_drop::{
     movegen::{
         any_move_from_short_move, attacked_by, captures, captures_boring, captures_check_threats,
         captures_checks, captures_of_wazir, check_evasions_capture_attacker, double_move_bitboard,
-        drops, drops_checks, drops_non_checks, in_check, jumps, jumps_boring, jumps_check_threats,
-        jumps_checks, move_bitboard, pseudocaptures, pseudojumps, setup_moves,
+        drops, drops_boring, drops_check_threats, drops_checks, in_check, jumps, jumps_boring,
+        jumps_check_threats, jumps_checks, move_bitboard, pseudocaptures, pseudojumps, setup_moves,
         triple_move_bitboard, validate_from_to,
     },
     Color, Move, Piece, Position, ShortMove, Square,
@@ -423,15 +423,18 @@ add..w.a
     let moves: Vec<String> = drops_checks(&position).map(|mov| mov.to_string()).collect();
     assert_eq!(&moves, &["A@f4", "A@f8"]);
 
-    let moves: Vec<String> = drops_non_checks(&position)
+    let moves: Vec<String> = drops_check_threats(&position)
         .map(|mov| mov.to_string())
         .collect();
+    assert_eq!(&moves, &["A@d2", "A@d6"]);
+
+    let moves: Vec<String> = drops_boring(&position).map(|mov| mov.to_string()).collect();
     assert_eq!(
         &moves,
         &[
-            "A@a3", "A@a5", "A@a7", "A@b5", "A@c1", "A@c2", "A@c4", "A@c6", "A@c8", "A@d1", "A@d2",
-            "A@d3", "A@d4", "A@d5", "A@d6", "A@d8", "A@e1", "A@e2", "A@e3", "A@e5", "A@e6", "A@f1",
-            "A@f2", "A@f5", "A@g2", "A@g4", "A@g5", "A@g6", "A@g8", "A@h4", "A@h5", "A@h7",
+            "A@a3", "A@a5", "A@a7", "A@b5", "A@c1", "A@c2", "A@c4", "A@c6", "A@c8", "A@d1", "A@d3",
+            "A@d4", "A@d5", "A@d8", "A@e1", "A@e2", "A@e3", "A@e5", "A@e6", "A@f1", "A@f2", "A@f5",
+            "A@g2", "A@g4", "A@g5", "A@g6", "A@g8", "A@h4", "A@h5", "A@h7",
         ]
     );
 }

@@ -365,7 +365,6 @@ fn pseudocaptures_by_piece_masks<'a>(
     from_mask: Bitboard,
     to_mask: Bitboard,
 ) -> impl Iterator<Item = Move> + 'a {
-    assert!(position.stage() == Stage::Regular);
     let me = position.to_move();
     let opp = me.opposite();
     let colored_piece = piece.with_color(me);
@@ -385,7 +384,6 @@ fn pseudocaptures_by_piece_masks<'a>(
 
 // Generates all captures of the wazir, i.e. final moves of the game.
 pub fn captures_of_wazir<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
-    assert!(position.stage() == Stage::Regular);
     let wazir_square = position
         .wazir_square(position.to_move().opposite())
         .unwrap();
@@ -397,7 +395,6 @@ pub fn captures_of_wazir<'a>(position: &'a Position) -> impl Iterator<Item = Mov
 pub fn check_evasions_capture_attacker<'a>(
     position: &'a Position,
 ) -> impl Iterator<Item = Move> + 'a {
-    assert!(position.stage() == Stage::Regular);
     let me = position.to_move();
     let opp = me.opposite();
     let wazir_square = position.wazir_square(me).unwrap();
@@ -527,7 +524,6 @@ pub fn jumps_by_wazir<'a>(position: &'a Position) -> impl Iterator<Item = Move> 
 /// Piece drops.
 /// If in check, these are non-escapes.
 pub fn drops<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
-    assert!(position.stage() == Stage::Regular);
     Piece::all_non_wazir()
         .flat_map(move |piece| drops_piece_to_mask(position, piece, !Bitboard::EMPTY))
 }
@@ -535,7 +531,6 @@ pub fn drops<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
 /// Piece drops that are checks.
 /// If in check, these are non-escapes.
 pub fn drops_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
-    assert!(position.stage() == Stage::Regular);
     let wazir_square = position
         .wazir_square(position.to_move().opposite())
         .unwrap();
@@ -544,15 +539,27 @@ pub fn drops_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 
     })
 }
 
-/// Piece drops that are not checks.
+/// Piece drops that are checks.
 /// If in check, these are non-escapes.
-pub fn drops_non_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
-    assert!(position.stage() == Stage::Regular);
+pub fn drops_check_threats<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     let wazir_square = position
         .wazir_square(position.to_move().opposite())
         .unwrap();
     Piece::all_non_wazir().flat_map(move |piece| {
-        drops_piece_to_mask(position, piece, !move_bitboard(piece, wazir_square))
+        drops_piece_to_mask(position, piece, double_move_bitboard(piece, wazir_square))
+    })
+}
+
+/// Piece drops that are not checks and not check threats.
+/// If in check, these are non-escapes.
+pub fn drops_boring<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
+    let wazir_square = position
+        .wazir_square(position.to_move().opposite())
+        .unwrap();
+    Piece::all_non_wazir().flat_map(move |piece| {
+        let to_mask =
+            !(move_bitboard(piece, wazir_square) | double_move_bitboard(piece, wazir_square));
+        drops_piece_to_mask(position, piece, to_mask)
     })
 }
 

@@ -1046,8 +1046,9 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 .map(MoveCandidate::new);
 
             let quiet_moves = movegen::jumps_check_threats(position)
+                .chain(movegen::drops_check_threats(position))
                 .chain(movegen::jumps_boring(position))
-                .chain(movegen::drops_non_checks(position))
+                .chain(movegen::drops_boring(position))
                 .map(MoveCandidate::new);
 
             Either::Case1(
