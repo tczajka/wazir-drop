@@ -2,11 +2,11 @@ log = "logs/validate.log"
 
 [[command]]
 type = "validate"
-weights = "data/nnue6_128_32_32.weights"
+weights = "data/nnue7_128_16_32b.weights"
 graph_dir = "data"
 
 [command.dataset]
-file = "data/test6.data"
+file = "data/test7.data"
 features = "WPS"
 chunk_size = 4194304
 batch_size = 8192
@@ -16,6 +16,6 @@ outcome_weight = 0.1
 
 [command.model.nnue.config]
 embedding_size = 128
-hidden_sizes = [32, 32]
+hidden_sizes = [16, 32]
 hidden_weight_bits = [8, 6]
 value_scale = 10000

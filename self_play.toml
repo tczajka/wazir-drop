@@ -2,7 +2,7 @@ log = "data/self_play_7_9.log"
 
 [[command]]
 type = "self_play"
-output = "data/train7_9.data"
+output = "data/x.data"
 num_cpus = 60
 num_games = 10_000_000
 batch_size = 10_000
@@ -13,18 +13,3 @@ extra_depth = 400
 temperature = 0.03
 temperature_cutoff = 0.06
 features = "WPS"
-
-[[command]]
-type = "self_play"
-output = "data/test7.data"
-num_cpus = 60
-num_games = 2_000_000
-batch_size = 10_000
-ttable_size_mb = 16
-pvtable_size_mb = 4
-depth = 400
-extra_depth = 400
-temperature = 0.03
-temperature_cutoff = 0.06
-features = "WPS"
-
