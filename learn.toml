@@ -1,11 +1,34 @@
-log = "data/learn7.log"
+log = "data/learn7a.log"
 
 [[command]]
 type = "learn"
-load_weights = "data/nnue7_128_16_32b.weights"
-save_weights = "data/nnue7_128_16_32c.weights"
+save_weights = "data/nnue7a_128_16_32a.weights"
+learning_rate = 1e-4
+epochs = 6
+log_period_seconds = 60
+
+[command.dataset]
+file = "data/train7.data"
+features = "WPS"
+chunk_size = 4194304
+batch_size = 8192
+outcome_weight = 0.1
+
+[command.model.nnue.config]
+embedding_size = 128
+hidden_sizes = [16, 32]
+hidden_weight_bits = [8, 6]
+value_scale = 10000
+
+[command.model.nnue.learn]
+max_embedding = 1
+
+[[command]]
+type = "learn"
+load_weights = "data/nnue7a_128_16_32a.weights"
+save_weights = "data/nnue7a_128_16_32b.weights"
 learning_rate = 1e-5
-epochs = 3
+epochs = 6
 log_period_seconds = 60
 
 [command.dataset]

@@ -70,7 +70,7 @@ impl<F: Features> EvalModel for NnueModel<F> {
             },
         );
         let embedding_bias =
-            embedding_path.var("bias", &[config.embedding_size], nn::Init::Const(0.0));
+            embedding_path.var("bias", &[config.embedding_size], nn::Init::Const(0.5));
 
         let mut last_size = 2 * config.embedding_size;
 
@@ -86,7 +86,7 @@ impl<F: Features> EvalModel for NnueModel<F> {
                         lo: -limit,
                         up: limit,
                     },
-                    bs_init: Some(nn::Init::Const(0.0)),
+                    bs_init: Some(nn::Init::Const(0.5)),
                     bias: true,
                 },
             );
