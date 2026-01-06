@@ -59,7 +59,7 @@ impl<F: Features> EvalModel for NnueModel<F> {
     type LearnConfig = LearnConfig;
 
     fn new(features: F, vs: nn::Path, config: &Config) -> Self {
-        let limit = (2.0 / features.approximate_avg_set()).sqrt();
+        let limit = (1.0 / features.approximate_avg_set()).sqrt();
         let embedding_path = &vs / "embedding";
         let embedding_weights = embedding_path.var(
             "weights",
@@ -70,7 +70,7 @@ impl<F: Features> EvalModel for NnueModel<F> {
             },
         );
         let embedding_bias =
-            embedding_path.var("bias", &[config.embedding_size], nn::Init::Const(0.5));
+            embedding_path.var("bias", &[config.embedding_size], nn::Init::Const(0.1));
 
         let mut last_size = 2 * config.embedding_size;
 
@@ -86,7 +86,7 @@ impl<F: Features> EvalModel for NnueModel<F> {
                         lo: -limit,
                         up: limit,
                     },
-                    bs_init: Some(nn::Init::Const(0.5)),
+                    bs_init: Some(nn::Init::Const(0.1)),
                     bias: true,
                 },
             );

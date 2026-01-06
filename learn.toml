@@ -3,7 +3,7 @@ log = "data/learn7a.log"
 [[command]]
 type = "learn"
 save_weights = "data/nnue7a_128_16_32a.weights"
-learning_rate = 1e-4
+learning_rate = 5e-5
 epochs = 6
 log_period_seconds = 60
 
