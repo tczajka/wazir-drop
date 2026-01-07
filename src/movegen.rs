@@ -322,32 +322,6 @@ pub fn captures_non_checks<'a>(position: &'a Position) -> impl Iterator<Item = M
         .chain(captures_by_wazir(position))
 }
 
-/// Must not be in check. Generates all captures that are check threats.
-pub fn captures_check_threats<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
-    let opp = position.to_move().opposite();
-    let wazir_square = position.wazir_square(opp).unwrap();
-    Piece::all_non_wazir().flat_map(move |piece| {
-        let from_mask = triple_move_bitboard(piece, wazir_square);
-        let to_mask = double_move_bitboard(piece, wazir_square);
-        pseudocaptures_by_piece_masks(position, piece, from_mask, to_mask)
-    })
-}
-
-/// Must not be in check.
-/// Generates all captures that are not checks, not check threats, and not suicides.
-pub fn captures_boring<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
-    let wazir_square = position
-        .wazir_square(position.to_move().opposite())
-        .unwrap();
-    Piece::all_non_wazir()
-        .flat_map(move |piece| {
-            let to_mask =
-                !(move_bitboard(piece, wazir_square) | double_move_bitboard(piece, wazir_square));
-            pseudocaptures_by_piece_masks(position, piece, Bitboard::ALL, to_mask)
-        })
-        .chain(captures_by_wazir(position))
-}
-
 /// Generates all captures by the wazir.
 pub fn captures_by_wazir<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     let opp = position.to_move().opposite();
@@ -451,7 +425,7 @@ pub fn jumps<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
         .chain(jumps_by_wazir(position))
 }
 
-/// Must not be in check. Generates all jumps that are checks and not suicides.
+/// Must not be in check. Generates all jump checks.
 pub fn jumps_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     let opp = position.to_move().opposite();
     let wazir_square = position.wazir_square(opp).unwrap();
@@ -462,7 +436,7 @@ pub fn jumps_checks<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 
     })
 }
 
-/// Must not be in check. Generates all jumps that are check threats and not suicides.
+/// Must not be in check. Generates all jump check threats.
 pub fn jumps_check_threats<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     let opp = position.to_move().opposite();
     let wazir_square = position.wazir_square(opp).unwrap();
@@ -473,15 +447,27 @@ pub fn jumps_check_threats<'a>(position: &'a Position) -> impl Iterator<Item = M
     })
 }
 
+/// Must not be in check. Generates all non-Wazir jumps that attack an escape square.
+pub fn jumps_attack_escape<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
+    let opp = position.to_move().opposite();
+    let wazir_square = position.wazir_square(opp).unwrap();
+    Piece::all_non_wazir().flat_map(move |piece| {
+        let from_mask = wazir_plus_double_move_bitboard(piece, wazir_square);
+        let to_mask = wazir_plus_move_bitboard(piece, wazir_square);
+        pseudojumps_by_piece_masks(position, piece, from_mask, to_mask)
+    })
+}
+
 /// Must not be in check.
-/// Generates all jumps that are not checks and not check threats and not suicides.
+/// Generates all jumps that are not checks, not check threats, don't attack an escape square, and are not suicides.
 pub fn jumps_boring<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     let opp = position.to_move().opposite();
     let wazir_square = position.wazir_square(opp).unwrap();
     Piece::all_non_wazir()
         .flat_map(move |piece| {
-            let to_mask =
-                !(move_bitboard(piece, wazir_square) | double_move_bitboard(piece, wazir_square));
+            let to_mask = !(move_bitboard(piece, wazir_square)
+                | double_move_bitboard(piece, wazir_square)
+                | wazir_plus_move_bitboard(piece, wazir_square));
             pseudojumps_by_piece_masks(position, piece, Bitboard::ALL, to_mask)
         })
         .chain(jumps_by_wazir(position))
@@ -553,15 +539,29 @@ pub fn drops_check_threats<'a>(position: &'a Position) -> impl Iterator<Item = M
     })
 }
 
-/// Piece drops that are not checks and not check threats.
+/// Piece drops that attack an escape square.
+pub fn drops_attack_escape<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
+    let opp = position.to_move().opposite();
+    let wazir_square = position.wazir_square(opp).unwrap();
+    Piece::all_non_wazir().flat_map(move |piece| {
+        drops_piece_to_mask(
+            position,
+            piece,
+            wazir_plus_move_bitboard(piece, wazir_square),
+        )
+    })
+}
+
+/// Piece drops that are not checks, not check threats and don't attack an escape square.
 /// If in check, these are non-escapes.
 pub fn drops_boring<'a>(position: &'a Position) -> impl Iterator<Item = Move> + 'a {
     let wazir_square = position
         .wazir_square(position.to_move().opposite())
         .unwrap();
     Piece::all_non_wazir().flat_map(move |piece| {
-        let to_mask =
-            !(move_bitboard(piece, wazir_square) | double_move_bitboard(piece, wazir_square));
+        let to_mask = !(move_bitboard(piece, wazir_square)
+            | double_move_bitboard(piece, wazir_square)
+            | wazir_plus_move_bitboard(piece, wazir_square));
         drops_piece_to_mask(position, piece, to_mask)
     })
 }
