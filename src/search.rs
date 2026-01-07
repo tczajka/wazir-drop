@@ -1039,12 +1039,12 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
             .into_iter()
             .flatten();
 
-            let checks = movegen::jumps_checks(position)
-                .chain(movegen::drops_checks(position))
+            let checks = movegen::drops_checks(position)
+                .chain(movegen::jumps_checks(position))
                 .map(MoveCandidate::new);
 
-            let quiet_moves = movegen::jumps_check_threats(position)
-                .chain(movegen::drops_check_threats(position))
+            let quiet_moves = movegen::drops_check_threats(position)
+                .chain(movegen::jumps_check_threats(position))
                 .chain(movegen::jumps_boring(position))
                 .chain(movegen::drops_boring(position))
                 .map(MoveCandidate::new);
