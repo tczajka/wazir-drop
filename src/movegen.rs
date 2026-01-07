@@ -1,14 +1,21 @@
 use crate::{
-    either::Either,
-    enums::{EnumMap, SimpleEnumExt},
-    smallvec::SmallVec,
-    AnyMove, Bitboard, Color, InvalidMove, Move, Piece, Position, SetupMove, ShortMove,
-    ShortMoveFrom, Square, Stage,
+    either::Either, enums::SimpleEnumExt, smallvec::SmallVec, AnyMove, Bitboard, Color,
+    InvalidMove, Move, Piece, Position, SetupMove, ShortMove, ShortMoveFrom, Square, Stage,
 };
 use std::iter;
 
 pub fn move_bitboard(piece: Piece, square: Square) -> Bitboard {
-    MOVE_BITBOARD_TABLE[piece][square]
+    MOVE_BITBOARD_TABLE[piece.index()][square.index()]
+}
+
+/// Includes going back to the same square.
+pub fn double_move_bitboard(piece: Piece, square: Square) -> Bitboard {
+    DOUBLE_MOVE_BITBOARD_TABLE[piece.index()][square.index()]
+}
+
+/// Includes single moves.
+pub fn triple_move_bitboard(piece: Piece, square: Square) -> Bitboard {
+    TRIPLE_MOVE_BITBOARD_TABLE[piece.index()][square.index()]
 }
 
 pub fn validate_from_to(piece: Piece, from: Square, to: Square) -> Result<(), InvalidMove> {
@@ -18,114 +25,67 @@ pub fn validate_from_to(piece: Piece, from: Square, to: Square) -> Result<(), In
     Ok(())
 }
 
-static MOVE_BITBOARD_TABLE: EnumMap<Piece, EnumMap<Square, Bitboard>> = {
-    let mut table = [EnumMap::from_array([Bitboard::EMPTY; Square::COUNT]); Piece::COUNT];
-    let mut piece_idx = 0;
-    while piece_idx != Piece::COUNT {
-        table[piece_idx] = calc_move_bitboard_table_for_piece(Piece::from_index(piece_idx));
-        piece_idx += 1;
-    }
-    EnumMap::from_array(table)
-};
-
-const fn calc_move_bitboard_table_for_piece(piece: Piece) -> EnumMap<Square, Bitboard> {
+const CONST_NO_MOVE_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] = {
     let mut table = [Bitboard::EMPTY; Square::COUNT];
     let mut square_idx = 0;
     while square_idx != Square::COUNT {
-        table[square_idx] = calc_move_bitboard(piece, Square::from_index(square_idx));
+        table[square_idx] = Bitboard::single(Square::from_index(square_idx));
         square_idx += 1;
     }
-    EnumMap::from_array(table)
-}
-
-const fn calc_move_bitboard(piece: Piece, square: Square) -> Bitboard {
-    let mut bitboard = Bitboard::EMPTY;
-    let directions = piece.directions();
-    let mut i = 0;
-    while i != directions.len() {
-        if let Some(square2) = square.add(directions[i]) {
-            bitboard = bitboard.with_square(square2);
-        }
-        i += 1;
-    }
-    bitboard
-}
-
-/// Includes going back to the same square.
-pub fn double_move_bitboard(piece: Piece, square: Square) -> Bitboard {
-    DOUBLE_MOVE_BITBOARD_TABLE[piece][square]
-}
-
-static DOUBLE_MOVE_BITBOARD_TABLE: EnumMap<Piece, EnumMap<Square, Bitboard>> = {
-    let mut table = [EnumMap::from_array([Bitboard::EMPTY; Square::COUNT]); Piece::COUNT];
-    let mut piece_idx = 0;
-    while piece_idx != Piece::COUNT {
-        table[piece_idx] = calc_double_move_bitboard_table_for_piece(Piece::from_index(piece_idx));
-        piece_idx += 1;
-    }
-    EnumMap::from_array(table)
+    [table; Piece::COUNT]
 };
 
-const fn calc_double_move_bitboard_table_for_piece(piece: Piece) -> EnumMap<Square, Bitboard> {
-    let mut table = [Bitboard::EMPTY; Square::COUNT];
+const fn apply_move_by_piece(
+    table: [Bitboard; Square::COUNT],
+    piece: Piece,
+) -> [Bitboard; Square::COUNT] {
+    let mut new_table = [Bitboard::EMPTY; Square::COUNT];
+    let directions = piece.directions();
     let mut square_idx = 0;
     while square_idx != Square::COUNT {
-        table[square_idx] = calc_double_move_bitboard(piece, Square::from_index(square_idx));
+        let square = Square::from_index(square_idx);
+        let mut bitboard = Bitboard::EMPTY;
+        let mut i = 0;
+        while i != directions.len() {
+            if let Some(square2) = square.add(directions[i]) {
+                bitboard = bitboard.union(table[square2.index()]);
+            }
+            i += 1;
+        }
+        new_table[square_idx] = bitboard;
         square_idx += 1;
     }
-    EnumMap::from_array(table)
+    new_table
 }
 
-const fn calc_double_move_bitboard(piece: Piece, square: Square) -> Bitboard {
-    let mut bitboard = Bitboard::EMPTY;
-    let directions = piece.directions();
-    let mut i = 0;
-    while i != directions.len() {
-        if let Some(square2) = square.add(directions[i]) {
-            bitboard = bitboard.union(calc_move_bitboard(piece, square2));
-        }
-        i += 1;
-    }
-    bitboard
-}
-
-/// Includes single moves.
-pub fn triple_move_bitboard(piece: Piece, square: Square) -> Bitboard {
-    TRIPLE_MOVE_BITBOARD_TABLE[piece][square]
-}
-
-static TRIPLE_MOVE_BITBOARD_TABLE: EnumMap<Piece, EnumMap<Square, Bitboard>> = {
-    let mut table = [EnumMap::from_array([Bitboard::EMPTY; Square::COUNT]); Piece::COUNT];
+const fn apply_move(
+    table: [[Bitboard; Square::COUNT]; Piece::COUNT],
+) -> [[Bitboard; Square::COUNT]; Piece::COUNT] {
+    let mut new_table = [[Bitboard::EMPTY; Square::COUNT]; Piece::COUNT];
     let mut piece_idx = 0;
     while piece_idx != Piece::COUNT {
-        table[piece_idx] = calc_triple_move_bitboard_table_for_piece(Piece::from_index(piece_idx));
+        new_table[piece_idx] = apply_move_by_piece(table[piece_idx], Piece::from_index(piece_idx));
         piece_idx += 1;
     }
-    EnumMap::from_array(table)
-};
-
-const fn calc_triple_move_bitboard_table_for_piece(piece: Piece) -> EnumMap<Square, Bitboard> {
-    let mut table = [Bitboard::EMPTY; Square::COUNT];
-    let mut square_idx = 0;
-    while square_idx != Square::COUNT {
-        table[square_idx] = calc_triple_move_bitboard(piece, Square::from_index(square_idx));
-        square_idx += 1;
-    }
-    EnumMap::from_array(table)
+    new_table
 }
 
-const fn calc_triple_move_bitboard(piece: Piece, square: Square) -> Bitboard {
-    let mut bitboard = Bitboard::EMPTY;
-    let directions = piece.directions();
-    let mut i = 0;
-    while i != directions.len() {
-        if let Some(square2) = square.add(directions[i]) {
-            bitboard = bitboard.union(calc_double_move_bitboard(piece, square2));
-        }
-        i += 1;
-    }
-    bitboard
-}
+const CONST_MOVE_BITBOARD_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
+    apply_move(CONST_NO_MOVE_TABLE);
+
+const CONST_DOUBLE_MOVE_BITBOARD_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
+    apply_move(CONST_MOVE_BITBOARD_TABLE);
+
+const CONST_TRIPLE_MOVE_BITBOARD_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
+    apply_move(CONST_DOUBLE_MOVE_BITBOARD_TABLE);
+
+static MOVE_BITBOARD_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] = CONST_MOVE_BITBOARD_TABLE;
+
+static DOUBLE_MOVE_BITBOARD_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
+    CONST_DOUBLE_MOVE_BITBOARD_TABLE;
+
+static TRIPLE_MOVE_BITBOARD_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
+    CONST_TRIPLE_MOVE_BITBOARD_TABLE;
 
 pub fn any_move_from_short_move(
     position: &Position,
