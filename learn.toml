@@ -1,4 +1,4 @@
-log = "data/learn7a.log"
+log = "data/learn7b.log"
 
 [[command]]
 type = "learn"
