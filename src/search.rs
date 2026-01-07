@@ -1044,7 +1044,9 @@ impl<'a, E: Evaluator> SearchInstance<'a, E> {
                 .map(MoveCandidate::new);
 
             let quiet_moves = movegen::drops_check_threats(position)
+                .chain(movegen::drops_attack_escape(position))
                 .chain(movegen::jumps_check_threats(position))
+                .chain(movegen::jumps_attack_escape(position))
                 .chain(movegen::jumps_boring(position))
                 .chain(movegen::drops_boring(position))
                 .map(MoveCandidate::new);

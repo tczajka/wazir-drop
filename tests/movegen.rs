@@ -2,11 +2,12 @@ use std::str::FromStr;
 
 use wazir_drop::{
     movegen::{
-        any_move_from_short_move, attacked_by, captures, captures_boring, captures_check_threats,
-        captures_checks, captures_non_checks, captures_of_wazir, check_evasions_capture_attacker,
-        double_move_bitboard, drops, drops_boring, drops_check_threats, drops_checks, in_check,
-        jumps, jumps_boring, jumps_check_threats, jumps_checks, move_bitboard, pseudocaptures,
-        pseudojumps, setup_moves, triple_move_bitboard, validate_from_to,
+        any_move_from_short_move, attacked_by, captures, captures_checks, captures_non_checks,
+        captures_of_wazir, check_evasions_capture_attacker, double_move_bitboard, drops,
+        drops_attack_escape, drops_boring, drops_check_threats, drops_checks, in_check, jumps,
+        jumps_attack_escape, jumps_boring, jumps_check_threats, jumps_checks, move_bitboard,
+        pseudocaptures, pseudojumps, setup_moves, triple_move_bitboard, validate_from_to,
+        wazir_plus_double_move_bitboard, wazir_plus_move_bitboard,
     },
     Color, Move, Piece, Position, ShortMove, Square,
 };
@@ -136,6 +137,40 @@ x.x.x.x.
 }
 
 #[test]
+fn test_wazir_plus_move_bitboard() {
+    assert_eq!(
+        wazir_plus_move_bitboard(Piece::Alfil, Square::A5).to_string(),
+        "\
+........
+........
+.x.x.x.x
+..x...x.
+........
+........
+........
+........
+"
+    );
+}
+
+#[test]
+fn test_wazir_plus_double_move_bitboard() {
+    assert_eq!(
+        wazir_plus_double_move_bitboard(Piece::Alfil, Square::A5).to_string(),
+        "\
+.x.x.x.x
+x...x...
+........
+........
+.x.x.x.x
+x...x...
+........
+........
+"
+    );
+}
+
+#[test]
 fn test_validate_from_to() {
     assert!(validate_from_to(Piece::Alfil, Square::D4, Square::F6).is_ok());
     assert!(validate_from_to(Piece::Alfil, Square::D4, Square::D5).is_err());
@@ -255,16 +290,6 @@ add.w..a
         .map(|mov| mov.to_string())
         .collect();
     assert_eq!(&moves, &["Ab7xdd5", "Ac5xae7"]);
-
-    let moves: Vec<String> = captures_check_threats(&position)
-        .map(|mov| mov.to_string())
-        .collect();
-    assert_eq!(&moves, &["Ab7xdd5"]);
-
-    let moves: Vec<String> = captures_boring(&position)
-        .map(|mov| mov.to_string())
-        .collect();
-    assert_eq!(&moves, &["Ac5xae7"]);
 }
 
 #[test]
@@ -345,10 +370,10 @@ fn test_jumps() {
 regular
 4
 AAAAAAAAddFf
-.W...D..
+.W......
 ..Ff..D.
 ......A.
-........
+.......D
 ...a..ad
 ..d..nN.
 a.a...a.
@@ -361,9 +386,9 @@ add...wa
     assert_eq!(
         &moves,
         &[
-            "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Db7-b5", "Db7-d7", "Fb3-a4",
-            "Fb3-c2", "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-g5", "Nf7-h6", "Wa2-a1",
-            "Wa2-a3", "Wa2-b2",
+            "Ac7-a5", "Ac7-e5", "Db7-b5", "Db7-d7", "Dd8-b8", "Dd8-d6", "Dd8-f8", "Fb3-a4",
+            "Fb3-c2", "Fb3-c4", "Nf7-d6", "Nf7-e5", "Nf7-g5", "Nf7-h6", "Wa2-a1", "Wa2-a3",
+            "Wa2-b2",
         ]
     );
 
@@ -371,9 +396,8 @@ add...wa
     assert_eq!(
         &moves,
         &[
-            "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Db7-b5", "Db7-d7", "Fb3-a4",
-            "Fb3-c2", "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-g5", "Nf7-h6", "Wa2-a1",
-            "Wa2-b2",
+            "Ac7-a5", "Ac7-e5", "Db7-b5", "Db7-d7", "Dd8-b8", "Dd8-d6", "Dd8-f8", "Fb3-a4",
+            "Fb3-c2", "Fb3-c4", "Nf7-d6", "Nf7-e5", "Nf7-g5", "Nf7-h6", "Wa2-a1", "Wa2-b2",
         ]
     );
 
@@ -385,12 +409,17 @@ add...wa
         .collect();
     assert_eq!(&moves, &["Db7-d7"]);
 
+    let moves: Vec<String> = jumps_attack_escape(&position)
+        .map(|mov| mov.to_string())
+        .collect();
+    assert_eq!(&moves, &["Ac7-e5", "Dd8-f8"]);
+
     let moves: Vec<String> = jumps_boring(&position).map(|mov| mov.to_string()).collect();
     assert_eq!(
         &moves,
         &[
-            "Ac7-a5", "Ac7-e5", "Da6-a4", "Da6-a8", "Da6-c6", "Db7-b5", "Fb3-a4", "Fb3-c2",
-            "Fb3-c4", "Nf7-d6", "Nf7-d8", "Nf7-e5", "Nf7-h6", "Wa2-a1", "Wa2-b2",
+            "Ac7-a5", "Db7-b5", "Dd8-b8", "Dd8-d6", "Fb3-a4", "Fb3-c2", "Fb3-c4", "Nf7-d6",
+            "Nf7-e5", "Nf7-h6", "Wa2-a1", "Wa2-b2",
         ]
     );
 }
@@ -433,13 +462,18 @@ add..w.a
         .collect();
     assert_eq!(&moves, &["A@d2", "A@d6"]);
 
+    let moves: Vec<String> = drops_attack_escape(&position)
+        .map(|mov| mov.to_string())
+        .collect();
+    assert_eq!(&moves, &["A@f5"]);
+
     let moves: Vec<String> = drops_boring(&position).map(|mov| mov.to_string()).collect();
     assert_eq!(
         &moves,
         &[
             "A@a3", "A@a5", "A@a7", "A@b5", "A@c1", "A@c2", "A@c4", "A@c6", "A@c8", "A@d1", "A@d3",
-            "A@d4", "A@d5", "A@d8", "A@e1", "A@e2", "A@e3", "A@e5", "A@e6", "A@f1", "A@f2", "A@f5",
-            "A@g2", "A@g4", "A@g5", "A@g6", "A@g8", "A@h4", "A@h5", "A@h7",
+            "A@d4", "A@d5", "A@d8", "A@e1", "A@e2", "A@e3", "A@e5", "A@e6", "A@f1", "A@f2", "A@g2",
+            "A@g4", "A@g5", "A@g6", "A@g8", "A@h4", "A@h5", "A@h7",
         ]
     );
 }
