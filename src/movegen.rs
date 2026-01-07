@@ -5,17 +5,25 @@ use crate::{
 use std::iter;
 
 pub fn move_bitboard(piece: Piece, square: Square) -> Bitboard {
-    MOVE_BITBOARD_TABLE[piece.index()][square.index()]
+    MOVE_TABLE[piece.index()][square.index()]
 }
 
 /// Includes going back to the same square.
 pub fn double_move_bitboard(piece: Piece, square: Square) -> Bitboard {
-    DOUBLE_MOVE_BITBOARD_TABLE[piece.index()][square.index()]
+    DOUBLE_MOVE_TABLE[piece.index()][square.index()]
 }
 
 /// Includes single moves.
 pub fn triple_move_bitboard(piece: Piece, square: Square) -> Bitboard {
-    TRIPLE_MOVE_BITBOARD_TABLE[piece.index()][square.index()]
+    TRIPLE_MOVE_TABLE[piece.index()][square.index()]
+}
+
+pub fn wazir_plus_move_bitboard(piece: Piece, square: Square) -> Bitboard {
+    WAZIR_PLUS_MOVE_TABLE[piece.index()][square.index()]
+}
+
+pub fn wazir_plus_double_move_bitboard(piece: Piece, square: Square) -> Bitboard {
+    WAZIR_PLUS_DOUBLE_MOVE_TABLE[piece.index()][square.index()]
 }
 
 pub fn validate_from_to(piece: Piece, from: Square, to: Square) -> Result<(), InvalidMove> {
@@ -70,22 +78,43 @@ const fn apply_move(
     new_table
 }
 
-const CONST_MOVE_BITBOARD_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
-    apply_move(CONST_NO_MOVE_TABLE);
+const fn apply_wazir_move(
+    table: [[Bitboard; Square::COUNT]; Piece::COUNT],
+) -> [[Bitboard; Square::COUNT]; Piece::COUNT] {
+    let mut new_table = [[Bitboard::EMPTY; Square::COUNT]; Piece::COUNT];
+    let mut piece_idx = 0;
+    while piece_idx != Piece::COUNT {
+        new_table[piece_idx] = apply_move_by_piece(table[piece_idx], Piece::Wazir);
+        piece_idx += 1;
+    }
+    new_table
+}
 
-const CONST_DOUBLE_MOVE_BITBOARD_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
-    apply_move(CONST_MOVE_BITBOARD_TABLE);
+const CONST_MOVE_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] = apply_move(CONST_NO_MOVE_TABLE);
 
-const CONST_TRIPLE_MOVE_BITBOARD_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
-    apply_move(CONST_DOUBLE_MOVE_BITBOARD_TABLE);
+const CONST_DOUBLE_MOVE_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
+    apply_move(CONST_MOVE_TABLE);
 
-static MOVE_BITBOARD_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] = CONST_MOVE_BITBOARD_TABLE;
+const CONST_TRIPLE_MOVE_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
+    apply_move(CONST_DOUBLE_MOVE_TABLE);
 
-static DOUBLE_MOVE_BITBOARD_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
-    CONST_DOUBLE_MOVE_BITBOARD_TABLE;
+const CONST_WAZIR_PLUS_MOVE_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
+    apply_wazir_move(CONST_MOVE_TABLE);
 
-static TRIPLE_MOVE_BITBOARD_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
-    CONST_TRIPLE_MOVE_BITBOARD_TABLE;
+const CONST_WAZIR_PLUS_DOUBLE_MOVE_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
+    apply_wazir_move(CONST_DOUBLE_MOVE_TABLE);
+
+static MOVE_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] = CONST_MOVE_TABLE;
+
+static DOUBLE_MOVE_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] = CONST_DOUBLE_MOVE_TABLE;
+
+static TRIPLE_MOVE_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] = CONST_TRIPLE_MOVE_TABLE;
+
+static WAZIR_PLUS_MOVE_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
+    CONST_WAZIR_PLUS_MOVE_TABLE;
+
+static WAZIR_PLUS_DOUBLE_MOVE_TABLE: [[Bitboard; Square::COUNT]; Piece::COUNT] =
+    CONST_WAZIR_PLUS_DOUBLE_MOVE_TABLE;
 
 pub fn any_move_from_short_move(
     position: &Position,

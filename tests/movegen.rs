@@ -7,6 +7,7 @@ use wazir_drop::{
         double_move_bitboard, drops, drops_boring, drops_check_threats, drops_checks, in_check,
         jumps, jumps_boring, jumps_check_threats, jumps_checks, move_bitboard, pseudocaptures,
         pseudojumps, setup_moves, triple_move_bitboard, validate_from_to,
+        wazir_plus_double_move_bitboard, wazir_plus_move_bitboard,
     },
     Color, Move, Piece, Position, ShortMove, Square,
 };
@@ -131,6 +132,40 @@ x.x.x.x.
 x.x.x.x.
 ........
 x.x.x.x.
+"
+    );
+}
+
+#[test]
+fn test_wazir_plus_move_bitboard() {
+    assert_eq!(
+        wazir_plus_move_bitboard(Piece::Alfil, Square::A5).to_string(),
+        "\
+........
+........
+.x.x.x.x
+..x...x.
+........
+........
+........
+........
+"
+    );
+}
+
+#[test]
+fn test_wazir_plus_double_move_bitboard() {
+    assert_eq!(
+        wazir_plus_double_move_bitboard(Piece::Alfil, Square::A5).to_string(),
+        "\
+.x.x.x.x
+x...x...
+........
+........
+.x.x.x.x
+x...x...
+........
+........
 "
     );
 }
