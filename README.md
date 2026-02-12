@@ -19,6 +19,7 @@ online tournament. WazirDrop [won](https://www.codecup.nl/competition.php?comp=3
   - [Simple material evaluation](#simple-material-evaluation)
   - [Linear model with piece-square features](#linear-model-with-piece-square-features)
   - [Wazir-piece-square features](#wazir-piece-square-features)
+- [Training a model using tch](#training-a-model-using-tch)
 - [NNUE: efficiently updateable neural network](#nnue-efficiently-updateable-neural-network)
   - [Accumulator update](#accumulator-update)
   - [Quantization](#quantization)
@@ -92,7 +93,7 @@ see what's going on if I use regular chess pieces (king = wazir, pawn = ferz, ro
 # Position representation
 
 ```rust
-struct Position {
+pub struct Position {
     stage: Stage,
     ply: Ply,
     board: Board,
@@ -105,7 +106,7 @@ The board is represented by a simple square -> color/piece mapping, as well
 as a set of bitboards (for each piece, for each color, empty squares):
 
 ```rust
-struct Board {
+pub struct Board {
     squares: EnumMap<Square, Option<ColoredPiece>>,
     occupied_by: EnumMap<Color, Bitboard>,
     empty_squares: Bitboard,
@@ -117,12 +118,12 @@ struct Board {
 The captured pieces are just a count for each color/piece:
 
 ```rust
-struct Captured {
+pub struct Captured {
     sides: EnumMap<Color, CapturedOneSide>,
     hash: u64,
 }
 
-struct CapturedOneSide {
+pub struct CapturedOneSide {
     counts: EnumMap<Piece, u8>,
 }
 ```
@@ -130,7 +131,7 @@ struct CapturedOneSide {
 Squares and pieces:
 
 ```rust
-enum Square {
+pub enum Square {
     A1, A2, A3, A4, A5, A6, A7, A8,
     B1, B2, B3, B4, B5, B6, B7, B8,
     C1, C2, C3, C4, C5, C6, C7, C8,
@@ -145,12 +146,12 @@ enum Square {
 Why are squares represented as a large 64-element `enum` rather than a simple number such as `u8`? This is for memory efficiency. An enum tells the Rust compiler that only these 64 values are valid. This allows it to store `Option<Square>` in 1 byte: 0-63 to represent a square, 64 to represent `None`.
 
 ```rust
-enum Color {
+pub enum Color {
     Red,
     Blue,
 }
 
-enum Piece {
+pub enum Piece {
     Alfil,
     Dabbaba,
     Ferz,
@@ -158,7 +159,7 @@ enum Piece {
     Wazir,
 }
 
-enum ColoredPiece {
+pub enum ColoredPiece {
     RedAlfil,
     BlueAlfil,
     RedDabbaba,
@@ -288,7 +289,7 @@ There are 64 squares, but because the rules of the game are symmetric
 to rotations and reflections of the board, we only have 10 different "normalized squares":
 
 ```rust
-enum NormalizedSquare {
+pub enum NormalizedSquare {
     A1, A2, A3, A4,
         B2, B3, B4,
             C3, C4,
@@ -296,7 +297,7 @@ enum NormalizedSquare {
 }
 ```
 
-In total we have 81 features: 50 for pieces on the board, 30 for captured pieces, and 1 for side to move:
+In total we have 80 possible features for each side: 50 for pieces on the board, 30 for captured pieces. Plus a bonus for side to move.
 
 ```rust
 pub static SCALE: f64 = 1000.0;
@@ -326,10 +327,40 @@ pub static FEATURES: [i16; 80] = [
 
 All the values are multiplied by `SCALE = 1000`.
 
-What can we notice here? Pieces are much more valuable in the center, except the Wazir which doesn't like the center. The first captured piece
+What can we notice here? Knights are the best piece. Pieces are much more valuable in the center, except the wazir which prefers corners. The first captured piece
 is much more valuable than more captured pieces of the same type.
 
 ## Wazir-piece-square features
+
+For the next, bigger model we still use a linear combination of features, but this time consider a larger set of features. I realized that piece values are very strongly dependend on where the wazirs are. We want to be attacking the opponent wazir, and protecting our own wazir. So we have features for each wazir position in combination with each other piece position (of the same or opposite color). But first we rotate and/or reflect the board so that the wazir square is normalized. 
+
+There are in total 6360 features per side:
+* 1 feature for each wazir position and other piece type and position. Total: 10 * 9 * 64 = 5760 features.
+* 1 feature for each wazir position and capture piece type and number. Total: 600 features.
+
+Plus a bonus for side to move.
+
+Let's look at some of the weights: when a wazir is in A1 corner, here are the values for a
+same-colored alfil:
+
+```rust
+// wazir: a1
+    // same alfil
+       0, -131,  387,  206,  315,  126,   33,   -5,
+    -161,   47,  154,   75,  115,  116,   25,   22,
+     364,  187,  410,  186,  173,  104,  131,   61,
+     146,   99,  213,  294,  198,  152,   72,   36,
+     272,  165,  192,  223,  274,  165,   51,  -45,
+     117,  142,  116,  125,  173,  161,   73,    3,
+      57,   76,  115,   74,   39,   76,   87,  144,
+      56,   17,   93,   94,   98,   51,   93,  112,
+```
+
+Having an alfil right next to our own wazir actually has **negative** value! The alfil is blocking a potential escape square.
+
+# Training a model using tch
+
+I trained all movels using the [tch](https://crates.io/crates/tch) crate which is a Rust wrapper for [PyTorch](https://pytorch.org/).
 
 # NNUE: efficiently updateable neural network
 
