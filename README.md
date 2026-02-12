@@ -14,11 +14,10 @@ online tournament. WazirDrop [won](https://www.codecup.nl/competition.php?comp=3
 - [Move representation](#move-representation)
 - [Bootstrapping position evaluation](#bootstrapping-position-evaluation)
   - [Evaluation as logit](#evaluation-as-logit)
-  - [Self-play](#self-play)
-  - [Evaluation training](#evaluation-training)
-  - [Starting point: simple material evaluation](#starting-point-simple-material-evaluation)
-  - [Linear features](#linear-features)
-  - [Piece-square features](#piece-square-features)
+  - [Training loop](#training-loop)
+  - [Self play](#self-play)
+  - [Simple material evaluation](#simple-material-evaluation)
+  - [Linear model with piece-square features](#linear-model-with-piece-square-features)
   - [Wazir-piece-square features](#wazir-piece-square-features)
 - [NNUE: efficiently updateable neural network](#nnue-efficiently-updateable-neural-network)
   - [Accumulator update](#accumulator-update)
@@ -31,7 +30,7 @@ online tournament. WazirDrop [won](https://www.codecup.nl/competition.php?comp=3
   - [Checks](#checks)
   - [Check threats](#check-threats)
   - [Escape square attacks](#escape-square-attacks)
-- [Alpha-beta search](#alpha-beta-search)
+- [Tree search](#tree-search)
   - [Quiescence search](#quiescence-search)
   - [Move ordering](#move-ordering)
   - [Transposition table](#transposition-table)
@@ -143,7 +142,7 @@ enum Square {
 }
 ```
 
-Why are squares represented as an `enum` rather than a number such as `u8`? This is for memory efficiency. An enum tells the Rust compiler that only these 64 values are valid. This allows it to store `Option<Square>` in 1 byte: 0-63 to represent a square, 64 to represent `None`.
+Why are squares represented as a large 64-element `enum` rather than a simple number such as `u8`? This is for memory efficiency. An enum tells the Rust compiler that only these 64 values are valid. This allows it to store `Option<Square>` in 1 byte: 0-63 to represent a square, 64 to represent `None`.
 
 ```rust
 enum Color {
@@ -217,36 +216,118 @@ to each other. So I decided to have the evaluation function be trained from self
 
 ## Evaluation as logit
 
-Our goal is to have the evaluation function approximate the [logit](https://en.wikipedia.org/wiki/Logit) of predicted win probability. So if $v$ is the current evaluation, then we estimate win probability as:
+Our goal is to have the evaluation function approximate the [logit](https://en.wikipedia.org/wiki/Logit) of predicted win probability. In other words,
+we want the win probability to be approximated by the [sigmoid](https://en.wikipedia.org/wiki/Sigmoid_function) of the position evaluation.
+
+If $v$ is the current evaluation, then we estimate win probability as:
 
 $$ p = \sigma(v) = \frac{1}{1 + e^{-v}}$$
 
 We treat draws as 50% win, 50% loss.
 
-| evaluation | win probability |
-| ---------: | --------------: |
-|         -5 |            0.7% |
-|         -3 |            4.7% |
-|         -1 |           26.9% |
-|       -0.5 |           37.8% |
-|          0 |             50% |
-|        0.5 |           62.2% |
-|          1 |           73.1% |
-|          3 |           95.3% |
-|          5 |           99.3% |
+![sigmoid](images/sigmoid.svg)
 
-So reasonable evaluations are normally somewhere in the range of [-5, 5]. We normally scale these by a factor of 10 000 and use integer evaluations, so
-typically in the range [-50 000, 50 000].
+So reasonable evaluations are normally somewhere in the range of [-5, 5].
 
-## Self-play
+In internal calculations, we usually scale these by a factor of 10 000 and use integer evaluations, so typically evaluations are in the range [-50 000, 50 000].
 
-## Evaluation training
+## Training loop
 
-## Starting point: simple material evaluation
+So how we do train an evaluation function? By having the program play against itself and learning from those games.
 
-## Linear features
+1. Take the current evaluation model.
+2. Collect a lot of game positions and their evaluations using [self play](#self-play).
+3. Train a new model.
+4. Go to 1.
 
-## Piece-square features
+This went through many iterations using multiple different models:
+* [simple material evaluation](#simple-material-evaluation)
+* [linear model with piece-square features](#linear-model-with-piece-square-features]
+* linear model with [wazir-piece-square features](#wazir-piece-square-features)
+* [neural network](#nnue-efficiently-updateable-neural-network)
+
+The last model, using the neural network was trained over 7 iterations of the training process.
+
+I ran the last iteration when I went away for a skiing trip for a week. Playing 100 million games took 8 days on a 32-core workstation, and then it took 1 more day to train the model using that data.
+
+## Self play
+
+The goal of self play was to gather a diverse set of reasonable positions, and get their evaluations better than what the current evaluation function
+can give us. We also generally want *quiet* positions, meaning positions in which captures aren't important. That's because our search can deal with captures anyway, we just want to be able to evaluate the resulting final positions after such sequences of captures.
+
+Here is what I did:
+1. Start with completely random setups.
+2. Do a depth 4 [tree search](#tree-search).
+3. Select the position at the end of the [best variation](https://www.chessprogramming.org/Principal_Variation) from the search. This will generally be a quiet position because of [quiescence search](#quiescence-search).
+4. Do another, deeper search (extra 4 ply) to evaluate the selected position well.
+5. Store the selected position and its evaluation in the output file.
+6. At the root position, pick a move and play it.
+7. Go to 2.
+
+ To get some extra variation in the games beyond just the starting positions, I don't always pick the best move. Instead, I randomly pick a move, with better moves having higher probabilities, according to [soft max](https://en.wikipedia.org/wiki/Softmax_function) with a temperature $T$:
+
+ $$ p_i = \frac{e^{v_i / T}}{\sum_i e^{v_i / T}} $$
+
+## Simple material evaluation
+
+But where do we begin the training process? I only had a very rough idea how to evaluate positions, I didn't even know which pieces are worth more than others. So I decided to just start with the simplest thing possible:
+
+* every piece on the board gets value 0.1
+* every captured piece also gets value 0.1
+
+That's it. That was the only evaluation function that I created manually.
+
+## Linear model with piece-square features
+
+The next step was a linear model with piece-square features. The evaluation is a linear combination of the following features:
+* 1 feature for each piece type / square combination
+* 1 feature for each captured piece type and its number
+* 1 feature for side to move (tempo bonus)
+
+There are 64 squares, but because the rules of the game are symmetric
+to rotations and reflections of the board, we only have 10 different "normalized squares":
+
+```rust
+enum NormalizedSquare {
+    A1, A2, A3, A4,
+        B2, B3, B4,
+            C3, C4,
+                D4,
+}
+```
+
+In total we have 81 features: 50 for pieces on the board, 30 for captured pieces, and 1 for side to move:
+
+```rust
+pub static SCALE: f64 = 1000.0;
+pub static TO_MOVE: i16 = 352;
+
+pub static FEATURES: [i16; 80] = [
+    // alfil
+    83, 89, 163, 222, 112, 194, 203, 311, 313, 365,
+    // dabbaba
+    74, 60, 115, 185, 59, 181, 212, 320, 330, 309,
+    // ferz
+    18, 49, 62, 126, 206, 226, 247, 289, 286, 250,
+    // knight
+    188, 221, 282, 318, 265, 343, 419, 449, 442, 405,
+    // wazir
+    655, 626, 25, -148, 599, 44, -304, -283, -514, -701,
+    // captured alfil
+    186, 111, 80, 71, 64, 73, 70, 91, 53, 55, -107, -85, 0, 0, 0, 0,
+    // captured dabbaba
+    307, 148, 89, 40, 23, 68, -236, 0,
+    // captured ferz
+    324, 207, 154, 34,
+    // captured knight
+    442, 344,
+];
+```
+
+All the values are multiplied by `SCALE = 1000`.
+
+What can we notice here? Pieces are much more valuable in the center, except the Wazir which doesn't like the center. The first captured piece
+is much more valuable than more captured pieces of the same type.
 
 ## Wazir-piece-square features
 
@@ -298,7 +379,7 @@ its future escape paths. For this, for each piece and square, we precompute the 
 * a wazir move + two piece moves; these are the "from" squares of such attacks
 
 
-# Alpha-beta search
+# Tree search
 
 We use a variant of alpha-beta search called [Principal Variation Search](https://en.wikipedia.org/wiki/Principal_variation_search).
 
