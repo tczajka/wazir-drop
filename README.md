@@ -14,7 +14,7 @@ online tournament. WazirDrop [won](https://www.codecup.nl/competition.php?comp=3
 - [Move representation](#move-representation)
 - [Bootstrapping position evaluation](#bootstrapping-position-evaluation)
   - [Evaluation as logit](#evaluation-as-logit)
-  - [Training loop](#training-loop)
+  - [Reinforcement learning](#reinforcement-learning)
   - [Self play](#self-play)
   - [Training a model using tch](#training-a-model-using-tch)
   - [Simple material evaluation](#simple-material-evaluation)
@@ -37,17 +37,16 @@ online tournament. WazirDrop [won](https://www.codecup.nl/competition.php?comp=3
   - [Miscellaneous improvements](#miscellaneous-improvements)
 - [Time allocation](#time-allocation)
 - [Repetitions](#repetitions)
-  - [Detecting repetition](#detecting-repetition)
-  - [Agressiveness factor](#agressiveness-factor)
+  - [Optimism factor](#optimism-factor)
 - [Opening book](#opening-book)
   - [Reasonable setups](#reasonable-setups)
-  - [Setup search](#setup-search)
-  - [Book size](#book-size)
-  - [Out of book search](#out-of-book-search)
-- [Compressing NNUE weights and opening book](#compressing-nnue-weights-and-opening-book)
+  - [Book generation](#book-generation)
+  - [How we play in the opening phase](#how-we-play-in-the-opening-phase)
+- [Data compression](#data-compression)
   - [Base 128 encoding in UTF-8](#base-128-encoding-in-utf-8)
   - [Encoding NNUE weights](#encoding-nnue-weights)
   - [Encoding setup moves](#encoding-setup-moves)
+- [Final thoughts](#final-thoughts)
 
 
 # The game
@@ -231,7 +230,7 @@ So reasonable evaluations are normally somewhere in the range of [-5, 5].
 
 In internal calculations, we usually scale these by a factor of 10 000 and use integer evaluations, so typically evaluations are in the range [-50 000, 50 000].
 
-## Training loop
+## Reinforcement learning
 
 So how we do train an evaluation function? By having the program play against itself and learning from those games.
 
@@ -240,9 +239,11 @@ So how we do train an evaluation function? By having the program play against it
 3. Train a new model.
 4. Go to 1.
 
-This went through many iterations using multiple different models:
+This approach is a kind of reinforcement learning, more specifically: Expert Iteration.
+
+I went through many iterations using multiple different models:
 * [simple material evaluation](#simple-material-evaluation)
-* [linear model with piece-square features](#linear-model-with-piece-square-features]
+* [linear model with piece-square features](#linear-model-with-piece-square-features)
 * linear model with [wazir-piece-square features](#wazir-piece-square-features)
 * [neural network](#nnue-efficiently-updateable-neural-network)
 
@@ -279,7 +280,7 @@ The target value we're trying to learn is a linear combination of deeper evaluat
 
 $$ y_i = (1 - \lambda) v_i + \lambda r_i $$
 
-where $\lambda$ was normally set to 0.1.
+where $\lambda$ is normally set to 0.1.
 
 ## Simple material evaluation
 
@@ -425,9 +426,9 @@ This way the evaluation is an integer scaled by a factor of 10000: logit 1 corre
 
 ## Setup moves
 
-We generate all possible setup moves by permuting the 16 pieces. The number of such moves is:
+We can generate all possible setup moves by permuting the 16 pieces. The number of such moves is:
 
-$$ \frac{16!}{8!\ 4!\ 2!\ 1!\ 1!} = 10\ 810\ 800$$
+$$ \frac{16!}{8!\ 4!\ 2!\ 1!\ 1!} = 10,\!810,\!800$$
 
 During actual gameplay this function is never used however. Instead, we use the [opening book](#opening-book).
 
@@ -486,7 +487,7 @@ When not in check, we generate moves in the following order:
 The transposition table stores information about positions that have previously been searched with their score, depth searched, etc.
 
 ```rust
-struct TTable {
+pub struct TTable {
     buckets: Vec<Bucket>,
     epoch: u8,
 }
@@ -530,25 +531,124 @@ One adjustment to this is *panic mode*. When the evaluation of the best move fou
 
 # Repetitions
 
-## Detecting repetition
+It's easy to fall into an infinite cycle when playing the game. In [this game](https://www.codecup.nl/showgame.php?ga=322670) Wazir Drop estimated its advantage as +2.6 which corresponds to 93% win probability. But starting from move 37 it went into an infinite forced cycle of checks: Nf7-g5 Wh8-h7 Ng5-f7 Wh7-h8. It seems to the program as if it can just keep doing this and never lose the advantage. The rules allow this, so this went on for the next 60+ moves until draw was automatically declared after move 102, as prescribed by the rules.
 
-## Agressiveness factor
+To avoid this kind of behavior, after this game I added a simple repetition detection. In tree search, any repetition is automatically considered a draw without further search. So if we have an advantage, we try to avoid repetitions.
 
+To detect repetition we store the history of position hashes, *and* a [Bloom filter](https://en.wikipedia.org/wiki/Bloom_filter) to make lookups faster.
+
+## Optimism factor
+
+We don't want to try to immediately go into a repetition draw any time we have the slightest disadvantage. Turns out Red has a slight disadvantage at the beginning of the game, but we don't want to try to go for a draw any time we're playing Red: we're optimistic and want to go for a win!
+
+For this reason, I added an "optimism factor". It is often called [contempt factor](https://www.chessprogramming.org/Contempt_Factor) in literature, but I prefer "optimism".
+
+What it is is that I simply add a small constant (+0.1) to the evaluation function for the side Wazir Drop plays. This way it will be slightly over-optimistic about its own chances and pessimistic about opponent's chances, leading to more aggressive play and avoiding draws in equal positions.
 
 # Opening book
 
+The opening book only contains [setups](#setup-moves). We have the best 20,000 red setups and blue's best response to each of them.
+
 ## Reasonable setups
 
-## Setup search
+The first step in generating the opening book was to reduce the 5,405,400 possible setups (not including their mirror reflections) to a smaller set of "reasonable" setups. We compute 50,000 such reasonable setups.
 
-## Book size
+Here is the algorithm:
 
-## Out of book search
+1. Take a random sample of 10,000 setups and call those (and their mirror images) "reasonable". They aren't really reasonable, but bear with me.
+2. For each possible red setup among the 5,405,400 possible, do a depth-1 search for the best blue response among the "reasonable" setups.
+3. Take the best 10,000 red openings as the new "reasonable" setups.
+4. Go to 2.
 
-# Compressing NNUE weights and opening book
+After 3 or 4 iterations this process converges. Then we do one more iteration, but this time we generate 50,000 "reasonable" setups.
+
+## Book generation
+
+We do a tree search for each of the 50,000 reasonable red setups, while only considering reasonable setups as blue responses.
+
+The we take the top 20,000 red openings and search those 1 ply deeper. The take the top 8,000 and search 1 ply deeper still. Etc.
+
+In the end, over the course of 24 hours, I computed:
+
+* 20,000 setups to depth 11
+* 8,000 setups to depth 12
+* 3,500 setups to depth 13
+* 1,500 setups to depth 14
+* 600 setups to depth 15
+* 300 setups to depth 16
+* 120 setups to depth 17
+* 60 setups to depth 18
+
+## How we play in the opening phase
+
+If we're playing red, I just used the top setup in the final tournament. It evaluated to about -0.03 for red. We could be a bit more unpredictable and select randomly among the top setup moves. That's what I did in earlier tournaments.
+
+If we're playing blue, then if the opponent is reasonably good, they will probably use one of the top 20,000 setups. Then we just immediately play the pre-computed response.
+
+If they play a setup not in the book, then I already have a big advantage. In this case we just do a tree search, treating the 20000 setups in the book as possible responses.
+
+# Data compression
+
+The rules of the tournament required putting all the code and data in one source code file with a size limit of 1,474,560 bytes. My final submission was pretty close to this limit: 1,275,891 bytes. This required some compression.
+
+I stored the neural network weights and the opening book as very long [raw string literals](https://doc.rust-lang.org/reference/tokens.html#grammar-RAW_STRING_LITERAL) in the source code. These literals have restrictions:
+
+* they can only store valid Unicode codepoints, encoded as [UTF-8](https://en.wikipedia.org/wiki/UTF-8)
+* The CR (U+000D) character is not allowed (to avoid issues in different end-of-line conventions between opearting systems)
+* The quote character (`"`) is allowed but causes complications, so I avoided it.
 
 ## Base 128 encoding in UTF-8
 
+First thinking was that I could just use ASCII characters. But if I want to avoid CR and `"`, I'm reduced to 126 characters per byte. I could work with that, but a power of 2 would be nicer, so that I just give put a constant number of bits per byte.
+
+I could just use 64 ASCII characters per byte. That would let me use 6 bits per byte. That's [Base64](https://en.wikipedia.org/wiki/Base64) encoding.
+
+I wanted to squeeze 7 bits per byte. So I created my own, non-standard Base128 encoding.
+
+But ASCII only gives me 126 characters, not 128. How to squeeze in extra 2 possibilities per byte? By using non-ASCII Unicode characters!
+
+In UTF-8:
+
+* ASCII characters 0-127 are encoded in a single byte: `0xxxxxxx` in binary.
+* Characters 128-2047 are encoded in two bytes: `110xxxxx 10xxxxxx`. That gives me 11 bits of "payload" per two bytes.
+
+So I use the two-byte encodings to encode some sequences of two 7-bit values. The top 4 bits encode the first value, and the bottom 7-bits encode the second value.
+
+We want to avoid certain combinations of the top 4 bits:
+
+* we can't use 0000 because that would be an "overlong encoding" of an ASCII character 0-127, which is not allowed in UTF-8.
+* we don't want to use 0001 because that corresponds to some special Unicode control characters in the range U+0080 .. U+009F, I just didn't want to have those in my files because they mess up how the files look in my text editor
+* we don't want to use 1100 in order to avoid the U+61C character: ARABIC LETTER MARK, which switches the text display from left-to-right to right-to-left, *really* messing up how the string looks in the text editor
+
+But that still leaves us with 13 extra values to work with. I used 9 of them to replace certain ASCII control characters: NUL, backspace, tab, LF, VT, FF, CR, ESC and `"`.
+
+Unfortunately I couldn't replace all 32 control ASCII characters, so there is still a bit of visual mess in the string literal, but it's not that bad.
+
 ## Encoding NNUE weights
 
+Now that we can encode bits in a string literal, we can use that to encode neural network weights. Since most of the weights are clustered around 0, I used a variable-length encoding:
+
+* sign bit
+* lowest 5 bits
+* a continuation bit (1 means 5 bits wasn't enough)
+* 3 more bits
+* another continuation bit
+* etc until the whole number is encoded
+
 ## Encoding setup moves
+
+Setup moves in the opening book are encoded using Huffman code. We could actually create a *perfect* Huffman code for this because all initial piece counts happen to be powers of 2. The length of each code for a piece is exactly proportional to its frequency.
+
+* alfils are encoded as `0`
+* dababbas are encoded as `10`
+* ferzes are encoded as `110`
+* knights are encoded as `1110`
+* wazirs are encoded as `1111`
+
+This makes every setup move take exactly 30 bits.
+
+# Final thoughts
+
+This was a super fun project. Great thanks to the CodeCup team for organizing the tournament, and to other competitors for also creating some very strong programs to play with.
+
+In the final round-robin tournament Wazir Drop ended up with a score of 112 wins, 2 draws and 0 losses, leading to a reasonably secure 1st place. The second place program by Matthijs Tijink had 106 wins, 7 draws and 1 loss.
