@@ -1,6 +1,6 @@
 # Wazir Drop: a tournament winning board game AI engine
 
-This an AI game engine for the game 0.1 that participated in the
+This is an AI game engine for the game 0.1 that participated in the
 [CodeCup 2026](https://www.codecup.nl/)
 online tournament. WazirDrop took [first place](https://www.codecup.nl/competition.php?comp=344)!
 
@@ -231,11 +231,11 @@ We treat draws as equivalent to 50% win probability.
 
 So reasonable evaluations are normally somewhere in the range of [-5, 5].
 
-In internal calculations, we usually scale these by a factor of 10,000 and round to an integer which gives 4 digits of precision in [-5.0000, 5.0000].
+In internal calculations, we usually scale these by a factor of 10,000 and round to an integer, which gives 4 digits of precision in [-5.0000, 5.0000].
 
 ## Training loop
 
-So how we do train an evaluation function? By having the program play against itself and learn from those games.
+So how do we train an evaluation function? By having the program play against itself and learn from those games.
 
 1. Take the current evaluation model.
 2. Collect a lot of game positions and their evaluations using [self play](#self-play).
@@ -256,7 +256,7 @@ I ran the last iteration when I went away for a skiing trip for a week. Playing 
 
 ## Self play
 
-The goal of self play was to gather a diverse set of positions, and get their evaluations more accurate than what the current evaluation function
+The goal of self play was to gather a diverse set of positions and get more accurate evaluations than what the current evaluation function
 can give us. We also generally want *quiet* positions, meaning positions in which captures aren't imminent. That's because our [tree search](#tree-search) will deal with captures anyway. We just want to be able to evaluate the resulting final positions after such sequences of captures.
 
 Here is what I did:
@@ -269,7 +269,7 @@ Here is what I did:
 
 All the positions selected in step 3 are stored in the generated dataset, along with their deeper evaluations and game results.
 
- To get some extra variation in the games beyond just the random starting positions, I don't always pick the best move in step 5. Instead, I randomly pick a move, with better moves having higher probabilities according to the [soft max](https://en.wikipedia.org/wiki/Softmax_function) distribution with a temperature $T$:
+To get some extra variation in the games beyond just the random starting positions, I don't always pick the best move in step 5. Instead, I randomly pick a move, with better moves having higher probabilities according to the [soft max](https://en.wikipedia.org/wiki/Softmax_function) distribution with a temperature $T$:
 
  $$ p_i = \frac{e^{v_i / T}}{\sum_i e^{v_i / T}} $$
 
@@ -348,11 +348,11 @@ is much more valuable than more captured pieces of the same type.
 
 ## Wazir-piece-square features
 
-For the next, bigger model we still use a linear combination of features, but this time consider a larger set of features. I realized that piece values are very strongly dependent on where the wazirs are. We want to be attacking the opponent wazir and protecting our own wazir. So we have features for each combination of wazir square plus some other piece square (of the same or opposite color). But first we rotate and/or reflect the board so that the wazir square is normalized. 
+For the next, bigger model, we still use a linear combination of features, but this time consider a larger set of features. I realized that piece values are very strongly dependent on where the wazirs are. We want to be attacking the opponent wazir and protecting our own wazir. So we have features for each combination of wazir square plus some other piece square (of the same or opposite color). But first we rotate and/or reflect the board so that the wazir square is normalized. 
 
 There are in total 6360 features per side:
-* 10 * 9 * 64 = 5760 features for each wazir square and other piece type, color and square.
-* 600 features for each wazir square and captured piece type and number.
+* 10 * 9 * 64 = 5760 features for each wazir square combined with other piece type, color, and square.
+* 600 features for each wazir square combined with captured piece type and number.
 * a tempo bonus for side to move.
 
 Let's look at some of the weights: when a wazir is in A1 corner, here are the values for a
@@ -391,7 +391,7 @@ The two length 128 vectors are concatenated, and then we have 2 more hidden laye
 
 ## Accumulator update
 
-The first layer would be computationally expensive to evaluate, but there are two aspects that make it much a lot easier.
+The first layer would be computationally expensive to evaluate, but there are two aspects that make it much easier.
 
 First, the features are *sparse*. Out of the 12,720 features for both sides, exactly 32 are active because that's how many pieces are always on the board or captured. So evaluating the embedding layer comes down to adding 32 vectors.
 
@@ -414,7 +414,7 @@ A crucial SIMD instruction is [PMADDUBSW](https://www.felixcloutier.com/x86/pmad
 
 So we want to store our values and weights in single bytes. All our weights are scaled and quantized to integers in the range [-127, 127].
 
-The weights in the first layer is scaled by a factor of 127, so the embeddings are in the [-1, 1] range.
+The weights in the first layer are scaled by a factor of 127, so the embeddings are in the [-1, 1] range.
 
 The weights in the second layer (256 -> 16) are scaled by a factor of 256. So it only supports weights in the range [-0.49, 0.49]. We clip all weights to this range during training.
 
@@ -432,11 +432,11 @@ We can generate all possible setup moves by permuting the 16 pieces. The number 
 
 $$ \frac{16!}{8!\ 4!\ 2!\ 1!\ 1!} = 10,\!810,\!800$$
 
-During actual gameplay this function is never used however, it would be too slow. Instead, we use the [opening book](#opening-book).
+During actual gameplay, this function is never used, however, as it would be too slow. Instead, we use the [opening book](#opening-book).
 
 ## Pseudomoves vs regular moves
 
-Game rules don't technically distinguish "checks" and allow the wazir to move into check or ignore a check. But we don't normally generate such "suicide" moves at all. I call those "pseudomoves". The only time we need them is the last two moves of the game where the wazir is checkmated and both sides still have to make one (pseudo-)move each to capture it.
+Game rules don't technically distinguish "checks" as a special move type and allow the wazir to move into check or ignore a check. But we don't normally generate such "suicide" moves at all. I call those "pseudomoves". The only time we need them is the last two moves of the game where the wazir is checkmated and both sides still have to make one (pseudo-)move each to capture it.
 
 ## Check evasions
 
@@ -523,7 +523,7 @@ enum TTableScoreType {
 
 [Futility pruning](https://www.chessprogramming.org/Futility_Pruning): at depth = 1, if evaluation looks bad (evaluation < alpha - 0.6), we don't even try boring moves (non-captures and non-checks) because they are unlikely to help.
 
-[Late move reductions](https://www.chessprogramming.org/Late_Move_Reductions): at depth > 1, we search boring moves (other than the first 5) 1 ply shallower that normal. If they turn out to be good move, we search again with full depth.
+[Late move reductions](https://www.chessprogramming.org/Late_Move_Reductions): at depth > 1, we search boring moves (other than the first 5) 1 ply shallower than normal. If they turn out to be good moves, we search again with full depth.
 
 # Time allocation
 
@@ -545,7 +545,7 @@ We don't want to try to immediately go into a repetition draw any time we have t
 
 For this reason, I added an "optimism factor". It is often called [contempt factor](https://www.chessprogramming.org/Contempt_Factor) in literature, but I prefer "optimism".
 
-What it is is that I simply add a small constant (+0.1) to the evaluation function for the side Wazir Drop plays. This way it will be slightly over-optimistic about its own chances and pessimistic about opponent's chances, leading to more aggressive play and avoiding draws in equal positions.
+What it does is that I simply add a small constant (+0.1) to the evaluation function for the side Wazir Drop plays. This way it will be slightly over-optimistic about its own chances and pessimistic about opponent's chances, leading to more aggressive play and avoiding draws in equal positions.
 
 # Opening book
 
@@ -568,7 +568,7 @@ After 3 or 4 iterations this process converges. Then we do one more iteration, b
 
 We do a tree search for each of the 50,000 reasonable red setups, while only considering reasonable setups as blue responses.
 
-The we take the top 20,000 red openings and search those 1 ply deeper. Then take the top 8,000 and search 1 ply deeper still. Etc.
+Then we take the top 20,000 red openings and search those 1 ply deeper. Then take the top 8,000 and search 1 ply deeper still. Etc.
 
 In the end, over the course of 24 hours I computed:
 
@@ -583,7 +583,7 @@ In the end, over the course of 24 hours I computed:
 
 ## How we play in the opening phase
 
-If we're playing red, I just always used the same top setup in the final tournament. It evaluated to about -0.03 for red. We could be a bit more unpredictable and select randomly among the top setup moves. That's what I did in earlier tournaments.
+If we're playing red, I just always use the same top setup in the final tournament. It evaluated to about -0.03 for red. We could be a bit more unpredictable and select randomly among the top setup moves. That's what I did in earlier tournaments.
 
 If we're playing blue, then if the opponent is reasonably good, they will probably use one of the top 20,000 setups. Then we just immediately play the pre-computed response.
 
@@ -601,20 +601,20 @@ I stored the neural network weights and the opening book as very long [raw strin
 
 ## Base 128 encoding in UTF-8
 
-The first idea was that I could just use ASCII characters. But if I want to avoid CR and `"`, I'm reduced to 126 possible characters per byte. I could work with that, but a power of 2 would be nicer so that I just give put a constant number of bits per byte.
+The first idea was that I could just use ASCII characters. But if I want to avoid CR and `"`, I'm reduced to 126 possible characters per byte. I could work with that, but a power of 2 would be nicer so that I can just put a constant number of bits per byte.
 
 I could just use 64 ASCII characters per byte. That would let me use 6 bits per byte. That's [Base64](https://en.wikipedia.org/wiki/Base64) encoding.
 
 I wanted to squeeze 7 bits per byte. So I created my own, non-standard Base128 encoding.
 
-But ASCII only gives me 126 characters, not 128. How to squeeze in extra 2 possibilities per byte? By using non-ASCII Unicode characters!
+But ASCII only gives me 126 characters, not 128. How to squeeze in the extra 2 possibilities per byte? By using non-ASCII Unicode characters!
 
 In UTF-8:
 
 * ASCII characters 0-127 are encoded in a single byte: `0xxxxxxx` in binary.
 * Characters 128-2047 are encoded in two bytes: `110xxxxx 10xxxxxx`. That gives me 11 bits of "payload" per two bytes.
 
-So I use the two-byte sequences to encode some sequences of two 7-bit values. The top 4 bits encode the first value and the bottom 7-bits encode the second value.
+So I use the two-byte sequences to encode some sequences of two 7-bit values. The top 4 bits encode the first value and the bottom 7 bits encode the second value.
 
 We want to avoid certain combinations of the top 4 bits:
 
