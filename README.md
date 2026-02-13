@@ -16,14 +16,13 @@ online tournament. WazirDrop [won](https://www.codecup.nl/competition.php?comp=3
   - [Evaluation as logit](#evaluation-as-logit)
   - [Training loop](#training-loop)
   - [Self play](#self-play)
+  - [Training a model using tch](#training-a-model-using-tch)
   - [Simple material evaluation](#simple-material-evaluation)
   - [Linear model with piece-square features](#linear-model-with-piece-square-features)
   - [Wazir-piece-square features](#wazir-piece-square-features)
-- [Training a model using tch](#training-a-model-using-tch)
 - [NNUE: efficiently updateable neural network](#nnue-efficiently-updateable-neural-network)
   - [Accumulator update](#accumulator-update)
-  - [Quantization](#quantization)
-  - [SIMD](#simd)
+  - [Quantization and SIMD](#quantization-and-simd)
 - [Move generation](#move-generation)
   - [Setup moves](#setup-moves)
   - [Pseudomoves vs regular moves](#pseudomoves-vs-regular-moves)
@@ -261,13 +260,26 @@ Here is what I did:
 2. Do a depth 4 [tree search](#tree-search).
 3. Select the position at the end of the [best variation](https://www.chessprogramming.org/Principal_Variation) from the search. This will generally be a quiet position because of [quiescence search](#quiescence-search).
 4. Do another, deeper search (extra 4 ply) to evaluate the selected position well.
-5. Store the selected position and its evaluation in the output file.
-6. At the root position, pick a move and play it.
-7. Go to 2.
+5. At the root position, pick a move and play it.
+6. Go to 2.
+
+All the positions selected in step 3 are stored in the output dataset, along with their deeper evaluations and game results.
 
  To get some extra variation in the games beyond just the starting positions, I don't always pick the best move. Instead, I randomly pick a move, with better moves having higher probabilities, according to [soft max](https://en.wikipedia.org/wiki/Softmax_function) with a temperature $T$:
 
  $$ p_i = \frac{e^{v_i / T}}{\sum_i e^{v_i / T}} $$
+
+## Training a model using tch
+
+I trained all models using the [tch](https://crates.io/crates/tch) crate which is a Rust wrapper around for [PyTorch](https://pytorch.org/).
+
+I pass through the dataset multiple times, in random order, and use the [Adam optimizer](https://docs.pytorch.org/docs/stable/generated/torch.optim.Adam.html) with [cross entropy loss](https://docs.pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html).
+
+The target value we're trying to learn is a linear combination of deeper evaluation and actual game result. If $v_i$ is the deeper evaluation and $r_i$ is game result (0, 0.5 or 1), the target values are:
+
+$$ y_i = (1 - \lambda) v_i + \lambda r_i $$
+
+where $\lambda$ was normally set to 0.1.
 
 ## Simple material evaluation
 
@@ -358,18 +370,56 @@ same-colored alfil:
 
 Having an alfil right next to our own wazir actually has **negative** value! The alfil is blocking a potential escape square.
 
-# Training a model using tch
-
-I trained all movels using the [tch](https://crates.io/crates/tch) crate which is a Rust wrapper for [PyTorch](https://pytorch.org/).
-
 # NNUE: efficiently updateable neural network
+
+The final model uses the same [wazir-piece-square](#wazir-piece-square-features) features, but instead of just using a linear combination of weights, we feed the features to a neural network.
+
+![NNUE](images/nnue.svg)
+
+The first layer is an embedding layer. Each of the 6360 features per side has a corresponding length 128 embedding vector, and those vectors are added together. The weights are shared between the two sides.
+
+This first layer contains the vast majority of weights: 814 208. The other layers have much fewer weights (just 2641). This, plus the fact that the features are sparse and can be updated incrementally, is what defines a [NNUE](https://en.wikipedia.org/wiki/Efficiently_updatable_neural_network).
+
+The resulting vectors are clipped to [0, 1] range in each hidden layer, i.e.
+we use the [Clipped ReLU](https://en.wikipedia.org/wiki/Rectified_linear_unit) (CReLU) activation functions.
+
+The two length 128 vectors are then concatenated, and then we have 2 more hidden layers with sizes 16 and 32, and finally the output layer with just 1 value, the position evaluation.
+
 
 ## Accumulator update
 
-## Quantization
+The first layer would be computationally expensive to evaluate, but there are two aspects that make it much easier.
 
-## SIMD
+First, the features are *sparse*. Out of the 12720 features, exactly 32 are active because that's how many pieces are on the board (or captured). So evaluating the first layer comes down to adding 32 vectors.
 
+Additionally there is an extra optimization. When we make a move, only up to 4 features change:
+
+* a piece is removed from the source square (or captured list when dropped)
+* a piece is inserted in its destination square
+* a captured piece is removed
+* a captured piece is added to the captured list
+
+So we can update the first hidden layer (which we call the accumulator) incrementally. On every move we only have to subtract 2 vectors and add 2 vectors.
+
+The only exception is wazir moves. When the wazir moves, all the features for one side change. In that case, we refresh the accumulator, meaning we have to add up to 32 (16 on average) vectors.
+
+## Quantization and SIMD
+
+During the CodeCup tournament, only a single CPU was available to each player. We use x86-64 SIMD instructions to evaluate the network efficiently. Unfortunately we couldn't use dedicated AVX2 VNNI specialized for neural networks because the CPU used for the tournament didn't implement those. So we had to make do with older SSE instructions.
+
+A crucial SIMD instruction is [PMADDUBSW](https://www.felixcloutier.com/x86/pmaddubsw) which can do 16 single byte multiplications in a 128-bit SIMD register.
+
+So we want to store our values and weights in single bytes. All our are scaled and quantized to integers in the range [-127, 127].
+
+The weights in the first layer is scaled by a factor of 127, so the weights correspond to embeddings in [-1, 1] range.
+
+The weights in the second layer (256 -> 16) are scaled by a factor of 256. So it only supports weights in the range [-0.49, 0.49]. We clip all weights to this range during training.
+
+The next layer (16 -> 32) is scaled by a factor of 64, so we support weights in the range [-1.98, 1.98].
+
+The weights in the final layer are scaled by a factor of 10000 / 127 = 78.7, so there we support weights in the range [-1.61, 1.61].
+
+This way the evaluation is an integer scaled by a factor of 10000: logit 1 corresponds to the value 10000.
 
 # Move generation
 
