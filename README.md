@@ -1,10 +1,10 @@
-# WazirDrop: tournament winning board game AI engine
+# Wazir Drop: a tournament winning board game AI engine
 
 This an AI game engine for the game 0.1 that participated in the
 [CodeCup 2026](https://www.codecup.nl/)
-online tournament. WazirDrop [won](https://www.codecup.nl/competition.php?comp=344)!
+online tournament. WazirDrop took [first place](https://www.codecup.nl/competition.php?comp=344)!
 
-- [WazirDrop: tournament winning board game AI engine](#wazirdrop-tournament-winning-board-game-ai-engine)
+- [Wazir Drop: a tournament winning board game AI engine](#wazir-drop-a-tournament-winning-board-game-ai-engine)
 - [The game](#the-game)
   - [Pieces](#pieces)
   - [Setup phase](#setup-phase)
@@ -12,9 +12,9 @@ online tournament. WazirDrop [won](https://www.codecup.nl/competition.php?comp=3
 - [GUI](#gui)
 - [Position representation](#position-representation)
 - [Move representation](#move-representation)
-- [Bootstrapping position evaluation](#bootstrapping-position-evaluation)
+- [Reinforcement learning](#reinforcement-learning)
   - [Evaluation as logit](#evaluation-as-logit)
-  - [Reinforcement learning](#reinforcement-learning)
+  - [Training loop](#training-loop)
   - [Self play](#self-play)
   - [Training a model using tch](#training-a-model-using-tch)
   - [Simple material evaluation](#simple-material-evaluation)
@@ -72,19 +72,19 @@ The goal of the game is to capture the opponent wazir. That's like in chess, exc
 
 ## Setup phase
 
-Each player starts with 1 wazir, 2 ferzes, 4 dababbas, 1 knight and 8 alfils. The goal of the game is to capture the other wazir.
+Each player starts with 1 wazir, 2 ferzes, 4 dababbas, 1 knight and 8 alfils.
 
 Each player can set up the pieces in any order they want in the first two rows on their side of the board. Red goes first, then blue.
 
 ## Captures and drops
 
-Like in chess, you capture opponent pieces by landing on them. The difference is that after you capture an opponent piece, you can **drop** it onto any empty square as your own piece, in lieu of a regular move. This is similar to how shogi and crazyhouse are played.
+Like in chess, you capture opponent pieces by landing on them. The difference is that after you capture an opponent piece, you can later **drop** it onto any empty square as your own piece, in lieu of a regular move. This is similar to how shogi and crazyhouse are played.
 
 # GUI
 
 In order to be able to play against the engine, I created a graphical
 interface. Rather than using circles with numbers, I found it a lot easier to
-see what's going on if I use regular chess pieces (king = wazir, pawn = ferz, rook = dababba, bishop = alfil).
+see what's going on if I use regular chess pieces (king = wazir, pawn = ferz, rook = dababba, bishop = alfil) even though they move differently.
 
 ![GUI](images/gui.png)
 
@@ -101,7 +101,10 @@ pub struct Position {
 ```
 
 The board is represented by a simple square -> color/piece mapping, as well
-as a set of bitboards (for each piece, for each color, empty squares):
+as a set of bitboards:
+* occupied squares for each piece type of a given color
+* all squares occupied by a color
+* empty squares
 
 ```rust
 pub struct Board {
@@ -113,7 +116,7 @@ pub struct Board {
 }
 ```
 
-The captured pieces are just a count for each color/piece:
+The captured pieces are represented a count for each piece type:
 
 ```rust
 pub struct Captured {
@@ -126,7 +129,7 @@ pub struct CapturedOneSide {
 }
 ```
 
-Squares and pieces:
+Squares are represented by this funny enum:
 
 ```rust
 pub enum Square {
@@ -141,7 +144,7 @@ pub enum Square {
 }
 ```
 
-Why are squares represented as a large 64-element `enum` rather than a simple number such as `u8`? This is for memory efficiency. An enum tells the Rust compiler that only these 64 values are valid. This allows it to store `Option<Square>` in 1 byte: 0-63 to represent a square, 64 to represent `None`.
+Why are squares represented as a large 64-element `enum` rather than a simple number such as `u8`? This is for memory efficiency. An enum tells the Rust compiler that only these 64 values are valid. This allows the compiler to optimizer storage in some scenarios. For example it can store `Option<Square>` in 1 byte: 0-63 to represent a square, 64 to represent `None`.
 
 ```rust
 pub enum Color {
@@ -182,17 +185,17 @@ There are four types of moves:
 * jumps (piece moves that don't capture anything)
 * drops (put a previously captured piece back on the board)
 
-Setup moves are represented by just a list of pieces in order:
+Setup moves are represented by a simple list of 16 pieces in order:
 
 ```rust
 pub struct SetupMove {
     pub color: Color,
     // From square 0 or square 63.
-    pub pieces: [Piece; Self::SIZE],
+    pub pieces: [Piece; 16],
 }
 ```
 
-All other moves (jumps, captures and drops) are represented by this data type:
+All other moves (jumps, captures and drops) are represented by this 4-byte data type:
 ```rust
 pub struct Move {
     pub colored_piece: ColoredPiece,
@@ -205,13 +208,13 @@ pub struct Move {
 If `from` is `None`, we have a drop move. If `captured` is not `None`, we have
 a capture move.
 
-This structure contains more information than what is implied by the CodeCup notation. This makes it easier to make moves, recognize invalid moves during search, and allows for easier to read notation. For example, instead of `b3c4` I internally use notation such as `Fb3xwc4`, so that we know it is a ferz capturing the wazir.
+The `Move` structure contains more information than what is implied by the CodeCup move notation. This makes it easier to make moves, recognize invalid moves during search, and allows for easier to read notation. For example, instead of `b3c4` I use notation such as `Fb3xwc4` in my logs, so that we know it is a ferz capturing the wazir.
 
-# Bootstrapping position evaluation
+# Reinforcement learning
 
 To do any reasonable tree search, we need an evaluation function that can estimate who is winning and by how much in any given position. But how to build
-such a function? I had no idea how to play the game or how much the pieces are worth relative
-to each other. So I decided to have the evaluation function be trained from self-play games.
+such a function? I had no idea how much the pieces are worth relative
+to each other or how to approach positional evaluation. So I decided to have the evaluation function be trained entirely from self-play games using reinforcement learning.
 
 ## Evaluation as logit
 
@@ -222,24 +225,24 @@ If $v$ is the current evaluation, then we estimate win probability as:
 
 $$ p = \sigma(v) = \frac{1}{1 + e^{-v}}$$
 
-We treat draws as 50% win, 50% loss.
+We treat draws as equivalent to 50% win probability.
 
 ![sigmoid](images/sigmoid.svg)
 
 So reasonable evaluations are normally somewhere in the range of [-5, 5].
 
-In internal calculations, we usually scale these by a factor of 10 000 and use integer evaluations, so typically evaluations are in the range [-50 000, 50 000].
+In internal calculations, we usually scale these by a factor of 10,000 and round to an integer which gives 4 digits of precision in [-5.0000, 5.0000].
 
-## Reinforcement learning
+## Training loop
 
-So how we do train an evaluation function? By having the program play against itself and learning from those games.
+So how we do train an evaluation function? By having the program play against itself and learn from those games.
 
 1. Take the current evaluation model.
 2. Collect a lot of game positions and their evaluations using [self play](#self-play).
-3. Train a new model.
+3. Train a new model based on in-game tree search and game results.
 4. Go to 1.
 
-This approach is a kind of reinforcement learning, more specifically: Expert Iteration.
+This approach is a type of reinforcement learning, more specifically: Expert Iteration.
 
 I went through many iterations using multiple different models:
 * [simple material evaluation](#simple-material-evaluation)
@@ -247,26 +250,26 @@ I went through many iterations using multiple different models:
 * linear model with [wazir-piece-square features](#wazir-piece-square-features)
 * [neural network](#nnue-efficiently-updateable-neural-network)
 
-The last model, using the neural network was trained over 7 iterations of the training process.
+The last model, with the neural network, was trained over 7 iterations of the training process.
 
 I ran the last iteration when I went away for a skiing trip for a week. Playing 100 million games took 8 days on a 32-core workstation, and then it took 1 more day to train the model using that data.
 
 ## Self play
 
-The goal of self play was to gather a diverse set of reasonable positions, and get their evaluations better than what the current evaluation function
-can give us. We also generally want *quiet* positions, meaning positions in which captures aren't important. That's because our search can deal with captures anyway, we just want to be able to evaluate the resulting final positions after such sequences of captures.
+The goal of self play was to gather a diverse set of positions, and get their evaluations more accurate than what the current evaluation function
+can give us. We also generally want *quiet* positions, meaning positions in which captures aren't imminent. That's because our [tree search](#tree-search) will deal with captures anyway. We just want to be able to evaluate the resulting final positions after such sequences of captures.
 
 Here is what I did:
-1. Start with completely random setups.
+1. Start each game with completely random initial setups. That is not entirely realistic, but good enough.
 2. Do a depth 4 [tree search](#tree-search).
 3. Select the position at the end of the [best variation](https://www.chessprogramming.org/Principal_Variation) from the search. This will generally be a quiet position because of [quiescence search](#quiescence-search).
-4. Do another, deeper search (extra 4 ply) to evaluate the selected position well.
+4. Do another, deeper search (extra 4 ply) to evaluate the selected position more accurately.
 5. At the root position, pick a move and play it.
-6. Go to 2.
+6. If the game is not finished, go to 2.
 
-All the positions selected in step 3 are stored in the output dataset, along with their deeper evaluations and game results.
+All the positions selected in step 3 are stored in the generated dataset, along with their deeper evaluations and game results.
 
- To get some extra variation in the games beyond just the starting positions, I don't always pick the best move. Instead, I randomly pick a move, with better moves having higher probabilities, according to [soft max](https://en.wikipedia.org/wiki/Softmax_function) with a temperature $T$:
+ To get some extra variation in the games beyond just the random starting positions, I don't always pick the best move in step 5. Instead, I randomly pick a move, with better moves having higher probabilities according to the [soft max](https://en.wikipedia.org/wiki/Softmax_function) distribution with a temperature $T$:
 
  $$ p_i = \frac{e^{v_i / T}}{\sum_i e^{v_i / T}} $$
 
@@ -274,9 +277,9 @@ All the positions selected in step 3 are stored in the output dataset, along wit
 
 I trained all models using the [tch](https://crates.io/crates/tch) crate which is a Rust wrapper around for [PyTorch](https://pytorch.org/).
 
-I pass through the dataset multiple times, in random order, and use the [Adam optimizer](https://docs.pytorch.org/docs/stable/generated/torch.optim.Adam.html) with [cross entropy loss](https://docs.pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html).
+I pass through the dataset around 5-10 times, in random order, and use the [Adam optimizer](https://docs.pytorch.org/docs/stable/generated/torch.optim.Adam.html) with the [binary cross entropy loss](https://docs.pytorch.org/docs/stable/generated/torch.nn.BCEWithLogitsLoss.html) function.
 
-The target value we're trying to learn is a linear combination of deeper evaluation and actual game result. If $v_i$ is the deeper evaluation and $r_i$ is game result (0, 0.5 or 1), the target values are:
+The target value we're trying to learn is a linear combination of deeper evaluation and actual game result. If $v_i$ is the deep evaluation of a position, and $r_i$ is the game result (0, 0.5 or 1), the target values are:
 
 $$ y_i = (1 - \lambda) v_i + \lambda r_i $$
 
@@ -284,7 +287,8 @@ where $\lambda$ is normally set to 0.1.
 
 ## Simple material evaluation
 
-But where do we begin the training process? I only had a very rough idea how to evaluate positions, I didn't even know which pieces are worth more than others. So I decided to just start with the simplest thing possible:
+But where do we begin the expert iteration learning loop? We need an initial "expert" to start with. I only had a very rough idea how to evaluate positions, I didn't even know which pieces are worth more than others. So I decided to just start with the simplest evaluation possible that I could
+come up with:
 
 * every piece on the board gets value 0.1
 * every captured piece also gets value 0.1
@@ -294,12 +298,12 @@ That's it. That was the only evaluation function that I created manually.
 ## Linear model with piece-square features
 
 The next step was a linear model with piece-square features. The evaluation is a linear combination of the following features:
-* 1 feature for each piece type / square combination
-* 1 feature for each captured piece type and its number
+* 50 features per side for each piece type / square combination
+* 30 feature per side for each captured piece type and its number
 * 1 feature for side to move (tempo bonus)
 
 There are 64 squares, but because the rules of the game are symmetric
-to rotations and reflections of the board, we only have 10 different "normalized squares":
+to rotations and reflections of the board, we only use 10 different "normalized squares". For example, each corner square gets the same weight.
 
 ```rust
 pub enum NormalizedSquare {
@@ -310,8 +314,7 @@ pub enum NormalizedSquare {
 }
 ```
 
-In total we have 80 possible features for each side: 50 for pieces on the board, 30 for captured pieces. Plus a bonus for side to move.
-
+These are the actual learned values:
 ```rust
 pub static SCALE: f64 = 1000.0;
 pub static TO_MOVE: i16 = 352;
@@ -345,13 +348,12 @@ is much more valuable than more captured pieces of the same type.
 
 ## Wazir-piece-square features
 
-For the next, bigger model we still use a linear combination of features, but this time consider a larger set of features. I realized that piece values are very strongly dependend on where the wazirs are. We want to be attacking the opponent wazir, and protecting our own wazir. So we have features for each wazir position in combination with each other piece position (of the same or opposite color). But first we rotate and/or reflect the board so that the wazir square is normalized. 
+For the next, bigger model we still use a linear combination of features, but this time consider a larger set of features. I realized that piece values are very strongly dependent on where the wazirs are. We want to be attacking the opponent wazir and protecting our own wazir. So we have features for each combination of wazir square plus some other piece square (of the same or opposite color). But first we rotate and/or reflect the board so that the wazir square is normalized. 
 
 There are in total 6360 features per side:
-* 1 feature for each wazir position and other piece type and position. Total: 10 * 9 * 64 = 5760 features.
-* 1 feature for each wazir position and capture piece type and number. Total: 600 features.
-
-Plus a bonus for side to move.
+* 10 * 9 * 64 = 5760 features for each wazir square and other piece type, color and square.
+* 600 features for each wazir square and captured piece type and number.
+* a tempo bonus for side to move.
 
 Let's look at some of the weights: when a wazir is in A1 corner, here are the values for a
 same-colored alfil:
@@ -369,7 +371,7 @@ same-colored alfil:
       56,   17,   93,   94,   98,   51,   93,  112,
 ```
 
-Having an alfil right next to our own wazir actually has **negative** value! The alfil is blocking a potential escape square.
+Having an alfil right next to our own wazir (here is the top-left corner) actually has **negative** value! The alfil next to the wazir would just be blocking a potential escape square.
 
 # NNUE: efficiently updateable neural network
 
@@ -377,50 +379,50 @@ The final model uses the same [wazir-piece-square](#wazir-piece-square-features)
 
 ![NNUE](images/nnue.svg)
 
-The first layer is an embedding layer. Each of the 6360 features per side has a corresponding length 128 embedding vector, and those vectors are added together. The weights are shared between the two sides.
+The first layer is an embedding layer. Each of the 6,360 features per side has a corresponding length 128 embedding vector, and those vectors are added together. The weights of the embedding layer are shared between the two sides.
 
-This first layer contains the vast majority of weights: 814 208. The other layers have much fewer weights (just 2641). This, plus the fact that the features are sparse and can be updated incrementally, is what defines a [NNUE](https://en.wikipedia.org/wiki/Efficiently_updatable_neural_network).
+This first layer contains the vast majority of weights: 814,208. The other layers have much fewer weights (just 2,641 total). This, plus the fact that the features are sparse and can be updated incrementally, is what defines a [NNUE](https://en.wikipedia.org/wiki/Efficiently_updatable_neural_network). It allows for very efficient inference.
 
-The resulting vectors are clipped to [0, 1] range in each hidden layer, i.e.
-we use the [Clipped ReLU](https://en.wikipedia.org/wiki/Rectified_linear_unit) (CReLU) activation functions.
+The resulting vectors are clipped to the [0, 1] range in each hidden layer, i.e.
+we use the [Clipped ReLU](https://en.wikipedia.org/wiki/Rectified_linear_unit) (CReLU) activation function.
 
-The two length 128 vectors are then concatenated, and then we have 2 more hidden layers with sizes 16 and 32, and finally the output layer with just 1 value, the position evaluation.
+The two length 128 vectors are concatenated, and then we have 2 more hidden layers with sizes 16 and 32, and finally the output layer with just 1 value, the position evaluation.
 
 
 ## Accumulator update
 
-The first layer would be computationally expensive to evaluate, but there are two aspects that make it much easier.
+The first layer would be computationally expensive to evaluate, but there are two aspects that make it much a lot easier.
 
-First, the features are *sparse*. Out of the 12720 features, exactly 32 are active because that's how many pieces are on the board (or captured). So evaluating the first layer comes down to adding 32 vectors.
+First, the features are *sparse*. Out of the 12,720 features for both sides, exactly 32 are active because that's how many pieces are always on the board or captured. So evaluating the embedding layer comes down to adding 32 vectors.
 
-Additionally there is an extra optimization. When we make a move, only up to 4 features change:
+Additionally there is an extra optimization: we can compute the embedding incrementally. When we make a move, only up to 4 features typically change:
 
 * a piece is removed from the source square (or captured list when dropped)
 * a piece is inserted in its destination square
 * a captured piece is removed
 * a captured piece is added to the captured list
 
-So we can update the first hidden layer (which we call the accumulator) incrementally. On every move we only have to subtract 2 vectors and add 2 vectors.
+So we can update the embedding layer (which we call the accumulator) incrementally. On every move we only have to subtract up to 2 vectors and add 2 vectors.
 
-The only exception is wazir moves. When the wazir moves, all the features for one side change. In that case, we refresh the accumulator, meaning we have to add up to 32 (16 on average) vectors.
+The only exception is wazir moves. When the wazir moves, all the features for one side change. In that case we refresh the accumulator, meaning we have to add up to 32 (16 on average) vectors.
 
 ## Quantization and SIMD
 
-During the CodeCup tournament, only a single CPU was available to each player. We use x86-64 SIMD instructions to evaluate the network efficiently. Unfortunately we couldn't use dedicated AVX2 VNNI specialized for neural networks because the CPU used for the tournament didn't implement those. So we had to make do with older SSE instructions.
+During the CodeCup tournament, only a single CPU was available to each player. We use x86-64 SIMD instructions to evaluate the network efficiently. Unfortunately we couldn't use dedicated AVX2 VNNI instructions specialized for neural networks because the CPU used for the tournament didn't implement those. So we had to make do with older SSE instructions.
 
 A crucial SIMD instruction is [PMADDUBSW](https://www.felixcloutier.com/x86/pmaddubsw) which can do 16 single byte multiplications in a 128-bit SIMD register.
 
-So we want to store our values and weights in single bytes. All our are scaled and quantized to integers in the range [-127, 127].
+So we want to store our values and weights in single bytes. All our weights are scaled and quantized to integers in the range [-127, 127].
 
-The weights in the first layer is scaled by a factor of 127, so the weights correspond to embeddings in [-1, 1] range.
+The weights in the first layer is scaled by a factor of 127, so the embeddings are in the [-1, 1] range.
 
 The weights in the second layer (256 -> 16) are scaled by a factor of 256. So it only supports weights in the range [-0.49, 0.49]. We clip all weights to this range during training.
 
 The next layer (16 -> 32) is scaled by a factor of 64, so we support weights in the range [-1.98, 1.98].
 
-The weights in the final layer are scaled by a factor of 10000 / 127 = 78.7, so there we support weights in the range [-1.61, 1.61].
+The weights in the final layer are scaled by a factor of 10,000 / 127 = 78.7, so there we support weights in the range [-1.61, 1.61].
 
-This way the evaluation is an integer scaled by a factor of 10000: logit 1 corresponds to the value 10000.
+This way the final evaluation as an integer is scaled by a factor of 10,000: logit 1 corresponds to the value 10,000.
 
 # Move generation
 
@@ -430,7 +432,7 @@ We can generate all possible setup moves by permuting the 16 pieces. The number 
 
 $$ \frac{16!}{8!\ 4!\ 2!\ 1!\ 1!} = 10,\!810,\!800$$
 
-During actual gameplay this function is never used however. Instead, we use the [opening book](#opening-book).
+During actual gameplay this function is never used however, it would be too slow. Instead, we use the [opening book](#opening-book).
 
 ## Pseudomoves vs regular moves
 
@@ -438,36 +440,36 @@ Game rules don't technically distinguish "checks" and allow the wazir to move in
 
 ## Check evasions
 
-When the wazir is in check, the only move we consider are check evasions. These
+When the wazir is in check, the only moves we consider are check evasions. These
 are (generated in this order):
 * capture the checking piece
-* wazir captures
-* wazir jumps
+* move the wazir with a capture
+* move the wazir without a capture
 
 ## Checks
 
-We generate checks separately. A jump check always moves a piece from a square two moves away from the opponent wazir to a square one move away from the opponent wazir. To generate checks quickly, we have these sets of squares precomputed for each piece type and each square for the opponent wazir.
+We generate checks separately. A jump check always moves a piece from a square two moves away from the opponent wazir to a square one move away from the opponent wazir. To generate checks quickly, we have these sets of squares precomputed for each piece type and each square of the opponent wazir.
 
 ## Check threats
 
-We also generate check **threats** separately. Those are move that threaten to
-give a check next move. Jump checks move a piece from a square *three* moves away from the opponent wazir to a square *two* moves away from the opponent wazir.
+We also generate check **threats** separately. Those are moves that threaten to
+give a check next move. Jump checks move a piece from a square *three* moves away from the opponent wazir to a square *two* moves away from the opponent wazir. So we also precompute sets of squares three moves away.
 
 ## Escape square attacks
 
 Another kind of move we generate separately are "escape square attacks". Those are moves that attack a square that is next to the opponent wazir, restricting
-its future escape paths. For this, for each piece and square, we precompute the set of squares that are reachable from a given square by:
-* a wazir move + one piece move; these are the destination squares of escape square attacks
-* a wazir move + two piece moves; these are the "from" squares of such attacks
+its future escape paths. To generate these efficiently, for each piece type and wazir square we precompute the set of squares that are reachable in:
+* one wazir move + one piece move; these are the destination squares of escape square attacks
+* one wazir move + two piece moves; these are the "from" squares of such attacks
 
 
 # Tree search
 
-We use a variant of alpha-beta search called [Principal Variation Search](https://en.wikipedia.org/wiki/Principal_variation_search).
+We use a variant of alpha-beta search ([Principal Variation Search](https://en.wikipedia.org/wiki/Principal_variation_search)).
 
 ## Quiescence search
 
-When we reach the full search depth, we keep searching some moves in what's called [quiescence search](https://en.wikipedia.org/wiki/Quiescence_search). In this phase we only consider check escapes and captures.
+When we reach the full search depth, we keep searching some extra moves in what's called [quiescence search](https://en.wikipedia.org/wiki/Quiescence_search). In this phase we only consider check escapes and captures.
 
 ## Move ordering
 
@@ -479,12 +481,12 @@ When not in check, we generate moves in the following order:
 5. Piece drop escape square attacks
 6. Jump checks
 7. Jump escape square attacks
-8. Other jumps
-9. Other drops
+8. All other "boring" jumps
+9. All other "boring" drops
 
 ## Transposition table
 
-The transposition table stores information about positions that have previously been searched with their score, depth searched, etc.
+The transposition table stores information about positions that have previously been searched with their score, depth searched, best move, etc.
 
 ```rust
 pub struct TTable {
@@ -517,17 +519,17 @@ enum TTableScoreType {
 
 [Check extension](https://www.chessprogramming.org/Check_Extensions): every time there is a check we extend search 1 ply deeper. This allows searching forcing sequences with checks deeper.
 
-[Null move pruning](https://www.chessprogramming.org/Null_Move_Pruning): if a position looks good for the side to move (evaluation > beta + 0.1), we try a null move and search 1 ply shallower. If this results in a beta cutoff, just use it.
+[Null move pruning](https://www.chessprogramming.org/Null_Move_Pruning): if a position looks good for the side to move (evaluation > beta + 0.1), we try a null move and search 1 ply shallower. If this results in a beta cutoff, just consider the position too good to require full depth search.
 
-[Futility pruning](https://www.chessprogramming.org/Futility_Pruning): at depth = 1, if evaluation looks bad (evaluation < alpha - 0.6), we don't even try boring moves (non-captures and non-checks).
+[Futility pruning](https://www.chessprogramming.org/Futility_Pruning): at depth = 1, if evaluation looks bad (evaluation < alpha - 0.6), we don't even try boring moves (non-captures and non-checks) because they are unlikely to help.
 
-[Late move reductions](https://www.chessprogramming.org/Late_Move_Reductions): at depth > 1, we search boring moves (other than the first 5) 1 ply shallower. If they turn out to be good move, we search again with full depth.
+[Late move reductions](https://www.chessprogramming.org/Late_Move_Reductions): at depth > 1, we search boring moves (other than the first 5) 1 ply shallower that normal. If they turn out to be good move, we search again with full depth.
 
 # Time allocation
 
 The basic time allocation uses a simple geometric sequence. Each next move gets 5% less time than the previous.
 
-One adjustment to this is *panic mode*. When the evaluation of the best move found so far drops by a significant amount (0.04) from the previous lower depth, we allocate up to 5x more time to try to find a better alternative move.
+One adjustment to this is *panic mode*. When the evaluation of the best move found so far drops by a significant amount (0.04) from what we thought the value was at the previous lower depth, we allocate up to 5x more time to try to find a better alternative move.
 
 # Repetitions
 
@@ -535,7 +537,7 @@ It's easy to fall into an infinite cycle when playing the game. In [this game](h
 
 To avoid this kind of behavior, after this game I added a simple repetition detection. In tree search, any repetition is automatically considered a draw without further search. So if we have an advantage, we try to avoid repetitions.
 
-To detect repetition we store the history of position hashes, *and* a [Bloom filter](https://en.wikipedia.org/wiki/Bloom_filter) to make lookups faster.
+To detect repetition we store the history of position hashes, and a [Bloom filter](https://en.wikipedia.org/wiki/Bloom_filter) to make lookups faster.
 
 ## Optimism factor
 
@@ -566,9 +568,9 @@ After 3 or 4 iterations this process converges. Then we do one more iteration, b
 
 We do a tree search for each of the 50,000 reasonable red setups, while only considering reasonable setups as blue responses.
 
-The we take the top 20,000 red openings and search those 1 ply deeper. The take the top 8,000 and search 1 ply deeper still. Etc.
+The we take the top 20,000 red openings and search those 1 ply deeper. Then take the top 8,000 and search 1 ply deeper still. Etc.
 
-In the end, over the course of 24 hours, I computed:
+In the end, over the course of 24 hours I computed:
 
 * 20,000 setups to depth 11
 * 8,000 setups to depth 12
@@ -581,25 +583,25 @@ In the end, over the course of 24 hours, I computed:
 
 ## How we play in the opening phase
 
-If we're playing red, I just used the top setup in the final tournament. It evaluated to about -0.03 for red. We could be a bit more unpredictable and select randomly among the top setup moves. That's what I did in earlier tournaments.
+If we're playing red, I just always used the same top setup in the final tournament. It evaluated to about -0.03 for red. We could be a bit more unpredictable and select randomly among the top setup moves. That's what I did in earlier tournaments.
 
 If we're playing blue, then if the opponent is reasonably good, they will probably use one of the top 20,000 setups. Then we just immediately play the pre-computed response.
 
-If they play a setup not in the book, then I already have a big advantage. In this case we just do a tree search, treating the 20000 setups in the book as possible responses.
+If they play a setup not in the book then we already have a big advantage. In this case we just do a tree search, treating only the 20,000 setups in the book as possible responses.
 
 # Data compression
 
 The rules of the tournament required putting all the code and data in one source code file with a size limit of 1,474,560 bytes. My final submission was pretty close to this limit: 1,275,891 bytes. This required some compression.
 
-I stored the neural network weights and the opening book as very long [raw string literals](https://doc.rust-lang.org/reference/tokens.html#grammar-RAW_STRING_LITERAL) in the source code. These literals have restrictions:
+I stored the neural network weights and the opening book as very long [raw string literals](https://doc.rust-lang.org/reference/tokens.html#grammar-RAW_STRING_LITERAL) in the source code. These literals can't just store any random bytes. They have restrictions:
 
 * they can only store valid Unicode codepoints, encoded as [UTF-8](https://en.wikipedia.org/wiki/UTF-8)
-* The CR (U+000D) character is not allowed (to avoid issues in different end-of-line conventions between opearting systems)
-* The quote character (`"`) is allowed but causes complications, so I avoided it.
+* The CR (U+000D) character is not allowed (to avoid issues in different end-of-line conventions between operating systems)
+* The quote character (`"`) is allowed but causes escaping complications, so I avoided it.
 
 ## Base 128 encoding in UTF-8
 
-First thinking was that I could just use ASCII characters. But if I want to avoid CR and `"`, I'm reduced to 126 characters per byte. I could work with that, but a power of 2 would be nicer, so that I just give put a constant number of bits per byte.
+The first idea was that I could just use ASCII characters. But if I want to avoid CR and `"`, I'm reduced to 126 possible characters per byte. I could work with that, but a power of 2 would be nicer so that I just give put a constant number of bits per byte.
 
 I could just use 64 ASCII characters per byte. That would let me use 6 bits per byte. That's [Base64](https://en.wikipedia.org/wiki/Base64) encoding.
 
@@ -612,13 +614,13 @@ In UTF-8:
 * ASCII characters 0-127 are encoded in a single byte: `0xxxxxxx` in binary.
 * Characters 128-2047 are encoded in two bytes: `110xxxxx 10xxxxxx`. That gives me 11 bits of "payload" per two bytes.
 
-So I use the two-byte encodings to encode some sequences of two 7-bit values. The top 4 bits encode the first value, and the bottom 7-bits encode the second value.
+So I use the two-byte sequences to encode some sequences of two 7-bit values. The top 4 bits encode the first value and the bottom 7-bits encode the second value.
 
 We want to avoid certain combinations of the top 4 bits:
 
-* we can't use 0000 because that would be an "overlong encoding" of an ASCII character 0-127, which is not allowed in UTF-8.
-* we don't want to use 0001 because that corresponds to some special Unicode control characters in the range U+0080 .. U+009F, I just didn't want to have those in my files because they mess up how the files look in my text editor
-* we don't want to use 1100 in order to avoid the U+61C character: ARABIC LETTER MARK, which switches the text display from left-to-right to right-to-left, *really* messing up how the string looks in the text editor
+* We can't use 0000 because that would be an ["overlong encoding"](https://en.wikipedia.org/wiki/UTF-8#Overlong_encodings) of an ASCII character 0-127, which is not allowed in UTF-8.
+* We don't want to use 0001 because that corresponds to some special Unicode control characters in the range U+0080 .. U+009F. I just didn't want to have those in my files because they mess up how the files look in my text editor.
+* We don't want to use 1100 in order to avoid the U+61C character: ARABIC LETTER MARK, which switches the text display from left-to-right to right-to-left, *really* messing up how the string looks in the text editor.
 
 But that still leaves us with 13 extra values to work with. I used 9 of them to replace certain ASCII control characters: NUL, backspace, tab, LF, VT, FF, CR, ESC and `"`.
 
@@ -637,7 +639,7 @@ Now that we can encode bits in a string literal, we can use that to encode neura
 
 ## Encoding setup moves
 
-Setup moves in the opening book are encoded using Huffman code. We could actually create a *perfect* Huffman code for this because all initial piece counts happen to be powers of 2. The length of each code for a piece is exactly proportional to its frequency.
+Setup moves in the opening book are encoded using a [Huffman code](https://en.wikipedia.org/wiki/Huffman_coding). We could actually create a *perfect* Huffman code for this because all initial piece counts happen to be powers of 2 and the total number of pieces is also a power of 2. The length of each code for a piece is exactly proportional to the logarithm of its frequency.
 
 * alfils are encoded as `0`
 * dababbas are encoded as `10`
