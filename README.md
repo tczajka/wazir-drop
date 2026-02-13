@@ -430,7 +430,7 @@ This way the final evaluation as an integer is scaled by a factor of 10,000: log
 
 We can generate all possible setup moves by permuting the 16 pieces. The number of such moves is:
 
-$$ \frac{16!}{8!\ 4!\ 2!\ 1!\ 1!} = 10,\!810,\!800$$
+$$ \frac{16!}{8!\ 4!\ 2!\ 1!\ 1!} = 10810800$$
 
 During actual gameplay, this function is never used, however, as it would be too slow. Instead, we use the [opening book](#opening-book).
 
