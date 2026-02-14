@@ -393,7 +393,7 @@ The two length 128 vectors are concatenated, and then we have 2 more hidden laye
 
 The first layer would be computationally expensive to evaluate, but there are two aspects that make it much easier.
 
-First, the features are *sparse*. Out of the 12,720 features for both sides, exactly 32 are active because that's how many pieces are always on the board or captured. So evaluating the embedding layer comes down to adding 32 vectors.
+First, the features are *sparse*. Out of the 6,360 features for each sides, exactly 31 are active because that's how many pieces (other than our wazir) are always on the board or captured. So evaluating the embedding layer comes down to adding 31 vectors.
 
 Additionally there is an extra optimization: we can compute the embedding incrementally. When we make a move, only up to 4 features typically change:
 
@@ -404,7 +404,7 @@ Additionally there is an extra optimization: we can compute the embedding increm
 
 So we can update the embedding layer (which we call the accumulator) incrementally. On every move we only have to subtract up to 2 vectors and add 2 vectors.
 
-The only exception is wazir moves. When the wazir moves, all the features for one side change. In that case we refresh the accumulator, meaning we have to add up to 32 (16 on average) vectors.
+The only exception is wazir moves. When the wazir moves, all the features for one side change. In that case we refresh the accumulator, meaning we have to add 31 vectors.
 
 ## Quantization and SIMD
 
