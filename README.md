@@ -299,7 +299,7 @@ That's it. That was the only evaluation function that I created manually.
 
 The next step was a linear model with piece-square features. The evaluation is a linear combination of the following features:
 * 50 features per side for each piece type / square combination
-* 30 feature per side for each captured piece type and its number
+* 30 features per side for each captured piece type and its number
 * 1 feature for side to move (tempo bonus)
 
 There are 64 squares, but because the rules of the game are symmetric
