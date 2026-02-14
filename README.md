@@ -393,7 +393,7 @@ The two length 128 vectors are concatenated, and then we have 2 more hidden laye
 
 The first layer would be computationally expensive to evaluate, but there are two aspects that make it much easier.
 
-First, the features are *sparse*. Out of the 6,360 features for each sides, exactly 31 are active because that's how many pieces (other than our wazir) are always on the board or captured. So evaluating the embedding layer comes down to adding 31 vectors.
+First, the features are *sparse*. Out of the 6,360 features for each side, exactly 31 are active because that's how many pieces (other than our wazir) are always on the board or captured. So evaluating the embedding layer comes down to adding 31 vectors.
 
 Additionally there is an extra optimization: we can compute the embedding incrementally. When we make a move, only up to 4 features typically change:
 
