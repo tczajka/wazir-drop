@@ -371,7 +371,7 @@ same-colored alfil:
       56,   17,   93,   94,   98,   51,   93,  112,
 ```
 
-Having an alfil right next to our own wazir (here is the top-left corner) actually has **negative** value! The alfil next to the wazir would just be blocking a potential escape square.
+Having an alfil right next to our own wazir (here in the top-left corner) actually has **negative** value! The alfil next to the wazir would just be blocking a potential escape square.
 
 # NNUE: efficiently updateable neural network
 
