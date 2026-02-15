@@ -36,6 +36,7 @@ online tournament. WazirDrop took [first place](https://www.codecup.nl/competiti
   - [Transposition table](#transposition-table)
   - [Miscellaneous improvements](#miscellaneous-improvements)
 - [Time allocation](#time-allocation)
+- [Hyperparameter tuning](#hyperparameter-tuning)
 - [Repetitions](#repetitions)
   - [Optimism factor](#optimism-factor)
 - [Opening book](#opening-book)
@@ -530,6 +531,22 @@ enum TTableScoreType {
 The basic time allocation uses a simple geometric sequence. Each next move gets 5% less time than the previous.
 
 One adjustment to this is *panic mode*. When the evaluation of the best move found so far drops by a significant amount (0.04) from what we thought the value was at the previous lower depth, we allocate up to 5x more time to try to find a better alternative move.
+
+# Hyperparameter tuning
+
+There are several hyperparameters in the program: null move pruning margin, futility pruning margin, time allocation parameters, etc.
+
+I tuned their values using an automated random search procedure that took another 24h compute time.
+
+We could tune one parameter at a time: tweak it, see if the resulting program plays better, etc.
+
+Instead, I used a faster procedure that tunes all the parameters at the same time. The algorithm is called SPSA, or [Simultaneous perturbation stochastic approximation](https://en.wikipedia.org/wiki/Simultaneous_perturbation_stochastic_approximation).
+
+The idea is that we randomly modify *all* the hyparameters at the same time. Suppose we have a vector of hyperparameters $h$. We pick a small random delta vector, $\Delta h$, and build two programs: one using parameters $h + \Delta h$ and one using parameters $h - \Delta h$. Have them play a game against each other. Whichever wins, adjust the parameters slightly in that direction: $h \pm \epsilon \Delta h$.
+
+Over time, each hyparameter will improve because game winners will be correlated with that parameter changing in the appropriate direction.
+
+The SPSA algorithm describes how we should be decreasing the size of $\Delta h$ and step sizes $\epsilon$ so that the procedure converges to optimal hyperparameter values.
 
 # Repetitions
 
